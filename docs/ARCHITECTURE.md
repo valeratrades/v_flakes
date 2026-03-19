@@ -2,18 +2,6 @@
 
 v-utils is a Nix flake providing reusable components for project configuration. Each module is independent and composable.
 
-## Module Overview
-
-```
-.
-├── files/           # File templates (gitignore, treefmt, rustfmt, etc.)
-├── github/          # GitHub integration (workflows, hooks, labels)
-├── rs/              # Rust project configuration
-├── readme_fw/       # README generation framework
-├── utils/           # Shared utilities
-└── best_practices/  # Documentation guidelines
-```
-
 ## Module Dependencies
 
 ```
