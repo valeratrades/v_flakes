@@ -133,10 +133,21 @@ let
 
   exCmd = pkgs.writeShellScriptBin "ex" ''
     set -euo pipefail
-    # Append .excalidraw to the positional file arg if missing
+    # Append .excalidraw to positional file arg if missing.
+    # Skip option values (args following -b/--browser or -l/--library).
     args=()
+    skip_next=false
     for arg in "$@"; do
-      if [[ "$arg" != -* && "$arg" != *.excalidraw ]]; then
+      if $skip_next; then
+        skip_next=false
+        args+=("$arg")
+        continue
+      fi
+      case "$arg" in
+        -b|--browser|-l|--library) skip_next=true; args+=("$arg"); continue ;;
+        -*) args+=("$arg"); continue ;;
+      esac
+      if [[ "$arg" != *.excalidraw ]]; then
         arg="$arg.excalidraw"
       fi
       args+=("$arg")
@@ -162,5 +173,5 @@ let
 in
 {
   shellHook = npmCacheSetup;
-  enabledPackages = [ pkgs.nodejs pkgs.xdg-utils exCmd exToMdCmd mdToExCmd ];
+  enabledPackages = [ pkgs.nodejs exCmd exToMdCmd mdToExCmd ];
 }
