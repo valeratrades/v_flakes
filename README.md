@@ -32,7 +32,7 @@ README generation framework from `.readme_assets/` directory.
 ## Usage
 ```nix
 {
-  inputs.v-utils.url = "github:valeratrades/.github";
+  inputs.v-utils.url = "github:valeratrades/v_flakes";
 
   outputs = { self, nixpkgs, v-utils, ... }:
     let
