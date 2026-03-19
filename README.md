@@ -1,7 +1,7 @@
-# v_flakes
+# v-utils
 <br>
-[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
-[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
+[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v-utils/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/v-utils/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
+[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v-utils/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/v-utils/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 
 Collection of reusable Nix components for project configuration.
 
@@ -32,26 +32,26 @@ README generation framework from `.readme_assets/` directory.
 ## Usage
 ```nix
 {
-  inputs.v-flakes.url = "github:valeratrades/v_flakes?ref=v1.4";
+  inputs.v-utils.url = "github:valeratrades/.github";
 
-  outputs = { self, nixpkgs, v-flakes, ... }:
+  outputs = { self, nixpkgs, v-utils, ... }:
     let
       pkgs = import nixpkgs { system = "x86_64-linux"; };
       pname = "my-project";
 
-      rs = v-flakes.rs {
+      rs = v-utils.rs {
         inherit pkgs;
         tracey = true;
         style.format = true;
       };
 
-      github = v-flakes.github {
+      github = v-utils.github {
         inherit pkgs pname rs;
         langs = [ "rs" ];
         jobs.default = true;
       };
 
-      readme = v-flakes.readme-fw {
+      readme = v-utils.readme-fw {
         inherit pkgs pname;
         rootDir = ./.;
         lastSupportedVersion = "nightly-1.86";
@@ -60,7 +60,7 @@ README generation framework from `.readme_assets/` directory.
       };
 
       # Combine all modules - automatically collects enabledPackages and shellHook
-      combined = v-flakes.utils.combineModules [ rs github readme ];
+      combined = v-utils.utils.combineModules [ rs github readme ];
     in
     {
       devShells.default = pkgs.mkShell {

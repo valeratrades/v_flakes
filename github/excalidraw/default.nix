@@ -162,5 +162,5 @@ let
 in
 {
   shellHook = npmCacheSetup;
-  enabledPackages = [ pkgs.nodejs exCmd exToMdCmd mdToExCmd ];
+  enabledPackages = [ pkgs.nodejs pkgs.xdg-utils exCmd exToMdCmd mdToExCmd ];
 }
