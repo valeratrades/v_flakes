@@ -296,9 +296,8 @@ let
   semverChecks = preCommit.semverChecks or false;
 
   # Label sync runs in background to avoid blocking shell startup.
-  # stdout is suppressed; stderr passes through for mismatch reports and errors.
   labelSyncHook = if labelsEnabled then ''
-    (nohup ${git_ops}/bin/git_ops sync-labels >/dev/null &)
+    (nohup ${git_ops}/bin/git_ops sync-labels >/dev/null 2>&1 &)
   '' else "";
 in
 {
