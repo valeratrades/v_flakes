@@ -84,7 +84,8 @@ fn main() -> ExitCode {
   "appState": {
     "gridSize": null,
     "gridStep": 5,
-    "viewBackgroundColor": "#ffffff"
+    "theme": "dark",
+    "viewBackgroundColor": "#121212"
   },
   "files": {}
 }"##;

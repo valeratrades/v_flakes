@@ -135,7 +135,8 @@ let
         buildFile = makeBuildFile workspace.${dir};
         targetPath = normalizePath dir;
       in ''
-      install -m 644 ${buildFile} ${targetPath}
+      cp -f ${buildFile} ${targetPath}
+      chmod 644 ${targetPath}
       rustfmt --config-path ${buildRustfmtFile} ${targetPath}
     '') workspaceDirs)
   else "";

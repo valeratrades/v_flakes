@@ -297,7 +297,7 @@ let
 
   # Label sync runs in background to avoid blocking shell startup.
   labelSyncHook = if labelsEnabled then ''
-    (nohup ${git_ops}/bin/git_ops sync-labels >/dev/null 2>&1 &)
+    (${git_ops}/bin/git_ops sync-labels >/dev/null 2>/dev/null &)
   '' else "";
 in
 {
@@ -316,7 +316,8 @@ in
     export PATH="${rust}/bin:$PATH"
     ${cargoNightly} -Zscript -q ${./append_custom.rs} ./.git/hooks/pre-commit
     cp -f ${(files.gitignore { inherit pkgs; inherit langs; extra = gitignore.extra or "";})} ./.gitignore
-    cp -f ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
+    rm -f ./.git/hooks/custom.sh
+    cp ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
     ${labelSyncHook}
     ${if excalidrawModule != null then excalidrawModule.shellHook else ""}
     '')
