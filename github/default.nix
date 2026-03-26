@@ -15,6 +15,16 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   enable ? false,
 }:
 
+# Warn when enable-gated fields are explicitly passed but enable is false
+let
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "langs" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" ];
+  presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
+  warnIfNeeded = value:
+    if (!enable && presentGated != []) then
+      builtins.trace "WARNING [v_flakes.github]: `enable` is false but the following fields were explicitly set and will have no effect: ${builtins.concatStringsSep ", " presentGated}" value
+    else value;
+in
+
 # Priority: explicit params > rs module > defaults
 let
   # Extract rust toolchain from rs module
@@ -179,6 +189,10 @@ let
       errors = [];
       warnings = [];
     };
+    tex = {
+      errors = [];
+      warnings = [];
+    };
   };
 
   # Compute defaults based on langs
@@ -300,7 +314,7 @@ let
     (${git_ops}/bin/git_ops sync-labels >/dev/null 2>/dev/null &)
   '' else "";
 in
-{
+warnIfNeeded ({
   inherit workflows;
   inherit (workflows) errors warnings other;
 
@@ -329,4 +343,5 @@ in
     ++ (if semverChecks then [ pkgs.cargo-semver-checks ] else [])
     ++ (if excalidrawModule != null then excalidrawModule.enabledPackages else [])
   else [];
-} // (if enable then { inherit git_ops code_duplication; } else {})
+} // (if enable then { inherit git_ops code_duplication; } else {}))
+
