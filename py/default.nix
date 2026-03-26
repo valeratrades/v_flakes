@@ -2,7 +2,6 @@
   pkgs ? null,
   nixpkgs ? null,
   # config options
-  ruff ? true,
   venv_path ? ".devenv/state/venv",
   src_path ? "py_src",
 }:
@@ -14,7 +13,6 @@ Usage:
 ```nix
 py = v-utils.py {
   inherit pkgs;
-  ruff = true;       # Copy ruff.toml (default: true)
   venv_path = ".devenv/state/venv";  # Venv path for ty (default)
   src_path = "py_src";               # Source path for tools (default)
 };
@@ -29,9 +27,9 @@ devShells.default = pkgs.mkShell {
 ```
 
 The shellHook will:
-- Copy ruff.toml to ./ruff.toml (if ruff = true)
-- Generate pyproject.toml if one doesn't exist
-- Ensure tool sections (pytest, ty, inline-snapshot) are present in pyproject.toml
+- Copy ruff.toml to ./ruff.toml
+- Generate pyproject.toml with [build-system] if one doesn't exist
+- Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml
 '';
 } else
 
@@ -40,9 +38,44 @@ let
 
   ruffFile = files.python.ruff { inherit pkgs; };
 
-  ruffHook = if ruff then ''
-    cp -f ${ruffFile} ./ruff.toml
-  '' else "";
+  # Controlled tool sections for pyproject.toml
+  toolSections = {
+    tool.pytest.ini_options = {
+      typeguard-packages = src_path;
+    };
+    tool.ty.environment = {
+      python = venv_path;
+      extra-search-paths = [ src_path ];
+    };
+    tool.inline-snapshot = {
+      format-command = "ruff format --stdin-filename {filename}";
+    };
+  };
+
+  toolSectionsFile = (pkgs.formats.toml {}).generate "pyproject-tools.toml" toolSections;
+
+  # Controlled section prefixes — any [header] starting with these is ours to overwrite
+  controlledPrefixes = [ "tool.pytest" "tool.ty" "tool.inline-snapshot" ];
+
+  # awk script: strip sections whose headers match controlled prefixes, preserve everything else
+  awkScript = let
+    conditions = builtins.concatStringsSep " || " (
+      map (p: "index(header, \"[${p}\") == 1") controlledPrefixes
+    );
+  in pkgs.writeText "strip-sections.awk" ''
+    BEGIN { skip = 0 }
+    /^\[/ {
+      header = $0
+      gsub(/[[:space:]]*$/, "", header)
+      if (${conditions}) {
+        skip = 1
+        next
+      } else {
+        skip = 0
+      }
+    }
+    !skip { print }
+  '';
 
   pyprojectHook = ''
     if [ ! -f ./pyproject.toml ]; then
@@ -56,28 +89,18 @@ let
     PYPROJECT_EOF
       echo "Generated pyproject.toml"
     fi
-  '';
-
-  # Ensure each tool section exists in pyproject.toml, append if missing
-  ensureSection = header: content: ''
-    if ! grep -q '^\[${header}\]' ./pyproject.toml 2>/dev/null; then
-      printf '\n[${header}]\n${content}\n' >> ./pyproject.toml
-    fi
-  '';
-
-  toolSectionsHook = ''
-    ${ensureSection "tool.pytest.ini_options" "typeguard-packages = \"${src_path}\""}
-    ${ensureSection "tool.ty.environment" "python = \"${venv_path}\"\nextra-search-paths = [\"${src_path}\"]"}
-    ${ensureSection "tool.inline-snapshot" "format-command = \"ruff format --stdin-filename {filename}\""}
+    _pyproject_stripped=$(awk -f ${awkScript} ./pyproject.toml)
+    _pyproject_stripped=$(printf '%s' "$_pyproject_stripped" | sed -e :a -e '/^[[:space:]]*$/{ $d; N; ba; }')
+    printf '%s\n\n' "$_pyproject_stripped" > ./pyproject.toml
+    cat ${toolSectionsFile} >> ./pyproject.toml
   '';
 in
 {
   inherit ruffFile;
 
   shellHook = ''
-    ${ruffHook}
+    cp -f ${ruffFile} ./ruff.toml
     ${pyprojectHook}
-    ${toolSectionsHook}
   '';
 
   enabledPackages = [];
