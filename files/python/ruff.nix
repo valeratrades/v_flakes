@@ -6,7 +6,7 @@
   src = [ "src" "test" ];
   # not-in-test = false;
   # target-version = "py312";
-  # preview = true;
+  preview = true;
   # respect-gitignore = false;
 
   exclude = [
@@ -113,6 +113,8 @@
       "D100"  # Missing docstring in public module
       "D104"  # Missing docstring in public package
       "D105"  # Missing docstring in magic method
+      # keep checking if D210 (blank line after docstring) ever gets added to ruff. Currently they're bikeshedding to infinity, but worth keeping an eye on.
+      "D202"  # No blank lines allowed after function docstring (we want them)
       "D206" # conflicts with ruff formatter
       "D401"  # Relax NumPy docstring convention: First line should be in imperative mood
       "E262"  # no-space-after-inline-comment
