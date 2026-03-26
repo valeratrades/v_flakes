@@ -106,6 +106,9 @@
      ];
 
     ignore = [
+			"E111"  # Indentation is not a multiple of N — conflicts with tab indent-style
+			"E114"  # Indentation is not a multiple of N (comment) — same
+			"E117"  # Over-indented — same
 			"E261"  # Two spaces before inline comment
 			"E262"  # Inline comment should start with '# '
 			"E265"  # Block comment should start with '# '
@@ -135,7 +138,8 @@
       "TD003" # Missing issue link after TODO
       "TRY003" # Avoid long messages outside exception class
       "W191" # conflicts with ruff formatter
-      # "C408"  # Unnecessary `dict()` call
+      "C408"  # Unnecessary `dict()` call — {} and dict() are identical bytecode, pure bikeshed
+      "S311"  # `random` not suitable for crypto — if we needed crypto we wouldn't be writing python
       # "C901"  # Too complex
       # "D101"  # Missing docstring in public class
       # "D102"  # Missing docstring in public method
