@@ -1,7 +1,9 @@
-args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? ["rs"], gitignore ? {}, labels ? {}, preCommit ? {},
-  # Pass the rs module output to inherit style/tracey settings automatically
-  # Also provides the rust toolchain (rs.rust) — required when enable = true
+args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, labels ? {}, preCommit ? {},
+  # Pass language module outputs — langs is inferred from whichever are non-null
+  # rs also provides the rust toolchain (rs.rust) — required when enable = true
   rs ? null,
+  py ? null,
+  tex ? null,
   # Or override individually (these take precedence over rs)
   traceyCheck ? null, style ? null, styleFormat ? null, styleAssert ? null, moduleFlags ? null,
   # Top-level install applies to all job sections (errors, warnings, other, release)
@@ -17,7 +19,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "langs" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -27,6 +29,17 @@ in
 
 # Priority: explicit params > rs module > defaults
 let
+  # Infer langs from which language modules are passed
+  inferredLangs =
+    (if rs != null then [ "rs" ] else [])
+    ++ (if py != null then [ "py" ] else [])
+    ++ (if tex != null then [ "tex" ] else []);
+  #DEPRECATE: when everything has switched to new standard
+  effectiveLangs =
+    if langs != null then
+      builtins.trace "DEPRECATED [v_flakes.github]: `langs` is deprecated. Pass language modules directly instead (e.g. `inherit rs py tex;`)" langs
+    else inferredLangs;
+
   # Extract rust toolchain from rs module
   rust = if rs != null then (rs.rust or null) else null;
 
@@ -72,9 +85,9 @@ Usage:
 ```nix
 github = v-utils.github {
   enable = true;  # Enable CI workflows, pre-commit hooks, gitignore, label sync
-  inherit pkgs pname rs;  # rs provides rust toolchain; required when enable = true
+  inherit pkgs pname rs;  # Pass language modules — langs is inferred automatically
+  # inherit py tex;       # Pass any combination; langs = ["rs" "py" "tex"] inferred
   lastSupportedVersion = "nightly-1.86";
-  langs = [ "rs" ];  # For gitignore generation
   gitignore.extra = "_scripts/node_modules";  # Appended to generated .gitignore
 
   # Top-level install applies to all sections (errors, warnings, other, release)
@@ -200,7 +213,7 @@ let
     let
       langJobs = builtins.concatLists (map (lang:
         (defaultJobsByLang.${lang}.${category} or [])
-      ) langs);
+      ) effectiveLangs);
       shared = if category == "warnings" then sharedWarnings
                else if category == "other" then sharedOther
                else [];
@@ -325,16 +338,17 @@ warnIfNeeded ({
 
   shellHook = ''
     ${workflows.shellHook}
-    ${if enable then
-    (if rust == null then abort "github { enable = true; } requires `rs` with a rust toolchain (rs = v-utils.rs { inherit pkgs rust; ... })" else ''
+    ${if enable then ''
+    ${if rust != null then ''
     export PATH="${rust}/bin:$PATH"
     ${cargoNightly} -Zscript -q ${./append_custom.rs} ./.git/hooks/pre-commit
-    cp -f ${(files.gitignore { inherit pkgs; inherit langs; extra = gitignore.extra or "";})} ./.gitignore
     rm -f ./.git/hooks/custom.sh
     cp ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
+    '' else ""}
+    cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${labelSyncHook}
     ${if excalidrawModule != null then excalidrawModule.shellHook else ""}
-    '')
+    ''
     else ""}
   '';
 

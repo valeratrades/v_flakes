@@ -21,6 +21,8 @@ See individual component descriptions in their respective directories.'';
         files = (import ./files).description;
         github = (import ./github { inherit nixpkgs; }).description;
         rs = (import ./rs { inherit nixpkgs; }).description;
+        py = (import ./py { inherit nixpkgs; }).description;
+        tex = (import ./tex { inherit nixpkgs; }).description;
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
@@ -32,7 +34,6 @@ See individual component descriptions in their respective directories.'';
         #TODO: pass `rs` once this repo has a rust-overlay input
         github = (import ./github) {
           inherit pkgs pname;
-          langs = [];
           labels.extra = [];
         };
 
@@ -69,6 +70,12 @@ ${parts.github}
 ## Rust
 ${parts.rs}
 
+## Python
+${parts.py}
+
+## LaTeX
+${parts.tex}
+
 ## Readme Framework
 Generates README.md from .readme_assets/ directory structure.
 '';
@@ -76,6 +83,8 @@ Generates README.md from .readme_assets/ directory structure.
       files = import ./files;
       github = import ./github;
       rs = import ./rs;
+      py = import ./py;
+      tex = import ./tex;
       readme-fw = import ./readme_fw;
       utils = import ./utils;
 
