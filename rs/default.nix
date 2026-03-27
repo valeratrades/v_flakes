@@ -120,8 +120,12 @@ let
     if stripped == "." || stripped == "" then "./build.rs" else "${stripped}/build.rs";
 
   rustfmtFile = files.rust.rustfmt { inherit pkgs; };
-  configFile = files.rust.config { inherit pkgs cranelift targets; };
-  denyFile = files.rust.deny { inherit pkgs; };
+  configFile = files.rust.config {
+    inherit pkgs cranelift;
+    extend = if targets != {} then { target.augment = targets; } else {};
+  };
+  denyExtend = if builtins.isAttrs deny then deny else {};
+  denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
 
   # Generate a build file for each workspace directory with its specific modules
   makeBuildFile = modules: files.rust.build { inherit pkgs modules; };
@@ -141,7 +145,8 @@ let
     '') workspaceDirs)
   else "";
 
-  denyHook = if deny then ''
+  denyEnabled = if builtins.isBool deny then deny else deny != {};
+  denyHook = if denyEnabled then ''
     cp -f ${denyFile} ./deny.toml
   '' else "";
 

@@ -1,4 +1,6 @@
 let
+  core = import ./core.nix;
+
   # Helper to allow both `default` and `defaults` as aliases for the same attribute.
   # When one is provided, both are set to the same value. When neither is provided, neither is set
   # (allowing downstream `or` fallbacks to work correctly).
@@ -109,6 +111,7 @@ in
     '';
 
   inherit checkCrateVersion optionalDefaults;
+  inherit (core) mergeConfig;
 
   # Combine multiple v-utils modules into a single shell configuration
   # Extracts enabledPackages and shellHook from each module and combines them

@@ -4,6 +4,8 @@
   # config options
   venv_path ? ".devenv/state/venv",
   src_path ? "py_src",
+  # Deep-merged into ruff config. Lists are concatenated, attrsets recurse, scalars replace.
+  ruff ? {},
 }:
 if nixpkgs != null && pkgs == null then {
   description = ''
@@ -36,7 +38,7 @@ The shellHook will:
 let
   files = import ../files;
 
-  ruffFile = files.python.ruff { inherit pkgs; };
+  ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
   # Controlled tool sections for pyproject.toml
   toolSections = {
