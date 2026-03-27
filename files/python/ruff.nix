@@ -143,6 +143,7 @@ let
         "TRY003" # Avoid long messages outside exception class
         "W191" # conflicts with ruff formatter
         "C408"  # Unnecessary `dict()` call — {} and dict() are identical bytecode, pure bikeshed
+        "C420" # Unnecessary dict comprehension, use `fromkeys()`. - In reality much less readable and python-specific. Don't wanna.
         "S311"  # `random` not suitable for crypto — if we needed crypto we wouldn't be writing python
         # "C901"  # Too complex
         # "D101"  # Missing docstring in public class
