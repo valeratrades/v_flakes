@@ -162,7 +162,7 @@ let
         # "PD901" # `df` is a bad variable name
         # "RUF006" # Store a reference to the return value of `asyncio.create_task`
         # "RUF012" # Mutable class attributes should be annotated with `typing.ClassVar`
-        # "S101"  # Use of assert detected
+         "S101"  # Use of assert detected, will get optimized out when `-O` flag is present (usually prod). - But asserts are precisely for invariant upkeep. This seems like overreaching, - I'll leave errors for things that we **expect** to encounter eventually, not invarints we're guarding against
         # "S105"  # Possible hardcoded password
         # "S106"  # Possible hardcoded password
         # "S113"  # Probable use of requests call without timeout
