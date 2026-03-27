@@ -47,7 +47,7 @@ let
     };
     tool.ty.environment = {
       python = venv_path;
-      extra-search-paths = [ src_path ];
+      extra-paths = [ src_path ];
     };
     tool.inline-snapshot = {
       format-command = "ruff format --stdin-filename {filename}";
