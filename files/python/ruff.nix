@@ -145,28 +145,25 @@ let
         "C408"  # Unnecessary `dict()` call — {} and dict() are identical bytecode, pure bikeshed
         "C420" # Unnecessary dict comprehension, use `fromkeys()`. - In reality much less readable and python-specific. Don't wanna.
         "S311"  # `random` not suitable for crypto — if we needed crypto we wouldn't be writing python
-        # "C901"  # Too complex
-        # "D101"  # Missing docstring in public class
-        # "D102"  # Missing docstring in public method
-        # "D103"  # Missing docstring in public function
-        # "D107"  # Missing docstring in `__init__`
+         "C901"  # Too complex
+         "D101"  # Missing docstring in public class
+         "D102"  # Missing docstring in public method
+         "D103"  # Missing docstring in public function
+         "D107"  # Missing docstring in `__init__`
         # "D200"  # One-line docstring should fit on one line
-        # "D203"  # 1 blank line required before class docstring
-        # "D205"  # 1 blank line required between summary and description
-        # "D212"  # Multi-line docstring summary should start at first line
-        # "D400"  # First line should end with a period
-        # "D413"  # Missing blank line after last section
-        # "D415"  # First line should end with period/question/exclamation
+         "D203"  # 1 blank line required before class docstring
+         "D400"  # First line should end with a period
+         "D413"  # Missing blank line after last section
+         "D415"  # First line should end with period/question/exclamation
         # "D416"  # Section name should end with a colon
-        # "PD011" # Use `.to_numpy()` instead of `.values`
-        # "PD901" # `df` is a bad variable name
+         "PD901" # `df` is a bad variable name
         # "RUF006" # Store a reference to the return value of `asyncio.create_task`
         # "RUF012" # Mutable class attributes should be annotated with `typing.ClassVar`
          "S101"  # Use of assert detected, will get optimized out when `-O` flag is present (usually prod). - But asserts are precisely for invariant upkeep. This seems like overreaching, - I'll leave errors for things that we **expect** to encounter eventually, not invarints we're guarding against
         # "S105"  # Possible hardcoded password
         # "S106"  # Possible hardcoded password
         # "S113"  # Probable use of requests call without timeout
-        # "S603"  # `subprocess` call: check for execution of untrusted input
+         #"S603"  # `subprocess` call: check for execution of untrusted input. But most importantly, oftentimes is a symptom of bad arch in general. 
       ];
     };
 
