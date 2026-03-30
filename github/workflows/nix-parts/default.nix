@@ -23,7 +23,7 @@ workflows = import ./github/workflows/nix-parts {
 };
 ```
 
-Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, tokei, loc-badge, code-duplication
+Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, py-tests, tokei, loc-badge, code-duplication
 
 Standalone workflows:
 - release = { }  # enabled by presence, disabled with `enable = false`
@@ -91,6 +91,10 @@ let
     go-tests = ./go/tests.nix;
     go-gocritic = ./go/gocritic.nix;
     go-security-audit = ./go/security_audit.nix;
+		#,}}}
+
+		# py {{{
+    py-tests = ./py/tests.nix;
 		#,}}}
   };
 

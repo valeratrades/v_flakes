@@ -9,7 +9,7 @@
     {
       uses = "actions/checkout@v4";
       "with" = {
-        repository = "valeratrades/.github";
+        repository = "valeratrades/v_flakes";
         path = "my_gh_stuff";
         sparse-checkout = "github/workflows";
         sparse-checkout-cone-mode = false;

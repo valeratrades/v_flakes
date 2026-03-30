@@ -199,7 +199,7 @@ let
       warnings = [ "go-gocritic" "go-security-audit" ];
     };
     py = {
-      errors = [];
+      errors = [ "py-tests" ];
       warnings = [];
     };
     tex = {
