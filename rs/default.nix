@@ -4,6 +4,7 @@
   # config options
   cranelift ? true,
   targets ? {},
+  config ? {},
   deny ? false,
   tracey ? true,
   style ? {},
@@ -104,6 +105,7 @@ enabledPackages includes:
 
 let
   files = import ../files;
+  core = import ../utils/core.nix;
 
   buildEnable = build.enable or true;
   workspace = build.workspace or { "./" = [ "git_version" "log_directives" ]; };
@@ -120,9 +122,11 @@ let
     if stripped == "." || stripped == "" then "./build.rs" else "${stripped}/build.rs";
 
   rustfmtFile = files.rust.rustfmt { inherit pkgs; };
+  targetsExtend = if targets != {} then { target.augment = targets; } else {};
+  configExtend = core.mergeConfig targetsExtend config;
   configFile = files.rust.config {
     inherit pkgs cranelift;
-    extend = if targets != {} then { target.augment = targets; } else {};
+    extend = configExtend;
   };
   denyExtend = if builtins.isAttrs deny then deny else {};
   denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
