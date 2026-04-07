@@ -103,7 +103,7 @@ fn main() -> ExitCode {
 		std::process::exit(1);
 	});
 	let (theme, stroke_color, bg_color) = if cli.dark {
-		("dark", "#ffffff", "#121212")
+		("dark", "#1e1e1e", "#121212")
 	} else {
 		("light", "#000000", "#ffffff")
 	};
