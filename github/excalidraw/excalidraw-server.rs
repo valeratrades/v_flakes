@@ -46,6 +46,10 @@ struct Cli {
 	/// Create the file if it doesn't exist
 	#[arg(short, long)]
 	touch: bool,
+
+	/// Open in light mode (default: dark)
+	#[arg(short, long)]
+	light: bool,
 }
 
 fn now_ms() -> u64 {
@@ -83,9 +87,7 @@ fn main() -> ExitCode {
   "elements": [],
   "appState": {
     "gridSize": null,
-    "gridStep": 5,
-    "theme": "dark",
-    "viewBackgroundColor": "#121212"
+    "gridStep": 5
   },
   "files": {}
 }"##;
@@ -100,7 +102,16 @@ fn main() -> ExitCode {
 		eprintln!("Failed to read {html_path}: {e}");
 		std::process::exit(1);
 	});
-	let html = html_template.replace("arch -- Excalidraw", &format!("{name} -- Excalidraw"));
+	let (theme, stroke_color, bg_color) = if cli.light {
+		("light", "#000000", "#ffffff")
+	} else {
+		("dark", "#ffffff", "#121212")
+	};
+	let html = html_template
+		.replace("arch -- Excalidraw", &format!("{name} -- Excalidraw"))
+		.replace("__THEME__", theme)
+		.replace("__STROKE_COLOR__", stroke_color)
+		.replace("__VIEW_BG_COLOR__", bg_color);
 
 	// Merge all library files into a single JSON array of .excalidrawlib objects
 	let libraries_json = if cli.library.is_empty() {
