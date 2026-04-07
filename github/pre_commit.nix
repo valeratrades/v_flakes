@@ -80,6 +80,7 @@ let
     if [ -f "Cargo.toml" ]; then
       cargo sort --workspace --grouped
 			cargo sort-derives
+      cargo autoinherit
       fd Cargo.toml --type f --exec git add {} \;
       ${semverChecksCmd}
       ${traceyCmd}

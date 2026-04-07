@@ -47,9 +47,9 @@ struct Cli {
 	#[arg(short, long)]
 	touch: bool,
 
-	/// Open in light mode (default: dark)
+	/// Open in dark mode (default: light)
 	#[arg(short, long)]
-	light: bool,
+	dark: bool,
 }
 
 fn now_ms() -> u64 {
@@ -102,10 +102,10 @@ fn main() -> ExitCode {
 		eprintln!("Failed to read {html_path}: {e}");
 		std::process::exit(1);
 	});
-	let (theme, stroke_color, bg_color) = if cli.light {
-		("light", "#000000", "#ffffff")
-	} else {
+	let (theme, stroke_color, bg_color) = if cli.dark {
 		("dark", "#ffffff", "#121212")
+	} else {
+		("light", "#000000", "#ffffff")
 	};
 	let html = html_template
 		.replace("arch -- Excalidraw", &format!("{name} -- Excalidraw"))
