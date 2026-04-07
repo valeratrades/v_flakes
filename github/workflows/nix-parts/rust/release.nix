@@ -85,7 +85,7 @@ let
           { uses = "actions/checkout@v4"; }
           {
             name = "Fetch tags";
-            run = "git fetch --tags --no-recurse-submodules";
+            run = "git fetch --tags --force --no-recurse-submodules";
           }
           {
             uses = "dtolnay/rust-toolchain@nightly";
