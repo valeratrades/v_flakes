@@ -277,7 +277,7 @@ ${content}
 <!-- markdownlint-disable -->
 <details>
 <summary>
-<h3>${headerText}</h3>
+<h2>${headerText}</h2>
 </summary>
 
 ${contentRendered}

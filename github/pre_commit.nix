@@ -78,10 +78,10 @@ let
     fi
 
     if [ -f "Cargo.toml" ]; then
-      cargo sort --workspace --grouped
+      cargo sort --workspace --grouped --quiet
 			cargo sort-derives
       cargo autoinherit
-      fd Cargo.toml --type f --exec git add {} \;
+      git diff --name-only --diff-filter=ACMR -- '*.toml' | xargs -r git add
       ${semverChecksCmd}
       ${traceyCmd}
       ${styleCmd}
