@@ -342,8 +342,7 @@ warnIfNeeded ({
     ${if rust != null then ''
     export PATH="${rust}/bin:$PATH"
     ${cargoNightly} -Zscript -q ${./append_custom.rs} ./.git/hooks/pre-commit
-    rm -f ./.git/hooks/custom.sh
-    cp ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
+    install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
     '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${labelSyncHook}
