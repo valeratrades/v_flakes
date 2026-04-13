@@ -239,53 +239,65 @@ let
     path = ".readme_assets/description\\.(md|typ)";
   };
 
-  installation_out = processSection {
-    path = ".readme_assets/(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
-    transform =
-      content: path:
-      let
-        fileName = builtins.baseNameOf path;
-        fileExt = builtins.elemAt (pkgs.lib.splitString "." fileName) 1;
-        isMd = fileExt == "md";
-        isTyp = fileExt == "typ";
+  installation_out =
+    let
+      installPattern = "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
+      installDir = "${rootStr}/.readme_assets";
+      installDirExists = builtins.pathExists installDir;
+      allInstallFiles = if installDirExists then builtins.attrNames (builtins.readDir installDir) else [ ];
+      matchingInstallFiles = builtins.filter (name: builtins.match installPattern name != null) allInstallFiles;
+      isMulti = builtins.length matchingInstallFiles >= 2;
 
-        basePart = builtins.substring (builtins.stringLength "installation") (builtins.stringLength fileName - builtins.stringLength "installation" - builtins.stringLength ".${fileExt}") fileName;
-
-        hasSuffix = pkgs.lib.hasPrefix "-" basePart;
-        suffixPart = if hasSuffix then pkgs.lib.removePrefix "-" basePart else "";
-        titleCaseWord = word: if builtins.stringLength word == 0 then "" else pkgs.lib.toUpper (builtins.substring 0 1 word) + builtins.substring 1 (builtins.stringLength word) word;
-
-        formatSuffix =
-          suffix:
+      folds = processSection {
+        path = ".readme_assets/(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
+        transform =
+          content: path:
           let
-            segments = pkgs.lib.splitString "-" suffix;
-            titledSegments = map titleCaseWord segments;
-            concat_back = builtins.concatStringsSep " " titledSegments;
-          in
-          concat_back;
+            fileName = builtins.baseNameOf path;
+            fileExt = builtins.elemAt (pkgs.lib.splitString "." fileName) 1;
+            isMd = fileExt == "md";
+            isTyp = fileExt == "typ";
 
-        headerText = if suffixPart == "" then "Installation" else "Installation: ${formatSuffix suffixPart}";
-        contentRendered =
-          if isMd || isTyp then
-            content
-          else
-            ''```sh
+            basePart = builtins.substring (builtins.stringLength "installation") (builtins.stringLength fileName - builtins.stringLength "installation" - builtins.stringLength ".${fileExt}") fileName;
+
+            hasSuffix = pkgs.lib.hasPrefix "-" basePart;
+            suffixPart = if hasSuffix then pkgs.lib.removePrefix "-" basePart else "";
+            titleCaseWord = word: if builtins.stringLength word == 0 then "" else pkgs.lib.toUpper (builtins.substring 0 1 word) + builtins.substring 1 (builtins.stringLength word) word;
+
+            formatSuffix =
+              suffix:
+              let
+                segments = pkgs.lib.splitString "-" suffix;
+                titledSegments = map titleCaseWord segments;
+                concat_back = builtins.concatStringsSep " " titledSegments;
+              in
+              concat_back;
+
+            headerText = if suffixPart == "" then "Installation" else "Installation: ${formatSuffix suffixPart}";
+            headerTag = if isMulti then "h3" else "h2";
+            contentRendered =
+              if isMd || isTyp then
+                content
+              else
+                ''```sh
 ${content}
 ```'';
-      in
-      ''
+          in
+          ''
 <!-- markdownlint-disable -->
 <details>
 <summary>
-<h2>${headerText}</h2>
+<${headerTag}>${headerText}</${headerTag}>
 </summary>
 
 ${contentRendered}
 
 </details>
 <!-- markdownlint-restore -->'';
-    optional = true;
-  };
+        optional = true;
+      };
+    in
+    if isMulti then "## Installation\n\n" + folds else folds;
 
   usage_out = processSection {
     path = ".readme_assets/usage\\.(sh|md|typ)";

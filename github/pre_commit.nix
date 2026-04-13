@@ -78,7 +78,14 @@ let
     fi
 
     if [ -f "Cargo.toml" ]; then
-      cargo sort --workspace --grouped --quiet
+      cargo_sort_out=$(cargo sort --workspace --grouped 2>&1)
+      cargo_sort_rewritten=$(echo "$cargo_sort_out" | grep -oP 'Cargo\.toml for "?\K[^" ]+(?="? has been rewritten)')
+      if [ -n "$cargo_sort_rewritten" ]; then
+        echo "# cargo-sorted:"
+        echo "$cargo_sort_rewritten" | while IFS= read -r name; do
+          echo "	rewrote Cargo.toml for \"$name\""
+        done
+      fi
 			cargo sort-derives
       cargo autoinherit
       git diff --name-only --diff-filter=ACMR -- '*.toml' | xargs -r git add
