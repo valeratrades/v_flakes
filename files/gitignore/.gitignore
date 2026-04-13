@@ -57,3 +57,6 @@ venv/
 
 ## Web
 **/*.sass-cache/
+
+## Other Tools
+.codeviz/

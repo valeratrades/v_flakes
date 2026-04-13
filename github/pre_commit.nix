@@ -87,7 +87,7 @@ let
         done
       fi
 			cargo sort-derives
-      cargo autoinherit
+      if grep -q '^\[workspace\]' Cargo.toml; then cargo autoinherit; fi
       git diff --name-only --diff-filter=ACMR -- '*.toml' | xargs -r git add
       ${semverChecksCmd}
       ${traceyCmd}

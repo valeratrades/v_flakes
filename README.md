@@ -43,6 +43,9 @@ README generation framework from `.readme_assets/` directory.
         inherit pkgs;
         tracey = true;
         style.format = true;
+        style.modules = {
+          prefer_ahash = true; # enforce ahash over std HashMap (default: false)
+        };
       };
 
       github = v-utils.github {
