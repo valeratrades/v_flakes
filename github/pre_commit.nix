@@ -78,6 +78,7 @@ let
     fi
 
     if [ -f "Cargo.toml" ]; then
+      staged_files=$(git diff --name-only --cached --diff-filter=ACMR)
       cargo_sort_out=$(cargo sort --workspace --grouped 2>&1)
       cargo_sort_rewritten=$(echo "$cargo_sort_out" | grep -oP 'Cargo\.toml for "?\K[^" ]+(?="? has been rewritten)')
       if [ -n "$cargo_sort_rewritten" ]; then
@@ -88,7 +89,8 @@ let
       fi
 			cargo sort-derives
       if grep -q '^\[workspace\]' Cargo.toml; then cargo autoinherit; fi
-      git diff --name-only --diff-filter=ACMR -- '*.toml' | xargs -r git add
+      # idea is: if all these functions are ran on every commit, then the only files impacted will be those with changes yet to be committed; hence if tool affects something outside of staged, it was outside of the scope meant to be committed anyways.
+      echo "$staged_files" | xargs -r git add
       ${semverChecksCmd}
       ${traceyCmd}
       ${styleCmd}
