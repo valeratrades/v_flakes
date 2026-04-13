@@ -9,7 +9,7 @@ Test links:
 - Bare bracket inner: [./_.test_link_inner.txt]
 - Bare bracket outer: [../_.test_link_outter.txt]
 
-## Expected files in `.readme_assets/`
+## Expected files in `docs/.readme_assets/`
 
 | Pattern | Required | Description |
 |---------|----------|-------------|

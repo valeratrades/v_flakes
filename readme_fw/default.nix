@@ -6,7 +6,7 @@
 #   - outPath: (optional, defaults to "LICENSE") path in the repo where the license will be copied
 #   - license: attrset from files.licenses.* with { name, path }
 #
-# logo: optional, auto-discovered from .readme_assets/logo.(md|html)
+# logo: optional, auto-discovered from docs/.readme_assets/logo.(md|html)
 #   - must be single line containing an image tag or markdown image
 #   - if no width specified, defaults to `defaultLogoWidth`
 let
@@ -60,9 +60,9 @@ let
   licenses = licensesNormalized;
   rootStr = pkgs.lib.removeSuffix "/" (toString rootDir);
 
-  # Logo processing: look for .readme_assets/logo.(md|html)
-  logoMdPath = rootDir + "/.readme_assets/logo.md";
-  logoHtmlPath = rootDir + "/.readme_assets/logo.html";
+  # Logo processing: look for docs/.readme_assets/logo.(md|html)
+  logoMdPath = rootDir + "/docs/.readme_assets/logo.md";
+  logoHtmlPath = rootDir + "/docs/.readme_assets/logo.html";
   logoPath =
     if builtins.pathExists logoMdPath then logoMdPath
     else if builtins.pathExists logoHtmlPath then logoHtmlPath
@@ -134,7 +134,7 @@ let
   #        builtins.trace "WARNING: ${toString fullPath} is missing" "TODO";
   #
   #    # Apply path replacement automatically for markdown files //TODO: extend to support `typ` too
-  #    contentWithPaths = if pkgs.lib.hasSuffix ".md" path && exists then builtins.replaceStrings [ "(./" ] [ "(./.readme_assets/" ] rawContent else rawContent;
+  #    contentWithPaths = if pkgs.lib.hasSuffix ".md" path && exists then builtins.replaceStrings [ "(./" ] [ "(./docs/.readme_assets/" ] rawContent else rawContent;
   #
   #    out = (if (exists || !optional) then (transform contentWithPaths) + "\n" else contentWithPaths);
   #  in
@@ -194,7 +194,7 @@ let
           contentWithPaths = if isMd && exists then
             builtins.replaceStrings
               [ "(./" "(../" "[./" "[../" ]
-              [ "(./.readme_assets/" "(./" "[./.readme_assets/" "[./" ]
+              [ "(./docs/.readme_assets/" "(./" "[./docs/.readme_assets/" "[./" ]
               rawContent
           else rawContent;
 
@@ -230,26 +230,26 @@ let
     if matchingFiles == [ ] && optional then "" else combinedContent;
 
   warning_out = processSection {
-    path = ".readme_assets/warning\\.(md|typ)";
+    path = "docs/.readme_assets/warning\\.(md|typ)";
     optional = true;
     transform = (content: path: if content == "" then "" else "\n> [!WARNING]\n" + builtins.concatStringsSep " \\\n" (map (line: "> " + line) (pkgs.lib.splitString "\n" content)));
   };
 
   description_out = processSection {
-    path = ".readme_assets/description\\.(md|typ)";
+    path = "docs/.readme_assets/description\\.(md|typ)";
   };
 
   installation_out =
     let
       installPattern = "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
-      installDir = "${rootStr}/.readme_assets";
+      installDir = "${rootStr}/docs/.readme_assets";
       installDirExists = builtins.pathExists installDir;
       allInstallFiles = if installDirExists then builtins.attrNames (builtins.readDir installDir) else [ ];
       matchingInstallFiles = builtins.filter (name: builtins.match installPattern name != null) allInstallFiles;
       isMulti = builtins.length matchingInstallFiles >= 2;
 
       folds = processSection {
-        path = ".readme_assets/(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
+        path = "docs/.readme_assets/(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
         transform =
           content: path:
           let
@@ -300,7 +300,7 @@ ${contentRendered}
     if isMulti then "## Installation\n\n" + folds else folds;
 
   usage_out = processSection {
-    path = ".readme_assets/usage\\.(sh|md|typ)";
+    path = "docs/.readme_assets/usage\\.(sh|md|typ)";
     transform =
       content: path:
       let
@@ -346,7 +346,7 @@ ${content}
   '';
 
   other_out = processSection {
-    path = ".readme_assets/other\\.(md|typ)";
+    path = "docs/.readme_assets/other\\.(md|typ)";
     optional = true;
     demoteHeaders = false;
   };
@@ -409,6 +409,12 @@ README_EOF
     ''
       ${locGistCheck}
       ${licenseCopies}
+      mkdir -p docs
+      #DEPRECATE: in v2.0 version
+      if [ -d ./.readme_assets ] && [ ! -d ./docs/.readme_assets ]; then
+        mv ./.readme_assets ./docs/.readme_assets
+        echo "Moved .readme_assets/ to docs/.readme_assets/"
+      fi
       cp -f ${readme} ./README.md
     '';
 in

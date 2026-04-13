@@ -61,7 +61,7 @@ Rust toolchain configuration:
 
 ## readme_fw/
 
-README generation from `.readme_assets/`:
+README generation from `docs/.readme_assets/`:
 
 - Reads `description.md`, `usage.md`, etc.
 - Generates badges (msrv, crates.io, docs.rs, loc, ci)

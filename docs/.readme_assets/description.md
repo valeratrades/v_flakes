@@ -19,7 +19,7 @@ GitHub integration: workflows, git hooks, gitignore, and label sync.
 File templates: rustfmt.toml, cargo config, deny.toml, treefmt, gitignore.
 
 ## readme-fw
-README generation framework from `.readme_assets/` directory.
+README generation framework from `docs/.readme_assets/` directory.
 - Supports `.md` and `.typ` sources
 - Badge generation (msrv, crates.io, docs.rs, loc, ci)
 - License file management

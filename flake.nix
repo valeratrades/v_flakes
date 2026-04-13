@@ -77,7 +77,7 @@ ${parts.py}
 ${parts.tex}
 
 ## Readme Framework
-Generates README.md from .readme_assets/ directory structure.
+Generates README.md from docs/.readme_assets/ directory structure.
 '';
 
       files = import ./files;
