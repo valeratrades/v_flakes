@@ -166,6 +166,8 @@ let
   latestCrateVersion = name: ''
     curl -sf "https://crates.io/api/v1/crates/${name}" 2>/dev/null | grep -o '"newest_version":"[^"]*"' | head -1 | cut -d'"' -f4
   '';
+  vFlakesVersion = (builtins.fromTOML (builtins.readFile ../Cargo.toml)).package.version;
+
   binstallHook = ''
     export PATH="$HOME/.cargo/bin:$PATH"
   '' + (if tracey then ''
@@ -175,7 +177,13 @@ let
       echo "Installing tracey@$_tracey_latest..."
       cargo binstall "tracey@$_tracey_latest" --no-confirm -q 2>/dev/null || cargo install "tracey@$_tracey_latest" -q
     fi
-  '' else "");
+  '' else "") + ''
+    _v_flakes_installed=$(cargo install --list 2>/dev/null | grep "^v_flakes v" | grep -oP '\d+\.\d+\.\d+' || echo "")
+    if [ "$_v_flakes_installed" != "${vFlakesVersion}" ]; then
+      echo "Installing v_flakes@${vFlakesVersion}..."
+      cargo binstall "v_flakes@${vFlakesVersion}" --no-confirm -q 2>/dev/null || cargo install "v_flakes@${vFlakesVersion}" -q
+    fi
+  '';
 
   # Lazy install hook for codestyle - called from pre-commit, not shell entry
   codestyleLazyInstall = if styleEnabled then ''
