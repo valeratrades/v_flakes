@@ -74,7 +74,8 @@ fn process(content: &str) -> String {
 
 		let keys_to_remove: Vec<String> = table
 			.iter()
-			.filter_map(|(k, v)| matches!(ga_action(v)?, GaAction::Comment).then(|| k.to_owned()))
+			.filter(|(_, v)| matches!(ga_action(v), Some(GaAction::Comment)))
+			.map(|(k, _)| k.to_owned())
 			.collect();
 
 		for key in &keys_to_remove {
@@ -95,6 +96,16 @@ fn process(content: &str) -> String {
 	}
 
 	doc.to_string()
+}
+
+fn git_tracked_cargo_tomls(root: &Path) -> std::io::Result<Vec<PathBuf>> {
+	let output = Command::new("git").arg("ls-files").current_dir(root).output()?;
+	let tracked: HashSet<PathBuf> = if output.status.success() {
+		String::from_utf8_lossy(&output.stdout).lines().map(PathBuf::from).collect()
+	} else {
+		HashSet::new()
+	};
+	Ok(tracked.into_iter().filter(|p| p.file_name().map(|n| n == "Cargo.toml").unwrap_or(false)).map(|p| root.join(p)).collect())
 }
 
 #[cfg(test)]
@@ -145,14 +156,4 @@ serde = { version = "1" }
 		let input = "[dependencies]\nserde = { version = \"1\" }\n";
 		assert_eq!(process(input), input);
 	}
-}
-
-fn git_tracked_cargo_tomls(root: &Path) -> std::io::Result<Vec<PathBuf>> {
-	let output = Command::new("git").arg("ls-files").current_dir(root).output()?;
-	let tracked: HashSet<PathBuf> = if output.status.success() {
-		String::from_utf8_lossy(&output.stdout).lines().map(PathBuf::from).collect()
-	} else {
-		HashSet::new()
-	};
-	Ok(tracked.into_iter().filter(|p| p.file_name().map(|n| n == "Cargo.toml").unwrap_or(false)).map(|p| root.join(p)).collect())
 }
