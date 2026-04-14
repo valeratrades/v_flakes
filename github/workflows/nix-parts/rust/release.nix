@@ -21,6 +21,10 @@
   aptDeps ? [],
   # `on` triggers. Default: push to v* tags. workflow_dispatch always appended.
   hooks ? { push.tags = [ "v[0-9]+.*" ]; },
+  # Optional gate condition (shell expression). When set, a `gate` job runs first and
+  # the build only proceeds if the condition is true.
+  # Example: '"$(git show HEAD~1:Cargo.toml | grep '\''^version'\'' | head -1)" != "$(grep '\''^version'\'' Cargo.toml | head -1)"'
+  gate ? null,
   # Legacy params (ignored, kept for backwards compat)
   installConfig ? {},
   install ? {},
@@ -47,6 +51,8 @@ let
   isWindows = target: builtins.match ".*-windows-.*" target != null;
   isLinux = target: builtins.match ".*-linux-.*" target != null;
 
+  gateJob = if gate != null then { gate = (import ./release-gate.nix { condition = gate; }).value; } else {};
+
   makeWorkflow = target:
     let
       os = targetToOs target;
@@ -69,7 +75,7 @@ let
         CARGO_NET_RETRY = "10";
         RUSTUP_MAX_RETRIES = "10";
       };
-      jobs.build = {
+      jobs = gateJob // { build = {
         runs-on = os;
         steps = [
           { uses = "actions/checkout@v4"; }
@@ -171,7 +177,10 @@ let
             env.GITHUB_TOKEN = "\${{ secrets.GITHUB_TOKEN }}";
           }
         ];
-      };
+      } // (if gate != null then {
+        needs = [ "gate" ];
+        "if" = "needs.gate.outputs.run == 'true'";
+      } else {}); };
     };
 in
 {
