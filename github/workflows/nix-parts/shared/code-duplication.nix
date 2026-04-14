@@ -20,6 +20,10 @@
       uses = "dtolnay/rust-toolchain@nightly";
     }
     {
+      name = "Install mold linker";
+      run = "sudo apt-get install -y mold";
+    }
+    {
       name = "Install qlty";
       uses = "qltysh/qlty-action/install@main";
     }
