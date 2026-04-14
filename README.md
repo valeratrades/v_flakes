@@ -1,7 +1,7 @@
-# v-utils
+# v_flakes
 <br>
-[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v-utils/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/v-utils/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
-[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v-utils/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/v-utils/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
+[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
+[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
 
 Collection of reusable Nix components for project configuration.
 

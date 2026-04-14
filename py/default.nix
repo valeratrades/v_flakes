@@ -40,17 +40,8 @@ let
 
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
-  cargoNightly = pkgs.writeShellScript "cargo-nightly" ''
-    export RUSTC_WRAPPER=
-    if command -v cargo &>/dev/null; then
-      exec cargo "$@"
-    else
-      exec rustup run nightly cargo "$@"
-    fi
-  '';
-
   pyprojectHook = ''
-    ${cargoNightly} -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${venv_path} ${src_path}
+    pyproject_merge ./pyproject.toml ${venv_path} ${src_path}
   '';
 in
 {

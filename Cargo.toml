@@ -1,0 +1,11 @@
+[package]
+name = "v_flakes"
+version = "0.1.0"
+edition = "2024"
+authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
+description = "CLI tools for v_flakes nix module management"
+license = "BlueOak-1.0.0"
+repository = "https://github.com/valeratrades/v_flakes"
+
+[dependencies]
+toml_edit = "0.25"

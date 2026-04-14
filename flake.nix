@@ -6,11 +6,12 @@ Collection of reusable Nix components.
 See individual component descriptions in their respective directories.'';
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.rust-overlay.url = "github:oxalica/rust-overlay";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils }:
     let
-      pname = "v-utils";
+      pname = "v_flakes";
 
       # Version constants for bundled packages - update these when bumping
       # Use partial semver (major.minor) - patch versions auto-resolve via cargo-binstall
@@ -27,17 +28,22 @@ See individual component descriptions in their respective directories.'';
     in
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs { inherit system; overlays = [ (import rust-overlay) ]; };
+        rust = pkgs.rust-bin.selectLatestNightlyWith (t: t.default.override {
+          extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
+        });
+        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
         utils = import ./utils;
         files = import ./files;
 
-        #TODO: pass `rs` once this repo has a rust-overlay input
+        rsModule = (import ./rs) { inherit pkgs rust; };
         github = (import ./github) {
           inherit pkgs pname;
-          labels.extra = [];
+          rs = rsModule;
+          enable = true;
+          lastSupportedVersion = "nightly-2025-10-10";
+          jobs.default = true;
         };
-
-        # README generation
         readme = (import ./readme_fw) {
           inherit pkgs pname;
           rootDir = ./.;
@@ -45,18 +51,23 @@ See individual component descriptions in their respective directories.'';
           defaults = true;
           badges = [ "ci" ];
         };
+        combined = utils.combine [ rsModule github readme ];
       in
       {
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [ curl ] ++ github.enabledPackages;
+          inherit stdenv;
+          packages = with pkgs; [ curl mold rust ] ++ combined.enabledPackages;
           shellHook = ''
             _bump_script="./__scripts/bump_crate.rs"
             ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
             ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
-            cp -f ${(files.gitignore { inherit pkgs; langs = [];})} ./.gitignore
-            ${readme.shellHook}
-            ${github.labelSyncHook}
+            cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
+            ${combined.shellHook}
+            # Bootstrap: build our own binaries and put them on PATH for local testing
+            cargo b -q 2>/dev/null
+            export PATH="$PWD/target/debug:$PATH"
           '';
+          env.RUST_BACKTRACE = 1;
         };
       }
     ) // {

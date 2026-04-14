@@ -235,6 +235,7 @@ dependencies = [
  "insta",
  "toml_edit",
  "v_fixtures",
+ "v_flakes",
 ]
 
 [[package]]
@@ -426,6 +427,13 @@ dependencies = [
  "regex",
  "tempfile",
  "walkdir",
+]
+
+[[package]]
+name = "v_flakes"
+version = "0.1.0"
+dependencies = [
+ "toml_edit",
 ]
 
 [[package]]

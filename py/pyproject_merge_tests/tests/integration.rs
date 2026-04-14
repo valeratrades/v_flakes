@@ -1,5 +1,5 @@
-use pyproject_merge_tests::merge;
 use v_fixtures::Fixture;
+use v_flakes::pyproject_merge::merge;
 
 fn run(fixture_str: &str) -> String {
 	let fixture = Fixture::parse(fixture_str);
