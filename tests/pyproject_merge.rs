@@ -138,35 +138,19 @@ fn sections_and_keys_sorted_alphabetically() {
 
 #[test]
 fn no_write_when_unchanged() {
-	// Write fixture to disk, run merge, check mtime didn't change.
-	// Input must already be in sorted form so merge produces identical output.
-	let fixture = Fixture::parse(r#"
-		//- /pyproject.toml
-		[build-system]
-		build-backend = "setuptools.backends._legacy:_Backend"
-		requires = ["setuptools>=75.0"]
+	let input = merge("", ".devenv/state/venv", "py_src");
+	insta::assert_snapshot!(merge(&input, ".devenv/state/venv", "py_src"), @r#"
+	[tool]
 
-		[tool.inline-snapshot]
-		format-command = "ruff format --stdin-filename {filename}"
+	[tool.inline-snapshot]
+	format-command = "ruff format --stdin-filename {filename}"
 
-		[tool.pytest.ini_options]
-		typeguard-packages = "py_src"
+	[tool.pytest.ini_options]
+	testpaths = ["py_src"]
+	typeguard-packages = "py_src"
 
-		[tool.ty.environment]
-		extra-paths = ["py_src"]
-		python = ".devenv/state/venv"
+	[tool.ty.environment]
+	extra-paths = ["py_src"]
+	python = ".devenv/state/venv"
 	"#);
-	let temp = fixture.write_to_tempdir();
-	let path = temp.path("/pyproject.toml");
-
-	let original = std::fs::read_to_string(&path).unwrap();
-	let mtime_before = std::fs::metadata(&path).unwrap().modified().unwrap();
-
-	let merged = merge(&original, ".devenv/state/venv", "py_src");
-	if merged != original {
-		std::fs::write(&path, &merged).unwrap();
-	}
-
-	let mtime_after = std::fs::metadata(&path).unwrap().modified().unwrap();
-	assert_eq!(mtime_before, mtime_after, "file was written despite no change");
 }

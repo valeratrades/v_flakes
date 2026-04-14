@@ -28,7 +28,7 @@ use clap::Parser;
 use serde::Deserialize;
 use std::process::{Command, Stdio};
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[command(name = "init-loc-gist")]
 #[command(about = "Initialize LOC badge file in GitHub gist")]
 struct Args {

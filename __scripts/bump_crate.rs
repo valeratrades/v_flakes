@@ -57,7 +57,7 @@ struct CrateInfo {
     newest_version: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum InstallMode {
     Binstall,
     Source,

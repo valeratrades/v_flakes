@@ -1,0 +1,16 @@
+---
+source: tests/pyproject_merge.rs
+expression: "merge(&input, \".devenv/state/venv\", \"py_src\")"
+---
+[tool]
+
+[tool.inline-snapshot]
+format-command = "ruff format --stdin-filename {filename}"
+
+[tool.pytest.ini_options]
+testpaths = ["py_src"]
+typeguard-packages = "py_src"
+
+[tool.ty.environment]
+extra-paths = ["py_src"]
+python = ".devenv/state/venv"

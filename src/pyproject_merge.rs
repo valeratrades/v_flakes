@@ -26,25 +26,6 @@ pub fn run(args: Cli) {
 	}
 }
 
-fn sort_table(table: &mut Table) {
-	table.sort_values();
-	for (_, v) in table.iter_mut() {
-		if let Some(t) = v.as_table_mut() {
-			sort_table(t);
-		}
-	}
-}
-
-fn reassign_positions(table: &mut Table, counter: &mut isize) {
-	table.set_position(Some(*counter));
-	*counter += 1;
-	for (_, v) in table.iter_mut() {
-		if let Some(t) = v.as_table_mut() {
-			reassign_positions(t, counter);
-		}
-	}
-}
-
 pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 	let mut doc = content.parse::<DocumentMut>().expect("valid TOML");
 
@@ -91,3 +72,22 @@ pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 
 	doc.to_string()
 }
+fn sort_table(table: &mut Table) {
+	table.sort_values();
+	for (_, v) in table.iter_mut() {
+		if let Some(t) = v.as_table_mut() {
+			sort_table(t);
+		}
+	}
+}
+
+fn reassign_positions(table: &mut Table, counter: &mut isize) {
+	table.set_position(Some(*counter));
+	*counter += 1;
+	for (_, v) in table.iter_mut() {
+		if let Some(t) = v.as_table_mut() {
+			reassign_positions(t, counter);
+		}
+	}
+}
+

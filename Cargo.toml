@@ -7,8 +7,6 @@ description = "CLI tools for v_flakes nix module management"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
 
-[package.metadata]
-
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 bin-dir = "{ bin }{ binary-ext }"
@@ -19,4 +17,5 @@ clap = { version = "4", features = ["derive"] }
 toml_edit = "0.25"
 
 [dev-dependencies]
-v_fixtures = { path = "/home/v/s/v_fixtures" }
+insta = "1"
+v_fixtures.version = "0.3.4"

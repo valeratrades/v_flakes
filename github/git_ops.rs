@@ -19,7 +19,7 @@ use std::io::{self, BufRead, IsTerminal, Write as _};
 use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[command(name = "vgit")]
 #[command(about = "GitHub repository management utilities")]
 struct Args {
@@ -27,7 +27,7 @@ struct Args {
     command: Commands,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Debug, Subcommand)]
 enum Commands {
     /// Sync repository labels with local configuration
     SyncLabels {
@@ -41,7 +41,7 @@ enum Commands {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 struct LabelSpec {
     name: String,
     color: String,
