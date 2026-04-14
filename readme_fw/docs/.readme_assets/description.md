@@ -18,6 +18,10 @@ Test links:
 | `usage.(sh\|md\|typ)` | Yes | Usage instructions |
 | `installation[-suffix].(sh\|md\|typ)` | No | Installation instructions (collapsible). Suffix becomes title, e.g. `installation-linux.sh` → "Installation: Linux" |
 | `other.(md\|typ)` | No | Additional content (roadmap, etc.) |
+| `arch.mermaid` | No | Architecture diagram (rendered as mermaid code block) |
+| `logo.(md\|html)` | No | Project logo (single-line image tag; defaults to 25% width) |
+
+Any file in `docs/.readme_assets/` that does not match one of the patterns above will trigger a `WARNING` trace during evaluation.
 
 ## Header demotion
 

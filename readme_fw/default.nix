@@ -239,6 +239,18 @@ let
     path = "docs/.readme_assets/description\\.(md|typ)";
   };
 
+  arch_out =
+    let
+      archMermaidPath = rootDir + "/docs/.readme_assets/arch.mermaid";
+    in
+    if builtins.pathExists archMermaidPath then
+      let
+        content = pkgs.lib.removeSuffix "\n" (builtins.readFile archMermaidPath);
+      in
+      "\n```mermaid\n${content}\n```\n"
+    else
+      "";
+
   installation_out =
     let
       installPattern = "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
@@ -351,6 +363,27 @@ ${content}
     demoteHeaders = false;
   };
 
+  # Warn about any files in docs/.readme_assets/ that are not handled by any section above.
+  # Patterns here must mirror exactly what processSection calls and special-cased files handle.
+  _recognizedPatterns = [
+    "warning\\.(md|typ)"
+    "description\\.(md|typ)"
+    "arch\\.mermaid"
+    "logo\\.(md|html)"
+    "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)"
+    "usage\\.(sh|md|typ)"
+    "other\\.(md|typ)"
+  ];
+  _assetsDir = "${rootStr}/docs/.readme_assets";
+  _assetsDirExists = builtins.pathExists _assetsDir;
+  _allAssets = if _assetsDirExists then builtins.attrNames (builtins.readDir _assetsDir) else [ ];
+  _isRecognized = name: builtins.any (pat: builtins.match pat name != null) _recognizedPatterns;
+  _unrecognizedAssets = builtins.filter (name: !(_isRecognized name)) _allAssets;
+  _warnUnrecognized = builtins.foldl'
+    (acc: name: builtins.trace "WARNING: docs/.readme_assets/${name} is not recognized by readme-fw and will not be included in README" acc)
+    null
+    _unrecognizedAssets;
+
   licenses_out =
     let
       licenseText =
@@ -378,15 +411,15 @@ ${content}
       </sub>
     '';
 
-  readme = pkgs.runCommand "README.md" { } ''
+  readme = builtins.seq _warnUnrecognized (pkgs.runCommand "README.md" { } ''
     cat > $out <<'README_EOF'
 ${warning_out}${builtins.readFile badges_out}
-${description_out}${installation_out}
+${description_out}${arch_out}${installation_out}
 ${usage_out}${other_out}
 ${builtins.readFile best_practices_out}
 ${builtins.readFile licenses_out}
 README_EOF
-  '';
+  '');
 
   # Expected loc badge URL for this pname/gistId
   expectedLocBadge = "https://gist.githubusercontent.com/valeratrades/${gistId}/raw/${pname}-loc.json";
