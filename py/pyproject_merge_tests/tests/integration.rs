@@ -109,23 +109,52 @@ fn idempotent() {
 }
 
 #[test]
+fn sections_and_keys_sorted_alphabetically() {
+	let result = run(r#"
+		//- /pyproject.toml
+		[tool.pytest.ini_options]
+		typeguard-packages = "py_src"
+
+		[build-system]
+		requires = ["maturin>=1.7"]
+		build-backend = "maturin"
+
+		[tool.maturin]
+		python-source = "py_src"
+		manifest-path = "robot_master/Cargo.toml"
+
+		[project]
+		name = "foo"
+
+		[dependency-groups]
+		dev = ["pytest"]
+	"#);
+
+	let sections: Vec<&str> = result.lines().filter(|l| l.starts_with('[')).collect();
+	let mut expected = sections.clone();
+	expected.sort();
+	assert_eq!(sections, expected, "sections not in alphabetical order:\n{result}");
+}
+
+#[test]
 fn no_write_when_unchanged() {
-	// Write fixture to disk, run merge, check mtime didn't change
+	// Write fixture to disk, run merge, check mtime didn't change.
+	// Input must already be in sorted form so merge produces identical output.
 	let fixture = Fixture::parse(r#"
 		//- /pyproject.toml
 		[build-system]
-		requires = ["setuptools>=75.0"]
 		build-backend = "setuptools.backends._legacy:_Backend"
+		requires = ["setuptools>=75.0"]
+
+		[tool.inline-snapshot]
+		format-command = "ruff format --stdin-filename {filename}"
 
 		[tool.pytest.ini_options]
 		typeguard-packages = "py_src"
 
 		[tool.ty.environment]
-		python = ".devenv/state/venv"
 		extra-paths = ["py_src"]
-
-		[tool.inline-snapshot]
-		format-command = "ruff format --stdin-filename {filename}"
+		python = ".devenv/state/venv"
 	"#);
 	let temp = fixture.write_to_tempdir();
 	let path = temp.path("/pyproject.toml");

@@ -1,5 +1,24 @@
 use toml_edit::{DocumentMut, Item, Table, value};
 
+fn sort_table(table: &mut Table) {
+	table.sort_values();
+	for (_, v) in table.iter_mut() {
+		if let Some(t) = v.as_table_mut() {
+			sort_table(t);
+		}
+	}
+}
+
+fn reassign_positions(table: &mut Table, counter: &mut usize) {
+	table.set_position(*counter);
+	*counter += 1;
+	for (_, v) in table.iter_mut() {
+		if let Some(t) = v.as_table_mut() {
+			reassign_positions(t, counter);
+		}
+	}
+}
+
 pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 	let mut doc = content.parse::<DocumentMut>().expect("valid TOML");
 
@@ -35,6 +54,9 @@ pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 		snap.insert("format-command", value("ruff format --stdin-filename {filename}"));
 		tool.insert("inline-snapshot", Item::Table(snap));
 	}
+
+	sort_table(doc.as_table_mut());
+	reassign_positions(doc.as_table_mut(), &mut 0);
 
 	doc.to_string()
 }
