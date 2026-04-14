@@ -32,6 +32,7 @@ The shellHook will:
 - Copy ruff.toml to ./ruff.toml
 - Generate pyproject.toml with [build-system] if one doesn't exist
 - Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml
+- Create venv at venv_path if missing, activate it, and warn if stale
 '';
 } else
 
@@ -50,6 +51,18 @@ in
   shellHook = ''
     cp -f ${ruffFile} ./ruff.toml
     ${pyprojectHook}
+    if [ ! -d "${venv_path}" ]; then
+      uv venv ${venv_path}
+    fi
+    source ${venv_path}/bin/activate
+    _venv_recorded="$(grep '^VIRTUAL_ENV=' ${venv_path}/bin/activate 2>/dev/null | head -1 | sed "s/VIRTUAL_ENV='//;s/'$//")"
+    _venv_actual="$(readlink -f ${venv_path})"
+    if [ "$_venv_recorded" != "$_venv_actual" ]; then
+      echo "warning: venv is stale (repo was moved?) — recreate with: rm -rf ${venv_path} && uv venv ${venv_path} && uv_sync"
+    elif [ -f "uv.lock" ] && [ "${venv_path}" -ot "uv.lock" ]; then
+      echo "warning: venv is older than uv.lock — run uv_sync"
+    fi
+    unset _venv_recorded _venv_actual
   '';
 
   enabledPackages = [];

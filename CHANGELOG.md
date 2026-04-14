@@ -1,5 +1,74 @@
 # Changelog
 
+## v1.5.0 / v1.6.0
+
+**Breaking: array fields now require explicit `.augment` or `.replace`**
+- Previously, assigning a list directly to a field that already has a list would silently augment it. Now it errors. You must be explicit:
+  ```nix
+  # old (ambiguous — was it augmenting or replacing?)
+  jobs.errors.augment = [ "rust-miri" ];  # this was the only working form before
+  # same field with a list value now requires explicit modifier:
+  jobs.errors.augment = [ "rust-miri" ];  # still works
+  jobs.errors.replace = [ "rust-miri" ];  # or this, to replace entirely
+  ```
+  This applies to all config fields across `rs`, `py`, `github`, and file modules.
+
+**Breaking: `readme-fw`: `.readme_assets/` moved to `docs/.readme_assets/`**
+- The readme assets directory is now expected at `docs/.readme_assets/` instead of `.readme_assets/` at the repo root.
+- Move your files: `mv .readme_assets/ docs/.readme_assets/`
+
+**`github` module**
+- `langs` param deprecated — pass language modules directly instead:
+  ```nix
+  # old
+  github = v-utils.github { inherit pkgs pname; langs = [ "rs" ]; };
+  # new
+  github = v-utils.github { inherit pkgs pname rs; };
+  # (langs is now inferred from whichever of rs/py/tex are passed)
+  ```
+- New `syncFork` param: generates a daily-scheduled + manually-triggerable GHA workflow to rebase a fork over upstream:
+  ```nix
+  github = v-utils.github { syncFork = true; };
+  # or: jobs.sync_fork = true;
+  ```
+- New top-level `install` param: nix packages applied to all CI job sections (errors, warnings, other, release). Per-section `install` still overrides:
+  ```nix
+  github = v-utils.github {
+    install = { packages = [ "mold" "pkg-config" ]; };  # applies everywhere
+    jobs.errors.install = { packages = [ "wayland" ]; }; # overrides for errors only
+  };
+  ```
+- New `jobs.*.hooks` param: override the `on:` triggers for each workflow file:
+  ```nix
+  jobs.errors.hooks = { push = { branches = [ "main" ]; }; pull_request = {}; workflow_dispatch = {}; };
+  ```
+- New `gitignore.extra` param: append extra lines to the generated `.gitignore`
+- Python projects now get a `pytest` GHA job generated automatically when `py` module is passed
+- New conditional release gate job: release workflow now checks whether `Cargo.toml` version changed before proceeding
+
+**`rs` module**
+- New `config` param: arbitrary `.cargo/config.toml` extensions as a Nix attrset, merged with the generated config:
+  ```nix
+  rs = v-utils.rs { inherit pkgs rust; config = { build.jobs = 4; }; };
+  ```
+
+**`py` module**
+- `ruff` param removed (ruff.toml is now always copied)
+- `pyproject.toml` tool sections (`tool.pytest`, `tool.ty`, `tool.inline-snapshot`) are now fully controlled and overwritten on each shell entry, not just appended when missing
+- Expanded ruff/pyproject linting defaults
+
+**`readme-fw`**
+- New: place an `arch.mermaid` file in `docs/.readme_assets/` and it gets embedded as a fenced mermaid block in the README
+- Now warns at eval time if any files in `docs/.readme_assets/` are unrecognized (won't be included in README)
+
+**Pre-commit**
+- `cargo-autoinherit` added to pre-commit hooks for Rust projects
+
+**Excalidraw**
+- Light/dark theme support in the embedded excalidraw server
+
+---
+
 ## v1.4.0
 
 **Breaking: `github` module**
