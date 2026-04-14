@@ -7,9 +7,6 @@ pub struct Cli {
 	pub path: PathBuf,
 	pub venv_path: String,
 	pub src_path: String,
-	/// Comma-separated list of directories pytest should not recurse into.
-	#[arg(long, value_delimiter = ',')]
-	pub norecursedirs: Vec<String>,
 }
 
 pub fn run(args: Cli) {
@@ -22,7 +19,7 @@ pub fn run(args: Cli) {
 		)
 	};
 
-	let merged = merge(&existing, &args.venv_path, &args.src_path, &args.norecursedirs);
+	let merged = merge(&existing, &args.venv_path, &args.src_path);
 
 	if merged != existing {
 		std::fs::write(&args.path, &merged).expect("writing pyproject.toml");
@@ -48,7 +45,7 @@ fn reassign_positions(table: &mut Table, counter: &mut isize) {
 	}
 }
 
-pub fn merge(content: &str, venv_path: &str, src_path: &str, norecursedirs: &[String]) -> String {
+pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 	let mut doc = content.parse::<DocumentMut>().expect("valid TOML");
 
 	if let Some(tool) = doc.get_mut("tool").and_then(|t| t.as_table_mut()) {
@@ -64,12 +61,10 @@ pub fn merge(content: &str, venv_path: &str, src_path: &str, norecursedirs: &[St
 		pytest.set_implicit(true);
 		let mut ini = Table::new();
 		ini.insert("typeguard-packages", value(src_path));
-		if !norecursedirs.is_empty() {
+		{
 			let mut arr = toml_edit::Array::new();
-			for dir in norecursedirs {
-				arr.push(dir.as_str());
-			}
-			ini.insert("norecursedirs", value(arr));
+			arr.push(src_path);
+			ini.insert("testpaths", value(arr));
 		}
 		pytest.insert("ini_options", Item::Table(ini));
 		tool.insert("pytest", Item::Table(pytest));

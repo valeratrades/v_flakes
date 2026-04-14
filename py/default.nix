@@ -6,8 +6,6 @@
   src_path ? "py_src",
   # Deep-merged into ruff config. Lists are concatenated, attrsets recurse, scalars replace.
   ruff ? {},
-  # Extra directories pytest should not recurse into (beyond its built-in defaults).
-  norecursedirs ? [],
 }:
 if nixpkgs != null && pkgs == null then {
   description = ''
@@ -43,10 +41,8 @@ let
 
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
-  norecursedirsFlag = if norecursedirs == [] then "" else "--norecursedirs ${builtins.concatStringsSep "," norecursedirs}";
-
   pyprojectHook = ''
-    v_flakes toml pyproject ./pyproject.toml ${venv_path} ${src_path} ${norecursedirsFlag}
+    v_flakes toml pyproject ./pyproject.toml ${venv_path} ${src_path}
   '';
 in
 {
