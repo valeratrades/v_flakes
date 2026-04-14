@@ -1,6 +1,6 @@
 [package]
 name = "v_flakes"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
 description = "CLI tools for v_flakes nix module management"
