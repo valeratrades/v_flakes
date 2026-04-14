@@ -47,6 +47,10 @@ See individual component descriptions in their respective directories.'';
             errors.hooks = { push.paths = [ "src/**" ]; };
             warnings.hooks = { push.paths = [ "src/**" ]; };
           };
+          release = {
+            hooks = { push.branches = [ "master" ]; };
+            gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
+          };
         };
         readme = (import ./readme_fw) {
           inherit pkgs pname;

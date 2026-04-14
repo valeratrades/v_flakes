@@ -168,6 +168,7 @@ let
   '';
   vFlakesVersion = (builtins.fromTOML (builtins.readFile ../Cargo.toml)).package.version;
 
+  #HACK: install expressions are not DRY (could move out binstallPinned, binstallExact; both using binstallCmd for exact expression (as it repeats exactly))
   binstallHook = ''
     export PATH="$HOME/.cargo/bin:$PATH"
   '' + (if tracey then ''

@@ -141,7 +141,7 @@ github = v-utils.github {
     # hooks: override `on` triggers (default: push.tags = ["v[0-9]+.*"]; workflow_dispatch always appended)
     hooks = { push.tags = [ "v[0-9]+.*" ]; push.branches = [ "release" ]; };
     # gate: shell condition — release only runs if true. Default: no gate (always run).
-    gate = ''"$(git show HEAD~1:Cargo.toml | grep '\''^version'\'' | head -1)" != "$(grep '\''^version'\'' Cargo.toml | head -1)"'';
+    gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
   };
 
   # Sync fork over upstream via rebase (daily schedule + manual trigger)

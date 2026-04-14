@@ -23,7 +23,7 @@
   hooks ? { push.tags = [ "v[0-9]+.*" ]; },
   # Optional gate condition (shell expression). When set, a `gate` job runs first and
   # the build only proceeds if the condition is true.
-  # Example: '"$(git show HEAD~1:Cargo.toml | grep '\''^version'\'' | head -1)" != "$(grep '\''^version'\'' Cargo.toml | head -1)"'
+  # Example: "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\""
   gate ? null,
   # Legacy params (ignored, kept for backwards compat)
   installConfig ? {},
