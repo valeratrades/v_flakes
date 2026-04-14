@@ -122,8 +122,9 @@ jobs:
         \ is less than 15% of code\"\n\t\t\t\tfi\n        \t\t\t"
 name: Warnings
 'on':
-  pull_request: {}
-  push: {}
+  push:
+    paths:
+    - src/**
   workflow_dispatch: {}
 permissions:
   contents: read
