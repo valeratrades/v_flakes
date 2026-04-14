@@ -1,7 +1,8 @@
 args@{ pkgs ? null, nixpkgs ? null, lastSupportedVersion ? null, jobsErrors, jobsWarnings, jobsOther ? [], hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", release ? null, gitlabSync ? null, syncFork ? false,
   # Per-section install dependencies: { packages = [ "pkg1" ]; apt = [ "pkg2" ]; }
   installErrors ? {}, installWarnings ? {}, installOther ? {},
-  # Per-section `on` triggers. Default: push + pull_request + workflow_dispatch.
+  # Per-section `on` triggers. Default: push + pull_request.
+  # workflow_dispatch is always appended unless already present in the provided value.
   hooksErrors ? null, hooksWarnings ? null, hooksOther ? null,
 }:
 
@@ -22,8 +23,8 @@ workflows = import ./github/workflows/nix-parts {
   # Or with args: { name = "rust-tests"; args.skipPatterns = [ "pattern1" "pattern2" ]; }
   jobsWarnings = [ "rust-clippy" "rust-machete" ];
   jobsOther = [ "loc-badge" ];
-  # Per-section `on` triggers (default: push + pull_request + workflow_dispatch):
-  # hooksErrors = { push = { branches = [ "main" ]; }; pull_request = {}; workflow_dispatch = {}; };
+  # Per-section `on` triggers (default: push + pull_request; workflow_dispatch always appended):
+  # hooksErrors = { push = { branches = [ "main" ]; }; pull_request = {}; };
 };
 ```
 
@@ -213,9 +214,12 @@ let
   
   defaultHooks = utils.defaultHooks;
 
-  # Build the `on` attrset for a workflow, falling back to defaultHooks.
+  # Build the `on` attrset for a workflow.
+  # workflow_dispatch is always injected unless the caller already set it explicitly.
   makeOn = hooksOverride:
-    if hooksOverride != null then hooksOverride else defaultHooks;
+    let base = if hooksOverride != null then hooksOverride else defaultHooks;
+    in if base ? workflow_dispatch then base
+       else base // { workflow_dispatch = {}; };
 
   base = { };
   # release = { ... } is enabled by presence. Set `enable = false` to disable.

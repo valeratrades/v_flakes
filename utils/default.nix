@@ -116,7 +116,6 @@ in
   defaultHooks = {
     push = { };
     pull_request = { };
-    workflow_dispatch = { };
   };
 
   inherit checkCrateVersion optionalDefaults;

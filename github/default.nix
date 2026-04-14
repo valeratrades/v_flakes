@@ -104,8 +104,9 @@ github = v-utils.github {
       augment = [ "rust-miri" ];  # Add extra jobs
       exclude = [ "rust-doc" ];   # Remove from defaults
       install = { packages = [ "wayland" "libxkbcommon" ]; };  # Per-section override
-      # hooks: override the `on` triggers for this workflow (default: push + pull_request + workflow_dispatch)
-      hooks = { push = { branches = [ "main" ]; }; pull_request = { }; workflow_dispatch = { }; };
+      # hooks: override the `on` triggers for this workflow (default: push + pull_request)
+      # workflow_dispatch is always appended automatically unless you set it explicitly.
+      hooks = { push = { branches = [ "main" ]; }; pull_request = { }; };
     };
     warnings = {
       default = true;
