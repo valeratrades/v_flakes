@@ -41,7 +41,7 @@ let
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
   pyprojectHook = ''
-    pyproject_merge ./pyproject.toml ${venv_path} ${src_path}
+    v_flakes toml pyproject ./pyproject.toml ${venv_path} ${src_path}
   '';
 in
 {

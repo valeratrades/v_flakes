@@ -1,4 +1,30 @@
+use std::path::PathBuf;
+
 use toml_edit::{DocumentMut, Item, Table, value};
+
+#[derive(clap::Args)]
+pub struct Cli {
+	pub path: PathBuf,
+	pub venv_path: String,
+	pub src_path: String,
+}
+
+pub fn run(args: Cli) {
+	let existing = if args.path.exists() {
+		std::fs::read_to_string(&args.path).expect("reading pyproject.toml")
+	} else {
+		format!(
+			"[build-system]\nrequires = [\"setuptools>=75.0\"]\nbuild-backend = \"setuptools.backends._legacy:_Backend\"\n\n[tool.setuptools.packages.find]\nwhere = [\"{src_path}\"]\n",
+			src_path = args.src_path
+		)
+	};
+
+	let merged = merge(&existing, &args.venv_path, &args.src_path);
+
+	if merged != existing {
+		std::fs::write(&args.path, &merged).expect("writing pyproject.toml");
+	}
+}
 
 fn sort_table(table: &mut Table) {
 	table.sort_values();
@@ -9,8 +35,8 @@ fn sort_table(table: &mut Table) {
 	}
 }
 
-fn reassign_positions(table: &mut Table, counter: &mut usize) {
-	table.set_position(*counter);
+fn reassign_positions(table: &mut Table, counter: &mut isize) {
+	table.set_position(Some(*counter));
 	*counter += 1;
 	for (_, v) in table.iter_mut() {
 		if let Some(t) = v.as_table_mut() {
@@ -56,7 +82,7 @@ pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
 	}
 
 	sort_table(doc.as_table_mut());
-	reassign_positions(doc.as_table_mut(), &mut 0);
+	reassign_positions(doc.as_table_mut(), &mut 0isize);
 
 	doc.to_string()
 }

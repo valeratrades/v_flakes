@@ -8,4 +8,8 @@ license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 toml_edit = "0.25"
+
+[dev-dependencies]
+v_fixtures = { path = "/home/v/s/v_fixtures" }
