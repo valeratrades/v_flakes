@@ -19,15 +19,17 @@
   cargoFlags ? {},
   # Optional apt dependencies for linux builds
   aptDeps ? [],
-  # Trigger config: which triggers to generate for
-  triggers ? { tag = true; },
-  # Branch for release_branch trigger
-  branch ? "release",
+  # `on` triggers. Default: push to v* tags. workflow_dispatch always appended.
+  hooks ? { push.tags = [ "v[0-9]+.*" ]; },
   # Legacy params (ignored, kept for backwards compat)
   installConfig ? {},
   install ? {},
 }:
 let
+  triggerOn =
+    if hooks ? workflow_dispatch then hooks
+    else hooks // { workflow_dispatch = {}; };
+
   targetToOs = target:
     if builtins.match ".*-linux-.*" target != null then "ubuntu-latest"
     else if builtins.match ".*-apple-.*" target != null then "macos-latest"
@@ -44,18 +46,6 @@ let
 
   isWindows = target: builtins.match ".*-windows-.*" target != null;
   isLinux = target: builtins.match ".*-linux-.*" target != null;
-
-  hasTag = triggers.tag or false;
-  hasBranch = triggers.branch or false;
-
-  triggerOn =
-    let
-      tagPart = if hasTag then { push.tags = [ "v[0-9]+.*" ]; } else {};
-      branchPart = if hasBranch then { push.branches = [ branch ]; } else {};
-      pushPart = if hasTag && hasBranch then {
-        push = { tags = [ "v[0-9]+.*" ]; branches = [ branch ]; };
-      } else tagPart // branchPart;
-    in pushPart // { workflow_dispatch = {}; };
 
   makeWorkflow = target:
     let

@@ -33,7 +33,7 @@ Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust
 Standalone workflows:
 - release = { }  # enabled by presence, disabled with `enable = false`
     Per-target binary release for cargo-binstall. Generates one workflow file per target (release-{shortName}.yml).
-    Default trigger: "tag" (v* tags). Set trigger = ["tag" "release_branch"] to also trigger on branch push.
+    Default hooks: push.tags = ["v[0-9]+.*"] + workflow_dispatch. Override via hooks = { ... }.
     Default targets: x86_64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
 - gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; }
     Sync to GitLab mirror (triggers on push to any branch/tag)
@@ -224,34 +224,15 @@ let
   base = { };
   # release = { ... } is enabled by presence. Set `enable = false` to disable.
   # `release = null` (the default) means no release workflows.
-  validTriggers = [ "tag" "release_branch" ];
   releaseEnabled = release != null && (
     if builtins.isAttrs release then (release.enable or true)
-    else abort "release must be an attrset, e.g. release = { trigger = \"tag\"; }"
+    else abort "release must be an attrset, e.g. release = { }"
   );
-
-  # Normalize trigger to a list. Default is ["tag"].
-  releaseTrigger =
-    let
-      raw = if builtins.isAttrs release then (release.trigger or ["tag"]) else ["tag"];
-      asList = if builtins.isList raw then raw else [raw];
-      invalid = builtins.filter (t: !(builtins.elem t validTriggers)) asList;
-    in
-    if invalid != [] then abort "release.trigger: unknown values ${builtins.toJSON invalid}. Valid: ${builtins.toJSON validTriggers}"
-    else asList;
-  hasTagTrigger = releaseEnabled && builtins.elem "tag" releaseTrigger;
-  hasReleaseBranchTrigger = releaseEnabled && builtins.elem "release_branch" releaseTrigger;
 
   # Per-target release workflows (one file per target)
   releaseWorkflows = if releaseEnabled then
     let
-      releaseArgs = builtins.removeAttrs release [ "enable" "trigger" "branch" ] // {
-        triggers = {
-          tag = hasTagTrigger;
-          branch = hasReleaseBranchTrigger;
-        };
-        branch = release.branch or "release";
-      };
+      releaseArgs = builtins.removeAttrs release [ "enable" ];
       spec = import files.rust-release releaseArgs;
     in builtins.mapAttrs (name: wf:
       (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs wf [ "standalone" "filename" "default" ])

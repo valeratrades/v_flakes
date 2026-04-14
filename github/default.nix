@@ -133,14 +133,13 @@ github = v-utils.github {
 
   # Binary releases — one workflow per target (release-{shortName}.yml)
   # Enabled by presence, disabled with `enable = false`
-  release = { };  # Defaults: tag trigger, standard targets
+  release = { };  # Defaults: push to v* tags + workflow_dispatch, standard targets
   # OR customize:
   release = {
     targets = [ "x86_64-unknown-linux-gnu" "x86_64-apple-darwin" "aarch64-apple-darwin" ];
     aptDeps = [ "libssl-dev" ];  # Optional apt deps for linux builds
-    # trigger: "tag" (default), "release_branch", or both:
-    trigger = [ "tag" "release_branch" ];
-    branch = "release";  # Branch for release_branch trigger (default: "release")
+    # hooks: override `on` triggers (default: push.tags = ["v[0-9]+.*"]; workflow_dispatch always appended)
+    hooks = { push.tags = [ "v[0-9]+.*" ]; push.branches = [ "release" ]; };
   };
 
   # Sync fork over upstream via rebase (daily schedule + manual trigger)
