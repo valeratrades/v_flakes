@@ -110,6 +110,15 @@ in
       fi
     '';
 
+  # Default GitHub Actions `on` triggers for standard CI workflows.
+  # Fires on every push, every PR, and allows manual dispatch.
+  # Override per-section via jobs.errors.hooks = { ... } in github/default.nix.
+  defaultHooks = {
+    push = { };
+    pull_request = { };
+    workflow_dispatch = { };
+  };
+
   inherit checkCrateVersion optionalDefaults;
   inherit (core) mergeConfig;
 

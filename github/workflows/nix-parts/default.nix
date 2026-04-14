@@ -1,6 +1,8 @@
 args@{ pkgs ? null, nixpkgs ? null, lastSupportedVersion ? null, jobsErrors, jobsWarnings, jobsOther ? [], hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", release ? null, gitlabSync ? null, syncFork ? false,
   # Per-section install dependencies: { packages = [ "pkg1" ]; apt = [ "pkg2" ]; }
   installErrors ? {}, installWarnings ? {}, installOther ? {},
+  # Per-section `on` triggers. Default: push + pull_request + workflow_dispatch.
+  hooksErrors ? null, hooksWarnings ? null, hooksOther ? null,
 }:
 
 # If called with just nixpkgs (for flake description), return description attribute
@@ -20,6 +22,8 @@ workflows = import ./github/workflows/nix-parts {
   # Or with args: { name = "rust-tests"; args.skipPatterns = [ "pattern1" "pattern2" ]; }
   jobsWarnings = [ "rust-clippy" "rust-machete" ];
   jobsOther = [ "loc-badge" ];
+  # Per-section `on` triggers (default: push + pull_request + workflow_dispatch):
+  # hooksErrors = { push = { branches = [ "main" ]; }; pull_request = {}; workflow_dispatch = {}; };
 };
 ```
 
@@ -207,13 +211,13 @@ let
   constructJobs = installConfig: paths:
     builtins.listToAttrs (map (importFile installConfig) paths);
   
-  base = {
-    on = {
-      push = { };
-      pull_request = { };
-      workflow_dispatch = { };
-    };
-  };
+  defaultHooks = utils.defaultHooks;
+
+  # Build the `on` attrset for a workflow, falling back to defaultHooks.
+  makeOn = hooksOverride:
+    if hooksOverride != null then hooksOverride else defaultHooks;
+
+  base = { };
   # release = { ... } is enabled by presence. Set `enable = false` to disable.
   # `release = null` (the default) means no release workflows.
   validTriggers = [ "tag" "release_branch" ];
@@ -282,6 +286,7 @@ let
     errors = if jobsErrors != [] then (pkgs.formats.yaml { }).generate "" (
       pkgs.lib.recursiveUpdate base {
         name = "Errors";
+        "on" = makeOn hooksErrors;
         permissions = (import files.base).permissions;
         env = (import files.rust-base).env;
         jobs = pkgs.lib.recursiveUpdate
@@ -293,6 +298,7 @@ let
     warnings = if jobsWarnings != [] then (pkgs.formats.yaml { }).generate "" (
       pkgs.lib.recursiveUpdate base {
         name = "Warnings";
+        "on" = makeOn hooksWarnings;
         permissions = (import files.base).permissions;
         env = (import files.rust-base).env;
         jobs = pkgs.lib.recursiveUpdate
@@ -304,6 +310,7 @@ let
     other = if jobsOther != [] then (pkgs.formats.yaml { }).generate "" (
       pkgs.lib.recursiveUpdate base {
         name = "Other";
+        "on" = makeOn hooksOther;
         permissions = (import files.base).permissions;
         jobs = pkgs.lib.recursiveUpdate
           (loadNixJob installOther)

@@ -104,6 +104,8 @@ github = v-utils.github {
       augment = [ "rust-miri" ];  # Add extra jobs
       exclude = [ "rust-doc" ];   # Remove from defaults
       install = { packages = [ "wayland" "libxkbcommon" ]; };  # Per-section override
+      # hooks: override the `on` triggers for this workflow (default: push + pull_request + workflow_dispatch)
+      hooks = { push = { branches = [ "main" ]; }; pull_request = { }; workflow_dispatch = { }; };
     };
     warnings = {
       default = true;
@@ -267,6 +269,14 @@ let
   installWarnings = effectiveInstall (jobs.warnings or {});
   installOther = effectiveInstall (jobs.other or {});
 
+  # Extract hooks (on-triggers) from each section, null means use default
+  effectiveHooks = section:
+    if builtins.isAttrs section && section ? hooks then section.hooks
+    else null;
+  hooksErrors = effectiveHooks (jobs.errors or {});
+  hooksWarnings = effectiveHooks (jobs.warnings or {});
+  hooksOther = effectiveHooks (jobs.other or {});
+
   # sync_fork: can be set via jobs.sync_fork or top-level syncFork param
   effectiveSyncFork = syncFork || (jobs.sync_fork or false);
 
@@ -276,6 +286,7 @@ let
   } // (if enable then {
     inherit lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release gitlabSync;
     inherit installErrors installWarnings installOther;
+    inherit hooksErrors hooksWarnings hooksOther;
   } else {
     jobsErrors = [];
     jobsWarnings = [];
