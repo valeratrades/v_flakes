@@ -60,6 +60,8 @@ fn ga_action(item: &Item) -> Option<GaAction> {
 fn process(content: &str) -> String {
 	let mut doc = content.parse::<DocumentMut>().expect("valid TOML");
 
+	doc.remove("patch");
+
 	let dep_section_names: Vec<String> = doc
 		.iter()
 		.filter(|(k, _)| k.ends_with("dependencies"))
@@ -144,6 +146,22 @@ my_lib = { path = "../my_lib" } #ga: sub path
 			r#"[dependencies]
 internal = { path = "../internal" } #ga: comment
 serde = { version = "1" }
+"#
+		), @r#"
+		[dependencies]
+		serde = { version = "1" }
+		"#);
+	}
+
+	#[test]
+	fn patch_crates_io_removed() {
+		insta::assert_snapshot!(process(
+			r#"[dependencies]
+serde = { version = "1" }
+
+[patch.crates-io]
+v_utils = { path = "../v_utils/v_utils" }
+v_utils_macros = { path = "../v_utils/v_utils_macros" }
 "#
 		), @r#"
 		[dependencies]

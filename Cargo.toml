@@ -7,6 +7,16 @@ description = "CLI tools for v_flakes nix module management"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
 
+[lints.rust]
+unused_features = "allow"
+
+[lints.clippy]
+float_cmp = "allow"
+len_zero = "allow"
+comparison_to_empty = "allow"
+undocumented_unsafe_blocks = "warn"
+tabs_in_doc_comments = "allow"
+
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 bin-dir = "{ bin }{ binary-ext }"
