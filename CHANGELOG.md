@@ -15,6 +15,15 @@
 
 ## v1.5.0
 
+**Breaking: `github` now requires `enable = true`**
+- `github` module has a new master switch `enable` that defaults to `false`.
+  Without it, no CI workflows, pre-commit hooks, gitignore, or label sync are generated — only standalone workflows (`syncFork`, `gitlabSync`, `release`) still work.
+  **All existing projects must add `enable = true`:**
+  ```nix
+  github = v-utils.github { inherit pkgs pname; enable = true; /* ... rest of params */ };
+  ```
+  A warning is printed at eval time if `enable`-gated fields are passed but `enable` is false.
+
 **Breaking: array fields now require explicit `.augment` or `.replace`**
 - Directly assigning a list to a field that already has a list now errors instead of silently augmenting:
   ```nix
@@ -265,6 +274,7 @@ Initial release. Modules:
 
 **v1.2 projects -> latest** (ask_llm, nautilus, polymarket_mm, prettify_log, shorts_basket, site, snapshot_fonts):
 1. Change ref to `v1.4`
+0. Add `enable = true` to your `github` call — **without this, nothing is generated**
 2. `files.licenses.blue_oak` is now `{ name = "..."; path = ...; }`, not a plain path.
    If using `readme-fw` with `defaults = true`, you can drop explicit license params entirely.
 3. `readme-fw` licenses changed from `[{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }]` to `[{ license = v-utils.files.licenses.blue_oak; }]`
@@ -275,6 +285,7 @@ Initial release. Modules:
 
 **v1.3 projects -> latest** (tg_admin):
 1. Change ref to `v1.4`
+0. Add `enable = true` to your `github` call — **without this, nothing is generated**
 2. Steps 3-7 above
 3. `rs` module: `build` param changed from `{ log_directives; git_version; }` to `{ workspace = { "./" = [...]; }; }`
 4. `rs` now requires `rust` param: `v-utils.rs { inherit pkgs rust; }`
