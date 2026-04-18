@@ -31,7 +31,7 @@ devShells.default = pkgs.mkShell {
 The shellHook will:
 - Copy ruff.toml to ./ruff.toml
 - Generate pyproject.toml with [build-system] if one doesn't exist
-- Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml
+- Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml via py/pyproject_merge.rs
 - Create venv at venv_path if missing, activate it, and warn if stale
 '';
 } else
@@ -42,7 +42,7 @@ let
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
   pyprojectHook = ''
-    v_flakes toml pyproject ./pyproject.toml ${venv_path} ${src_path}
+    cargo -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${venv_path} ${src_path}
   '';
 in
 {

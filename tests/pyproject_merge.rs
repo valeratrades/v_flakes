@@ -1,3 +1,5 @@
+#![cfg(feature = "toml")]
+
 use v_fixtures::Fixture;
 use v_flakes::pyproject_merge::merge;
 
