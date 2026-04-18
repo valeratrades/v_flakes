@@ -3,9 +3,16 @@ name = "v_flakes"
 version = "0.1.2"
 edition = "2024"
 authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
-description = "CLI tools for v_flakes nix module management"
+description = "Shared primitives for v_flakes nix module scripts"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
+
+[package.metadata]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
 
 [lints.rust]
 unused_features = "allow"
@@ -17,15 +24,14 @@ comparison_to_empty = "allow"
 undocumented_unsafe_blocks = "warn"
 tabs_in_doc_comments = "allow"
 
-[package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
-bin-dir = "{ bin }{ binary-ext }"
-pkg-fmt = "tgz"
+[features]
+toml = ["dep:clap", "dep:toml_edit"]
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-toml_edit = "0.25"
+clap = { version = "4", features = ["derive"], optional = true }
+toml_edit = { version = "0.25", optional = true }
 
 [dev-dependencies]
 insta = "1"
+toml_edit = "0.25"
 v_fixtures.version = "0.3.4"
