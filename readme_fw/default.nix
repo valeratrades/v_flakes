@@ -239,13 +239,15 @@ let
     path = "docs/.readme_assets/description\\.(md|typ)";
   };
 
+  hasMermaid = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.mermaid");
+  hasDrawio = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.drawio");
+
   arch_out =
-    let
-      archMermaidPath = rootDir + "/docs/.readme_assets/arch.mermaid";
-    in
-    if builtins.pathExists archMermaidPath then
+    if hasMermaid && hasDrawio then
+      throw "Both arch.mermaid and arch.drawio found in docs/.readme_assets/ — only one is allowed at a time"
+    else if hasMermaid then
       let
-        rawFile = builtins.path { path = archMermaidPath; };
+        rawFile = builtins.path { path = rootDir + "/docs/.readme_assets/arch.mermaid"; };
         fixerScript = ./fix_mermaid_quotes.py;
         content = pkgs.lib.removeSuffix "\n" (builtins.readFile (
           pkgs.runCommand "arch.mermaid.fixed" { buildInputs = [ pkgs.python3 ]; } ''
@@ -254,6 +256,8 @@ let
         ));
       in
       "\n```mermaid\n${content}\n```\n"
+    else if hasDrawio then
+      "\n![Architecture](./docs/.readme_assets/assets/arch.svg)\n"
     else
       "";
 
@@ -375,6 +379,7 @@ ${content}
     "warning\\.(md|typ)"
     "description\\.(md|typ)"
     "arch\\.mermaid"
+    "arch\\.drawio"
     "logo\\.(md|html)"
     "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)"
     "usage\\.(sh|md|typ)"
@@ -382,7 +387,11 @@ ${content}
   ];
   _assetsDir = "${rootStr}/docs/.readme_assets";
   _assetsDirExists = builtins.pathExists _assetsDir;
-  _allAssets = if _assetsDirExists then builtins.attrNames (builtins.readDir _assetsDir) else [ ];
+  _allAssets =
+    if _assetsDirExists then
+      let dirContents = builtins.readDir _assetsDir;
+      in builtins.filter (name: dirContents.${name} == "regular") (builtins.attrNames dirContents)
+    else [ ];
   _isRecognized = name: builtins.any (pat: builtins.match pat name != null) _recognizedPatterns;
   _unrecognizedAssets = builtins.filter (name: !(_isRecognized name)) _allAssets;
   _warnUnrecognized = builtins.foldl'
@@ -444,10 +453,19 @@ README_EOF
           ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
         fi
       '' else "";
+      drawioConvert = if hasDrawio then ''
+        mkdir -p docs/.readme_assets/assets
+        ${pkgs.xvfb-run}/bin/xvfb-run ${pkgs.drawio}/bin/drawio \
+          --no-sandbox --disable-gpu \
+          --export --format svg \
+          --output docs/.readme_assets/assets/arch.svg \
+          docs/.readme_assets/arch.drawio
+      '' else "";
     in
     ''
       ${locGistCheck}
       ${licenseCopies}
+      ${drawioConvert}
       mkdir -p docs
       #DEPRECATE: in v2.0 version
       if [ -d ./.readme_assets ] && [ ! -d ./docs/.readme_assets ]; then
@@ -459,5 +477,5 @@ README_EOF
 in
 {
   inherit readme shellHook init_loc_gist;
-  enabledPackages = [ init_loc_gist pkgs.tokei ];
+  enabledPackages = [ init_loc_gist pkgs.tokei ] ++ pkgs.lib.optionals hasDrawio [ pkgs.drawio pkgs.xvfb-run ];
 }
