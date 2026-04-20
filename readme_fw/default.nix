@@ -241,10 +241,12 @@ let
 
   hasMermaid = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.mermaid");
   hasDrawio = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.drawio");
+  hasPng = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.png");
+  archCount = (if hasMermaid then 1 else 0) + (if hasDrawio then 1 else 0) + (if hasPng then 1 else 0);
 
   arch_out =
-    if hasMermaid && hasDrawio then
-      throw "Both arch.mermaid and arch.drawio found in docs/.readme_assets/ — only one is allowed at a time"
+    if archCount > 1 then
+      throw "Multiple arch files found in docs/.readme_assets/ — only one of arch.mermaid, arch.drawio, arch.png is allowed at a time"
     else if hasMermaid then
       let
         rawFile = builtins.path { path = rootDir + "/docs/.readme_assets/arch.mermaid"; };
@@ -258,6 +260,8 @@ let
       "\n```mermaid\n${content}\n```\n"
     else if hasDrawio then
       "\n![Architecture](./docs/.readme_assets/assets/arch.svg)\n"
+    else if hasPng then
+      "\n![Architecture](./docs/.readme_assets/arch.png)\n"
     else
       "";
 
@@ -380,6 +384,7 @@ ${content}
     "description\\.(md|typ)"
     "arch\\.mermaid"
     "arch\\.drawio"
+    "arch\\.png"
     "logo\\.(md|html)"
     "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)"
     "usage\\.(sh|md|typ)"
