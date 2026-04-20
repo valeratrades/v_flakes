@@ -29,6 +29,8 @@ README generation framework from `docs/.readme_assets/` directory.
 - Badge generation (msrv, crates.io, docs.rs, loc, ci)
 - License file management
 
+![Architecture](./docs/.readme_assets/assets/arch.svg)
+
 ## Usage
 ```nix
 {
@@ -56,7 +58,7 @@ README generation framework from `docs/.readme_assets/` directory.
 
       readme = v-utils.readme-fw {
         inherit pkgs pname;
-        rootDir = ./.;
+        rootDir = ./docs/.readme_assets/.;
         lastSupportedVersion = "nightly-1.86";
         defaults = true;
         badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];

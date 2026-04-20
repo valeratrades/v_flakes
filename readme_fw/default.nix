@@ -456,7 +456,6 @@ README_EOF
       drawioConvert = if hasDrawio then ''
         mkdir -p docs/.readme_assets/assets
         ${pkgs.xvfb-run}/bin/xvfb-run ${pkgs.drawio}/bin/drawio \
-          --no-sandbox --disable-gpu \
           --export --format svg \
           --output docs/.readme_assets/assets/arch.svg \
           docs/.readme_assets/arch.drawio
