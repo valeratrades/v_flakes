@@ -245,7 +245,13 @@ let
     in
     if builtins.pathExists archMermaidPath then
       let
-        content = pkgs.lib.removeSuffix "\n" (builtins.readFile archMermaidPath);
+        rawFile = builtins.path { path = archMermaidPath; };
+        fixerScript = ./fix_mermaid_quotes.py;
+        content = pkgs.lib.removeSuffix "\n" (builtins.readFile (
+          pkgs.runCommand "arch.mermaid.fixed" { buildInputs = [ pkgs.python3 ]; } ''
+            python3 ${fixerScript} ${rawFile} > $out
+          ''
+        ));
       in
       "\n```mermaid\n${content}\n```\n"
     else
