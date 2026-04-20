@@ -28,7 +28,11 @@ See individual component descriptions in their respective directories.'';
     in
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; overlays = [ (import rust-overlay) ]; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ (import rust-overlay) ];
+          config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "drawio" ];
+        };
         rust = pkgs.rust-bin.selectLatestNightlyWith (t: t.default.override {
           extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
         });
