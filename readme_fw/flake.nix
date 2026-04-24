@@ -15,10 +15,7 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
+        pkgs = import nixpkgs { inherit system; };
         readme-fw = import ./.;
 
         pname = "readme-fw";

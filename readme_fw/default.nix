@@ -240,13 +240,12 @@ let
   };
 
   hasMermaid = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.mermaid");
-  hasDrawio = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.drawio");
   hasPng = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.png");
-  archCount = (if hasMermaid then 1 else 0) + (if hasDrawio then 1 else 0) + (if hasPng then 1 else 0);
+  archCount = (if hasMermaid then 1 else 0) + (if hasPng then 1 else 0);
 
   arch_out =
     if archCount > 1 then
-      throw "Multiple arch files found in docs/.readme_assets/ — only one of arch.mermaid, arch.drawio, arch.png is allowed at a time"
+      throw "Multiple arch files found in docs/.readme_assets/ — only one of arch.mermaid, arch.png is allowed at a time"
     else if hasMermaid then
       let
         rawFile = builtins.path { path = rootDir + "/docs/.readme_assets/arch.mermaid"; };
@@ -257,11 +256,9 @@ let
           ''
         ));
       in
-      "\n```mermaid\n${content}\n```\n"
-    else if hasDrawio then
-      "\n![Architecture](./docs/.readme_assets/assets/arch.svg)\n"
+      "## Architecture\n\n```mermaid\n${content}\n```\n"
     else if hasPng then
-      "\n![Architecture](./docs/.readme_assets/arch.png)\n"
+      "## Architecture\n\n![Architecture](./docs/.readme_assets/arch.png)\n"
     else
       "";
 
@@ -383,7 +380,6 @@ ${content}
     "warning\\.(md|typ)"
     "description\\.(md|typ)"
     "arch\\.mermaid"
-    "arch\\.drawio"
     "arch\\.png"
     "logo\\.(md|html)"
     "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)"
@@ -434,8 +430,8 @@ ${content}
   readme = builtins.seq _warnUnrecognized (pkgs.runCommand "README.md" { } ''
     cat > $out <<'README_EOF'
 ${warning_out}${builtins.readFile badges_out}
-${description_out}${arch_out}${installation_out}
-${usage_out}${other_out}
+${description_out}${installation_out}
+${usage_out}${arch_out}${other_out}
 ${builtins.readFile best_practices_out}
 ${builtins.readFile licenses_out}
 README_EOF
@@ -458,18 +454,10 @@ README_EOF
           ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
         fi
       '' else "";
-      drawioConvert = if hasDrawio then ''
-        mkdir -p docs/.readme_assets/assets
-        ${pkgs.xvfb-run}/bin/xvfb-run ${pkgs.drawio}/bin/drawio \
-          --export --format svg \
-          --output docs/.readme_assets/assets/arch.svg \
-          docs/.readme_assets/arch.drawio
-      '' else "";
     in
     ''
       ${locGistCheck}
       ${licenseCopies}
-      ${drawioConvert}
       mkdir -p docs
       #DEPRECATE: in v2.0 version
       if [ -d ./.readme_assets ] && [ ! -d ./docs/.readme_assets ]; then
@@ -481,5 +469,5 @@ README_EOF
 in
 {
   inherit readme shellHook init_loc_gist;
-  enabledPackages = [ init_loc_gist pkgs.tokei ] ++ pkgs.lib.optionals hasDrawio [ pkgs.drawio pkgs.xvfb-run ];
+  enabledPackages = [ init_loc_gist pkgs.tokei ];
 }

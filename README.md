@@ -29,8 +29,6 @@ README generation framework from `docs/.readme_assets/` directory.
 - Badge generation (msrv, crates.io, docs.rs, loc, ci)
 - License file management
 
-![Architecture](./docs/.readme_assets/assets/arch.svg)
-
 ## Usage
 ```nix
 {
@@ -76,6 +74,9 @@ README generation framework from `docs/.readme_assets/` directory.
 }
 ```
 
+## Architecture
+
+![Architecture](./docs/.readme_assets/assets/arch.svg)
 ## Bundled Tools
 
 The `rs` module bundles these tools from crates.io:
