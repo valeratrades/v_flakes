@@ -8,12 +8,10 @@ clap = { version = "4", features = ["derive"] }
 v_flakes = { path = "../..", features = ["toml"] }
 ---
 
-use clap::Parser;
-
-#[derive(Parser)]
+#[derive(clap::Parser)]
 struct Cli {
 	#[command(flatten)]
-	args: v_flakes::cargo_pre_ci::Cli,
+	args: v_flakes::cargo_pre_ci::Args,
 }
 
 fn main() {

@@ -7,11 +7,11 @@ use std::{
 use toml_edit::{DocumentMut, Item, Value};
 
 #[derive(clap::Args)]
-pub struct Cli {
+pub struct Args {
 	pub path: PathBuf,
 }
 
-pub fn run(args: Cli) {
+pub fn run(args: Args) {
 	let cargo_files = git_tracked_cargo_tomls(&args.path).expect("discovering Cargo.toml files");
 	let mut modified_any = false;
 	for path in cargo_files {
