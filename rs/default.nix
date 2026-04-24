@@ -6,6 +6,7 @@
   targets ? {},
   config ? {},
   deny ? false,
+  clippy ? {},
   tracey ? true,
   style ? {},
   # build.rs options
@@ -38,6 +39,7 @@ rs = v-utils.rs {
   inherit pkgs rust;  # rust is the nix toolchain package
   cranelift = true;  # Enable cranelift backend (default: true)
   deny = false;      # Copy deny.toml for cargo-deny (default: false)
+  clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see files/rust/clippy.nix)
   tracey = true;     # Enable tracey spec coverage (default: true)
   style = {
     format = true;   # Auto-fix style issues in pre-commit (default: true)
@@ -94,6 +96,7 @@ The shellHook will:
 - Prepend nix rust to PATH so it takes precedence over rustup shims
 - Copy rustfmt.toml to ./rustfmt.toml
 - Copy cargo config to ./.cargo/config.toml
+- Copy clippy config to ./.cargo/clippy.toml
 - Copy build.rs to each directory in build.workspace (with write permissions for treefmt)
 - Copy deny.toml to ./deny.toml (if deny = true)
 
@@ -130,6 +133,7 @@ let
   };
   denyExtend = if builtins.isAttrs deny then deny else {};
   denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
+  clippyFile = files.rust.clippy { inherit pkgs; extend = clippy; };
 
   # Generate a build file for each workspace directory with its specific modules
   makeBuildFile = modules: files.rust.build { inherit pkgs modules; };
@@ -197,7 +201,7 @@ let
   '' else "";
 in
 {
-  inherit rust rustfmtFile configFile denyFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
+  inherit rust rustfmtFile configFile denyFile clippyFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
 
   # For backwards compatibility, expose the first build file
   buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});
@@ -206,6 +210,7 @@ in
     mkdir -p ./.cargo
     cp -f ${rustfmtFile} ./rustfmt.toml
     cp -f ${configFile} ./.cargo/config.toml
+    cp -f ${clippyFile} ./.cargo/clippy.toml
     ${buildHook}
     ${denyHook}
     ${binstallHook}
