@@ -76,7 +76,7 @@ README generation framework from `docs/.readme_assets/` directory.
 
 ## Architecture
 
-![Architecture](./docs/.readme_assets/assets/arch.svg)
+<img src="./docs/.readme_assets/arch.png" alt="Architecture" width="60%">
 ## Bundled Tools
 
 The `rs` module bundles these tools from crates.io:

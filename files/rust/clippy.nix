@@ -6,6 +6,7 @@ let
     "allow-print-in-tests" = true;
     "allow-expect-in-tests" = true;
     "allow-unwrap-in-tests" = true;
+    "allow-len-without-is-empty" = true;
     "allow-dbg-in-tests" = true;
     "float_cmp" = "allow"; # is bad for `==` direct comparisons, but `<` and `>` should be allowed
     #get_first = "allow" # const fn, so actually is more performant, despite being annoying.

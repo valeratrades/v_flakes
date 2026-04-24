@@ -240,12 +240,17 @@ let
   };
 
   hasMermaid = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.mermaid");
-  hasPng = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.png");
+  readmeAssetsDir = rootDir + "/docs/.readme_assets";
+  readmeAssetFiles = if builtins.pathExists readmeAssetsDir then builtins.attrNames (builtins.readDir readmeAssetsDir) else [];
+  archPngFiles = builtins.filter (name: builtins.match "arch(_[0-9]+)?\\.png" name != null) readmeAssetFiles;
+  hasPng = archPngFiles != [];
   archCount = (if hasMermaid then 1 else 0) + (if hasPng then 1 else 0);
 
   arch_out =
     if archCount > 1 then
       throw "Multiple arch files found in docs/.readme_assets/ — only one of arch.mermaid, arch.png is allowed at a time"
+    else if builtins.length archPngFiles > 1 then
+      throw "Multiple arch PNG files found in docs/.readme_assets/ — only one arch*.png is allowed at a time"
     else if hasMermaid then
       let
         rawFile = builtins.path { path = rootDir + "/docs/.readme_assets/arch.mermaid"; };
@@ -258,7 +263,12 @@ let
       in
       "## Architecture\n\n```mermaid\n${content}\n```\n"
     else if hasPng then
-      "## Architecture\n\n![Architecture](./docs/.readme_assets/arch.png)\n"
+      let
+        archPngName = builtins.head archPngFiles;
+        pctMatch = builtins.match "arch_([0-9]+)\\.png" archPngName;
+        width = if pctMatch != null then "${builtins.head pctMatch}%" else "60%";
+      in
+      "## Architecture\n\n<img src=\"./docs/.readme_assets/${archPngName}\" alt=\"Architecture\" width=\"${width}\">\n"
     else
       "";
 
