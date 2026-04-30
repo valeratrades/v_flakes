@@ -12,6 +12,8 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   release ? null, gitlabSync ? null,
   excalidraw ? null,
   syncFork ? false,
+  # Dirs to exclude from sort-derives and codestyle (e.g. vendored code or submodules), e.g. ["libs/nautilus_trader"]
+  excludeDirs ? [],
   # Master switch: enables CI workflows, pre-commit hooks, gitignore, label sync, git_ops, etc.
   # When false (default), only explicitly requested standalone workflows (syncFork, gitlabSync, release) are generated.
   enable ? false,
@@ -19,7 +21,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -355,7 +357,7 @@ warnIfNeeded ({
     ${if rust != null then ''
     export PATH="${rust}/bin:$PATH"
     ${cargoNightly} -Zscript -q ${./append_custom.rs} ./.git/hooks/pre-commit
-    install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
+    install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
     '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${labelSyncHook}
