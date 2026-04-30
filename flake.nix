@@ -46,6 +46,7 @@ See individual component descriptions in their respective directories.'';
           rs = rsModule;
           enable = true;
           lastSupportedVersion = "nightly-2025-10-10";
+          excalidraw."docs/arch.excalidraw".standalone = true;
           jobs = {
             default = true;
             errors.hooks = { push.paths = [ "src/**" ]; };
