@@ -229,10 +229,15 @@ let
     else abort "release must be an attrset, e.g. release = { }"
   );
 
+  # Path to the Cargo.toml of the crate being packaged for binstall.
+  # In a workspace, point this at the binary crate's manifest (the workspace
+  # root has no [package] section and would fail the binstall metadata check).
+  releaseCargoTomlPath = if releaseEnabled then (release.cargoTomlPath or "Cargo.toml") else "Cargo.toml";
+
   # Per-target release workflows (one file per target)
   releaseWorkflows = if releaseEnabled then
     let
-      releaseArgs = builtins.removeAttrs release [ "enable" ];
+      releaseArgs = builtins.removeAttrs release [ "enable" "cargoTomlPath" ];
       spec = import files.rust-release releaseArgs;
     in builtins.mapAttrs (name: wf:
       (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs wf [ "standalone" "filename" "default" ])
@@ -317,7 +322,7 @@ let
       );
     in ''
       ${copyCommands}
-      cargo -Zscript -q ${ensureBinstallScript}
+      cargo -Zscript -q ${ensureBinstallScript} ${releaseCargoTomlPath}
     ''
   else "";
 

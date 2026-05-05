@@ -144,6 +144,9 @@ github = v-utils.github {
     hooks = { push.tags = [ "v[0-9]+.*" ]; push.branches = [ "release" ]; };
     # gate: shell condition — release only runs if true. Default: no gate (always run).
     gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
+    # cargoTomlPath: path to the binary crate's Cargo.toml (relative to repo root).
+    # Required in workspaces where the root has no [package] section. Default: "Cargo.toml".
+    cargoTomlPath = "./social_networks/Cargo.toml";
   };
 
   # Sync fork over upstream via rebase (daily schedule + manual trigger)
