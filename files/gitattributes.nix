@@ -25,9 +25,20 @@ let
     documents = [
       "*.pdf"
     ];
+    data = [
+      "*.json"
+      "*.csv"
+      "*.excalidraw"
+      "*.parquet"
+      "*.pkl"
+      "*.npy"
+      "*.npz"
+      "*.db"
+      "*.sqlite"
+      "*.sqlite3"
+      "*.onnx"
+    ];
   };
-
-  allPatterns = lfsPatterns.audio ++ lfsPatterns.images ++ lfsPatterns.documents;
 
   # Generate a single line for a pattern
   # enable = true: add LFS tracking
@@ -35,7 +46,7 @@ let
   mkLfsLine = enable: pattern:
     if enable
     then "${pattern} filter=lfs diff=lfs merge=lfs -text"
-    else "${pattern} -filter -diff -merge text";
+    else "${pattern} binary -filter";
 
   # Generate a section with a comment header
   mkSection = enable: name: patterns:
