@@ -7,6 +7,7 @@
   config ? {},
   deny ? false,
   clippy ? {},
+  lints ? true,
   tracey ? true,
   style ? {},
   # build.rs options
@@ -40,6 +41,7 @@ rs = v-utils.rs {
   cranelift = true;  # Enable cranelift backend (default: true)
   deny = false;      # Copy deny.toml for cargo-deny (default: false)
   clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see files/rust/clippy.nix)
+  lints = true;     # `false` disables Cargo.toml [lints.rust] (or [workspace.lints.rust]) management. Pass an attrset to extend defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
   tracey = true;     # Enable tracey spec coverage (default: true)
   style = {
     format = true;   # Auto-fix style issues in pre-commit (default: true)
@@ -97,6 +99,7 @@ The shellHook will:
 - Copy rustfmt.toml to ./rustfmt.toml
 - Copy cargo config to ./.cargo/config.toml
 - Copy clippy config to ./.cargo/clippy.toml
+- Merge controlled `[lints.rust]` (or `[workspace.lints.rust]` if `[workspace]` exists) into ./Cargo.toml
 - Copy build.rs to each directory in build.workspace (with write permissions for treefmt)
 - Copy deny.toml to ./deny.toml (if deny = true)
 
@@ -134,6 +137,14 @@ let
   denyExtend = if builtins.isAttrs deny then deny else {};
   denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
   clippyFile = files.rust.clippy { inherit pkgs; extend = clippy; };
+  lintsExtend = if builtins.isAttrs lints then lints else {};
+  lintsEnabled = if builtins.isBool lints then lints else true;
+  lintsFile = files.rust.lints { inherit pkgs; extend = lintsExtend; };
+  lintsHook = if lintsEnabled then ''
+    if [ -f ./Cargo.toml ]; then
+      cargo -Zscript -q ${./cargo_merge.rs} ./Cargo.toml ${lintsFile}
+    fi
+  '' else "";
 
   # Generate a build file for each workspace directory with its specific modules
   makeBuildFile = modules: files.rust.build { inherit pkgs modules; };
@@ -201,7 +212,7 @@ let
   '' else "";
 in
 {
-  inherit rust rustfmtFile configFile denyFile clippyFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
+  inherit rust rustfmtFile configFile denyFile clippyFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
 
   # For backwards compatibility, expose the first build file
   buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});
@@ -211,6 +222,7 @@ in
     cp -f ${rustfmtFile} ./rustfmt.toml
     cp -f ${configFile} ./.cargo/config.toml
     cp -f ${clippyFile} ./.cargo/clippy.toml
+    ${lintsHook}
     ${buildHook}
     ${denyHook}
     ${binstallHook}

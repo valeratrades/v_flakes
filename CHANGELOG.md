@@ -2,6 +2,11 @@
 
 ## v1.6.0
 
+- `rs`: new `lints` param (default `true`) — manages `[lints.rust]` (or `[workspace.lints.rust]` when `[workspace]` is present) in `Cargo.toml` on shell entry. Default body: `unused_features = "allow"`. Pass `false` to disable, or an attrset to extend (per-key `.replace`/`.augment`/`.exclude` from `utils/core.nix` apply). Other lint sections (e.g. `[lints.clippy]`) are left alone.
+  ```nix
+  rs = v-utils.rs { inherit pkgs rust; lints = { unused_imports = "warn"; }; };
+  rs = v-utils.rs { inherit pkgs rust; lints = false; };  # opt out
+  ```
 - `readme-fw`: **Breaking** — assets directory moved from `.readme_assets/` to `docs/.readme_assets/`. Run: `mv .readme_assets/ docs/.readme_assets/`
 - `readme-fw`: `arch.mermaid` in `docs/.readme_assets/` is now embedded as a fenced mermaid block in the README
 - `readme-fw`: warns at eval time if any file in `docs/.readme_assets/` is unrecognized and would be silently excluded
