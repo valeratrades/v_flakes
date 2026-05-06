@@ -177,7 +177,7 @@ let
               typFile = builtins.path { path = fullPath; };
             in
             builtins.readFile (pkgs.runCommand "typst-to-markdown" { buildInputs = [ pkgs.pandoc ]; } ''
-              pandoc -f typst -t markdown ${typFile} -o $out
+              pandoc -f typst -t gfm ${typFile} -o $out
             '')
           else "";
 
@@ -395,6 +395,7 @@ ${content}
     "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)"
     "usage\\.(sh|md|typ)"
     "other\\.(md|typ)"
+    ".*\\.bak" # silenced backups
   ];
   _assetsDir = "${rootStr}/docs/.readme_assets";
   _assetsDirExists = builtins.pathExists _assetsDir;
