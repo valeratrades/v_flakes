@@ -24,11 +24,11 @@ let
     ];
     documents = [
       "*.pdf"
+      "*.excalidraw"
     ];
     data = [
       "*.json"
       "*.csv"
-      "*.excalidraw"
       "*.parquet"
       "*.pkl"
       "*.npy"
@@ -64,6 +64,7 @@ let
       (mkSection enable "Audio formats" lfsPatterns.audio)
       (mkSection enable "Image formats" lfsPatterns.images)
       (mkSection enable "Documents" lfsPatterns.documents)
+      (mkSection enable "Data" lfsPatterns.data)
     ];
 
   content =
