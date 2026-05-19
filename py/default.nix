@@ -38,6 +38,7 @@ The shellHook will:
 
 let
   files = import ../files;
+  utils = import ../utils;
 
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
@@ -48,7 +49,7 @@ in
 {
   inherit ruffFile;
 
-  shellHook = ''
+  shellHook = utils.mkShellHook ''
     cp -f ${ruffFile} ./ruff.toml
     ${pyprojectHook}
     if [ ! -d "${venv_path}" ]; then

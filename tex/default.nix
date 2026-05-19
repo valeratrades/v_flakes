@@ -23,7 +23,10 @@ devShells.default = pkgs.mkShell {
 '';
 } else
 
+let
+  utils = import ../utils;
+in
 {
-  shellHook = "";
+  shellHook = utils.mkShellHook "";
   enabledPackages = [];
 }

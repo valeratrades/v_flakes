@@ -1,6 +1,28 @@
 let
   core = import ./core.nix;
 
+  # Wrap a raw shellHook string into the opaque form expected by `combine`.
+  # All v_flakes producer modules expose `shellHook` via this helper rather
+  # than as a plain string. That way `pkgs.mkShell { shellHook = mod.shellHook; }`
+  # fails with a Nix "cannot coerce attrset to string" error, forcing the
+  # consumer to route through `combine` (which installs the repo-root guard).
+  mkShellHook = raw:
+    if !(builtins.isString raw)
+    then throw "v_flakes.utils.mkShellHook: expected a string, got ${builtins.typeOf raw}"
+    else { __vFlakesHook = raw; };
+
+  # Unwrap an opaque shellHook back to a raw string. Throws if the value
+  # was not produced via `mkShellHook` — that catches consumers passing
+  # plain strings into `combine` (which would silently bypass the guard).
+  unwrapShellHook = h:
+    if builtins.isAttrs h && h ? __vFlakesHook then h.__vFlakesHook
+    else throw ''
+      v_flakes: shellHook must be constructed via utils.mkShellHook.
+      Got: ${if builtins.isString h
+             then "a plain string (use `utils.mkShellHook \"...\"` to wrap it)"
+             else builtins.typeOf h}
+    '';
+
   # Helper to allow both `default` and `defaults` as aliases for the same attribute.
   # When one is provided, both are set to the same value. When neither is provided, neither is set
   # (allowing downstream `or` fallbacks to work correctly).
@@ -118,7 +140,7 @@ in
     pull_request = { };
   };
 
-  inherit checkCrateVersion optionalDefaults;
+  inherit checkCrateVersion optionalDefaults mkShellHook unwrapShellHook;
   inherit (core) mergeConfig;
 
   # Combine multiple v-utils modules into a single shell configuration
@@ -145,7 +167,9 @@ in
   combine = modules:
     let
       getPackages = m: m.enabledPackages or [];
-      getHook = m: m.shellHook or "";
+      # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
+      # if a plain string slipped in — that's a programmer error we want loud.
+      getHook = m: if m ? shellHook then unwrapShellHook m.shellHook else "";
       combinedHooks = builtins.concatStringsSep "\n" (builtins.filter (h: h != "") (map getHook modules));
     in
     {

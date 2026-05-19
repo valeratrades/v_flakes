@@ -26,6 +26,7 @@ args@{
 }:
 
 let
+  utils = import ../utils;
   defaultLicense = { name = "Blue Oak 1.0.0"; path = ../files/licenses/blue_oak.md; };
   licensesRaw = if licenses != null then licenses else
     assert default || throw "licenses is required when defaults = false";
@@ -466,7 +467,7 @@ README_EOF
         fi
       '' else "";
     in
-    ''
+    utils.mkShellHook ''
       ${locGistCheck}
       ${licenseCopies}
       mkdir -p docs

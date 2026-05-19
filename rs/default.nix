@@ -112,6 +112,7 @@ enabledPackages includes:
 let
   files = import ../files;
   core = import ../utils/core.nix;
+  utils = import ../utils;
 
   buildEnable = build.enable or true;
   workspace = build.workspace or { "./" = [ "git_version" "log_directives" ]; };
@@ -217,7 +218,7 @@ in
   # For backwards compatibility, expose the first build file
   buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});
 
-  shellHook = ''
+  shellHook = utils.mkShellHook ''
     mkdir -p ./.cargo
     cp -f ${rustfmtFile} ./rustfmt.toml
     cp -f ${configFile} ./.cargo/config.toml

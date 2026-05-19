@@ -16,6 +16,7 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        utils = import ../utils;
         readme-fw = import ./.;
 
         pname = "readme-fw";
@@ -41,6 +42,16 @@
           jobsWarnings = [ ];  # Add your warning jobs here
           jobsOther = [ "loc-badge" ];  # LOC badge updater
         };
+
+        combined = utils.combine [
+          readme
+          { shellHook = utils.mkShellHook ''
+              # Generate workflows
+              mkdir -p .github/workflows
+              cp -f ${workflows.other} .github/workflows/other.yml
+            '';
+          }
+        ];
       in
       {
         packages = {
@@ -49,11 +60,7 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = [ pkgs.typst pkgs.pandoc ];
-          shellHook = readme.shellHook + ''
-            # Generate workflows
-            mkdir -p .github/workflows
-            cp -f ${workflows.other} .github/workflows/other.yml
-          '';
+          shellHook = combined.shellHook;
         };
       }
     );

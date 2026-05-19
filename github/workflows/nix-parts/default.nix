@@ -370,7 +370,7 @@ let
 in
 workflows // {
   inherit releaseWorkflows gitlabSyncWorkflow syncForkWorkflow;
-  shellHook = ''
+  shellHook = utils.mkShellHook ''
     mkdir -p ./.github/workflows
     ${errorsHook}
     ${warningsHook}

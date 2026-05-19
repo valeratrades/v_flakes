@@ -67,7 +67,7 @@ See individual component descriptions in their respective directories.'';
           rsModule
           github
           readme
-          { shellHook = ''
+          { shellHook = utils.mkShellHook ''
               cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
             '';
           }

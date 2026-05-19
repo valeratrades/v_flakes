@@ -338,8 +338,8 @@ warnIfNeeded ({
 
   inherit labelSyncHook;
 
-  shellHook = ''
-    ${workflows.shellHook}
+  shellHook = utils.mkShellHook ''
+    ${utils.unwrapShellHook workflows.shellHook}
     ${if enable then ''
     ${if rust != null then ''
     export PATH="${rust}/bin:$PATH"
