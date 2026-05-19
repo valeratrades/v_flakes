@@ -63,7 +63,15 @@ See individual component descriptions in their respective directories.'';
           defaults = true;
           badges = [ "ci" ];
         };
-        combined = utils.combine [ rsModule github readme ];
+        combined = utils.combine [
+          rsModule
+          github
+          readme
+          { shellHook = ''
+              cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
+            '';
+          }
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
@@ -73,7 +81,6 @@ See individual component descriptions in their respective directories.'';
             _bump_script="./__scripts/bump_crate.rs"
             ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
             ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
-            cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
             ${combined.shellHook}
             # Bootstrap: build our own binaries and put them on PATH for local testing
             cargo b -q 2>/dev/null

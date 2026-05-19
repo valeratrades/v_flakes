@@ -133,13 +133,34 @@ in
   #
   # Each module should have optional `enabledPackages` (list) and `shellHook` (string) attributes.
   # Missing attributes are treated as empty.
+  #
+  # The combined shellHook is wrapped in a guard that:
+  #   - aborts (exit 1) if the shell is not inside a git repository — module
+  #     hooks write files via relative paths, so a missing repo means we have
+  #     no anchor and risk dumping files in arbitrary locations.
+  #   - skips all component hooks (with a warning) when CWD is not the git
+  #     repo root, so e.g. `nix develop ..` from inside a subdirectory never
+  #     pollutes that subdirectory with generated `.github/`, `.gitignore`,
+  #     `.gitattributes`, etc.
   combine = modules:
     let
       getPackages = m: m.enabledPackages or [];
       getHook = m: m.shellHook or "";
+      combinedHooks = builtins.concatStringsSep "\n" (builtins.filter (h: h != "") (map getHook modules));
     in
     {
       enabledPackages = builtins.concatLists (map getPackages modules);
-      shellHook = builtins.concatStringsSep "\n" (builtins.filter (h: h != "") (map getHook modules));
+      shellHook = ''
+        _v_flakes_repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+          echo "error: v_flakes shellHook requires a git repository" >&2
+          exit 1
+        }
+        if [ "$PWD" != "$_v_flakes_repo_root" ]; then
+          echo "warning: v_flakes shellHook skipped — CWD is not repo root ($PWD != $_v_flakes_repo_root)" >&2
+        else
+          ${combinedHooks}
+        fi
+        unset _v_flakes_repo_root
+      '';
     };
 }
