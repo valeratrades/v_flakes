@@ -2,6 +2,7 @@
 
 ## v1.6.0
 
+- `github`: **Breaking** — the `excalidraw` param and bundled `ex` / `ex-to-md` / `md-to-ex` tools are removed. The standalone `ex` script now lives in the user's personal scripts (`~/nix/home/scripts/excalidraw.rs`); the markdown/mermaid integration is gone entirely. Drop any `excalidraw = { ... };` from your `github { ... }` call.
 - `rs`: new `lints` param (default `true`) — manages `[lints.rust]` (or `[workspace.lints.rust]` when `[workspace]` is present) in `Cargo.toml` on shell entry. Default body: `unused_features = "allow"`. Pass `false` to disable, or an attrset to extend (per-key `.replace`/`.augment`/`.exclude` from `utils/core.nix` apply). Other lint sections (e.g. `[lints.clippy]`) are left alone.
   ```nix
   rs = v-utils.rs { inherit pkgs rust; lints = { unused_imports = "warn"; }; };

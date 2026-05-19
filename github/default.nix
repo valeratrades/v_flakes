@@ -10,7 +10,6 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   # Per-section install overrides this.
   install ? {},
   release ? null, gitlabSync ? null,
-  excalidraw ? null,
   syncFork ? false,
   # Dirs to exclude from sort-derives and codestyle (e.g. vendored code or submodules), e.g. ["libs/nautilus_trader"]
   excludeDirs ? [],
@@ -21,7 +20,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "excalidraw" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -156,16 +155,6 @@ github = v-utils.github {
   # GitLab mirror sync (triggers on any push)
   gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; };
   # Repo name appended from GitHub context. Requires GITLAB_TOKEN secret
-
-  # Excalidraw tools (ex, ex-to-md, md-to-ex)
-  # Keys are file paths relative to project root.
-  excalidraw = {
-    "docs/arch.excalidraw" = {
-      standalone = true;  # ex-to-md writes to docs/arch.md
-      # OR
-      inline = { fpath = "docs/ARCHITECTURE.md"; num = 1; };  # Replace Nth mermaid block in file
-    };
-  };
 };
 ```
 
@@ -185,7 +174,6 @@ The shellHook will:
 enabledPackages includes:
 - `git_ops` - GitHub operations (sync-labels, etc.)
 - `code_duplication` - Run the same duplication detection used in CI locally (requires qlty)
-- `ex`, `ex-to-md`, `md-to-ex` - Excalidraw tools (when excalidraw is configured)
 '';
 } else
 
@@ -332,10 +320,6 @@ let
   git_ops = import ./git.nix { inherit pkgs labelArgs cargoNightly; gitOpsScript = ./git_ops.rs; };
   code_duplication = import ./code_duplication.nix { inherit pkgs cargoNightly; script = ./workflows/code-duplication.rs; };
 
-  excalidrawModule = if excalidraw != null then
-    import ./excalidraw { inherit pkgs; entries = excalidraw; }
-  else null;
-
   # Process preCommit config
   # can be very slow
   semverChecks = preCommit.semverChecks or false;
@@ -364,7 +348,6 @@ warnIfNeeded ({
     '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${labelSyncHook}
-    ${if excalidrawModule != null then excalidrawModule.shellHook else ""}
     ''
     else ""}
   '';
@@ -372,7 +355,6 @@ warnIfNeeded ({
   enabledPackages = if enable then
     [ git_ops code_duplication pkgs.treefmt ]
     ++ (if semverChecks then [ pkgs.cargo-semver-checks ] else [])
-    ++ (if excalidrawModule != null then excalidrawModule.enabledPackages else [])
   else [];
 } // (if enable then { inherit git_ops code_duplication; } else {}))
 
