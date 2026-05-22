@@ -42,11 +42,14 @@ let
 
   # Generate a single line for a pattern
   # enable = true: add LFS tracking
-  # enable = false: explicitly disable LFS tracking
+  # enable = false: explicitly disable LFS tracking (just unset `filter`, keep
+  #   git's auto-detection of text vs binary intact — preserves real diffs on
+  #   json/csv/svg/excalidraw while still showing "Binary files differ" for
+  #   actually-binary content like mp3/png/pdf)
   mkLfsLine = enable: pattern:
     if enable
     then "${pattern} filter=lfs diff=lfs merge=lfs -text"
-    else "${pattern} binary -filter";
+    else "${pattern} -filter";
 
   # Generate a section with a comment header
   mkSection = enable: name: patterns:
