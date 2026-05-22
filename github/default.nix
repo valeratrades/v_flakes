@@ -1,4 +1,4 @@
-args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, labels ? {}, preCommit ? {},
+args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, lfs ? null, labels ? {}, preCommit ? {},
   # Pass language module outputs — langs is inferred from whichever are non-null
   # rs also provides the rust toolchain (rs.rust) — required when enable = true
   rs ? null,
@@ -20,7 +20,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "labels" "preCommit" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -90,6 +90,7 @@ github = v-utils.github {
   # inherit py tex;       # Pass any combination; langs = ["rs" "py" "tex"] inferred
   lastSupportedVersion = "nightly-1.86";
   gitignore.extra = "_scripts/node_modules";  # Appended to generated .gitignore
+  lfs = false;  # null (default): don't touch .gitattributes; false: explicitly opt out of LFS for known binary patterns; true: track them via LFS
 
   # Top-level install applies to all sections (errors, warnings, other, release)
   # Per-section install overrides this.
@@ -170,6 +171,7 @@ The shellHook will:
 - Copy workflow files to .github/workflows/
 - Set up git hooks (pre-commit with treefmt integration)
 - Copy gitignore based on specified langs
+- Copy gitattributes when `lfs` is set (true to track via LFS, false to explicitly opt out)
 
 enabledPackages includes:
 - `git_ops` - GitHub operations (sync-labels, etc.)
@@ -347,6 +349,7 @@ warnIfNeeded ({
     install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
     '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
+    ${if lfs != null then "cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes" else ""}
     ${labelSyncHook}
     ''
     else ""}
