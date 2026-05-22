@@ -95,6 +95,11 @@ let
     fi
 
     if [ -f "Cargo.toml" ]; then
+      patched_manifests=$(find . -name Cargo.toml -not -path './target/*' -print0 | xargs -r -0 grep -l '^\[patch\.crates-io\]' 2>/dev/null || true)
+      if [ -n "$patched_manifests" ]; then
+        echo "WARNING: [patch.crates-io] section present in:"
+        echo "$patched_manifests" | sed 's|^\./||;s|^|	|'
+      fi
       staged_files=$(git diff --name-only --cached --diff-filter=ACMR)
       cargo_sort_out=$(cargo sort --workspace --grouped 2>&1)
       cargo_sort_rewritten=$(echo "$cargo_sort_out" | grep -oP 'Cargo\.toml for "?\K[^" ]+(?="? has been rewritten)')
