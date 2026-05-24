@@ -1,4 +1,4 @@
-args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, lfs ? null, labels ? {}, preCommit ? {},
+args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, lfs ? null, labels ? {}, preCommit ? {}, conventions ? true,
   # Pass language module outputs — langs is inferred from whichever are non-null
   # rs also provides the rust toolchain (rs.rust) — required when enable = true
   rs ? null,
@@ -20,7 +20,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "conventions" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -130,6 +130,10 @@ github = v-utils.github {
   preCommit = {
     semverChecks = false;  # Run cargo-semver-checks (default: false, can be very slow)
   };
+  # Copy convention files (e.g. GIT_CONVENTION.md) from github.com/<owner>/<owner>
+  # on shell entry. Cached per v_flakes version, so subsequent rebuilds are no-ops
+  # until v_flakes itself is bumped. Default: true.
+  conventions = true;
   # Style settings are inherited from rs module automatically.
   # Override with style = { ... } or traceyCheck = ... if needed.
 
@@ -330,6 +334,20 @@ let
   labelSyncHook = if labelsEnabled then ''
     (${git_ops}/bin/git_ops sync-labels >/dev/null 2>/dev/null &)
   '' else "";
+
+  # Convention files copied from github.com/<owner>/<owner> on first rebuild
+  # for each v_flakes version. Expand this list to add more.
+  conventionsFiles = [ "GIT_CONVENTION.md" ];
+  # Version key: any change to the script or the file list re-pulls.
+  # Tied to v_flakes via the on-disk contents of git_ops.rs (its store path
+  # changes with every v_flakes revision that touches it).
+  conventionsVersionKey = builtins.hashString "sha256" (
+    (builtins.readFile ./git_ops.rs) + (builtins.toJSON conventionsFiles)
+  );
+  conventionsFileArgs = builtins.concatStringsSep " " (map (f: "--file ${f}") conventionsFiles);
+  conventionsHook = if enable && conventions then ''
+    (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} >/dev/null 2>/dev/null &)
+  '' else "";
 in
 warnIfNeeded ({
   inherit workflows;
@@ -351,6 +369,7 @@ warnIfNeeded ({
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${if lfs != null then "cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes" else ""}
     ${labelSyncHook}
+    ${conventionsHook}
     ''
     else ""}
   '';

@@ -39,6 +39,16 @@ enum Commands {
         #[arg(long)]
         check_duplicate_colors: bool,
     },
+    /// Copy convention files from the owner's profile repo (github.com/<owner>/<owner>)
+    SyncConventions {
+        /// Opaque key tying the cache to the v_flakes version (any change re-pulls)
+        #[arg(long)]
+        version_key: String,
+
+        /// File path inside the profile repo to copy into the working repo (repeatable)
+        #[arg(long, value_name = "PATH")]
+        file: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -79,23 +89,23 @@ fn compute_labels_fingerprint(labels: &[LabelSpec]) -> String {
     out
 }
 
-/// Per-repo state file: ~/.local/state/git_ops/labels/<hex-encoded-repo-path>
-fn state_file_for_repo(repo_root: &str) -> PathBuf {
+/// Per-repo state file: ~/.local/state/git_ops/<bucket>/<hex-encoded-repo-path>
+fn state_file_for_repo(bucket: &str, repo_root: &str) -> PathBuf {
     let state_dir = dirs::state_dir()
         .expect("XDG_STATE_HOME not available")
         .join("git_ops")
-        .join("labels");
+        .join(bucket);
     // Simple hex encoding of repo path to get a safe filename
     let hex: String = repo_root.bytes().map(|b| format!("{:02x}", b)).collect();
     state_dir.join(hex)
 }
 
-fn load_saved_fingerprint(repo_root: &str) -> Option<String> {
-    fs::read_to_string(state_file_for_repo(repo_root)).ok()
+fn load_saved_fingerprint(bucket: &str, repo_root: &str) -> Option<String> {
+    fs::read_to_string(state_file_for_repo(bucket, repo_root)).ok()
 }
 
-fn save_fingerprint(repo_root: &str, fingerprint: &str) {
-    let path = state_file_for_repo(repo_root);
+fn save_fingerprint(bucket: &str, repo_root: &str, fingerprint: &str) {
+    let path = state_file_for_repo(bucket, repo_root);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("failed to create state directory");
     }
@@ -335,7 +345,7 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
     let fingerprint = compute_labels_fingerprint(&local_labels);
     let repo_root = get_repo_root().expect("not in a git repository");
 
-    if load_saved_fingerprint(&repo_root).as_ref() == Some(&fingerprint) {
+    if load_saved_fingerprint("labels", &repo_root).as_ref() == Some(&fingerprint) {
         return;
     }
 
@@ -412,7 +422,7 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
         }
     }
 
-    save_fingerprint(&repo_root, &fingerprint);
+    save_fingerprint("labels", &repo_root, &fingerprint);
 
     // Only print summary if there were actual changes
     if created > 0 || updated > 0 || deleted > 0 {
@@ -420,6 +430,98 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
             "Labels synced: {} created, {} updated, {} deleted",
             created, updated, deleted
         );
+    }
+}
+
+fn compute_conventions_fingerprint(version_key: &str, owner: &str, files: &[String]) -> String {
+    let mut sorted: Vec<&String> = files.iter().collect();
+    sorted.sort();
+    let mut out = String::new();
+    out.push_str("v=");
+    out.push_str(version_key);
+    out.push('\n');
+    out.push_str("owner=");
+    out.push_str(owner);
+    out.push('\n');
+    for f in sorted {
+        out.push_str(f);
+        out.push('\n');
+    }
+    out
+}
+
+fn get_repo_owner() -> Result<String, String> {
+    let output = run_gh(&["repo", "view", "--json", "owner", "--jq", ".owner.login"])
+        .map_err(|e| format!("Failed to run gh: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "gh repo view failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let owner = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if owner.is_empty() {
+        return Err("empty owner from gh".into());
+    }
+    Ok(owner)
+}
+
+fn fetch_raw_file(owner: &str, repo: &str, path: &str) -> Result<Vec<u8>, String> {
+    let api_path = format!("/repos/{owner}/{repo}/contents/{path}");
+    let output = run_gh(&["api", "-H", "Accept: application/vnd.github.raw", &api_path])
+        .map_err(|e| format!("gh api failed: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "gh api failed for {path}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(output.stdout)
+}
+
+fn sync_conventions(version_key: String, files: Vec<String>) {
+    let repo_root = get_repo_root().expect("not in a git repository");
+
+    let owner = match get_repo_owner() {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("conventions: {e}");
+            return;
+        }
+    };
+
+    let fingerprint = compute_conventions_fingerprint(&version_key, &owner, &files);
+    if load_saved_fingerprint("conventions", &repo_root).as_ref() == Some(&fingerprint) {
+        return;
+    }
+
+    // If the profile repo doesn't exist, persist the fingerprint anyway so we
+    // don't re-check on every rebuild — only when the v_flakes version (or
+    // owner / file list) changes.
+    if !run_gh_success(&["repo", "view", &format!("{owner}/{owner}")]) {
+        save_fingerprint("conventions", &repo_root, &fingerprint);
+        return;
+    }
+
+    let repo_path = PathBuf::from(&repo_root);
+    let mut wrote = 0;
+    for f in &files {
+        match fetch_raw_file(&owner, &owner, f) {
+            Ok(bytes) => {
+                let dest = repo_path.join(f);
+                if let Some(parent) = dest.parent() {
+                    fs::create_dir_all(parent).expect("failed to create dir for convention file");
+                }
+                fs::write(&dest, &bytes).expect("failed to write convention file");
+                wrote += 1;
+            }
+            Err(e) => eprintln!("conventions: skip {f}: {e}"),
+        }
+    }
+
+    save_fingerprint("conventions", &repo_root, &fingerprint);
+    if wrote > 0 {
+        println!("conventions: synced {wrote} file(s) from {owner}/{owner}");
     }
 }
 
@@ -433,6 +535,13 @@ fn main() {
                 std::process::exit(1);
             }
             sync_labels(label, check_duplicate_colors);
+        }
+        Commands::SyncConventions { version_key, file } => {
+            if file.is_empty() {
+                eprintln!("ERROR: No convention files specified. Use --file PATH to specify files.");
+                std::process::exit(1);
+            }
+            sync_conventions(version_key, file);
         }
     }
 }
