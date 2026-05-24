@@ -450,20 +450,29 @@ fn compute_conventions_fingerprint(version_key: &str, owner: &str, files: &[Stri
     out
 }
 
+/// Parse the GitHub owner from `remote.origin.url` — purely local, no network.
 fn get_repo_owner() -> Result<String, String> {
-    let output = run_gh(&["repo", "view", "--json", "owner", "--jq", ".owner.login"])
-        .map_err(|e| format!("Failed to run gh: {e}"))?;
+    let output = Command::new("git")
+        .args(["config", "--get", "remote.origin.url"])
+        .output()
+        .map_err(|e| format!("Failed to run git: {e}"))?;
     if !output.status.success() {
-        return Err(format!(
-            "gh repo view failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
+        return Err("no remote.origin.url".into());
     }
-    let owner = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if owner.is_empty() {
-        return Err("empty owner from gh".into());
-    }
-    Ok(owner)
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Accepts: https://github.com/OWNER/REPO[.git], git@github.com:OWNER/REPO[.git],
+    //          ssh://git@github.com/OWNER/REPO[.git]
+    let after_host = url
+        .split_once("github.com")
+        .map(|(_, rest)| rest.trim_start_matches([':', '/']))
+        .ok_or_else(|| format!("not a github.com remote: {url}"))?;
+    let owner = after_host
+        .split('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| format!("couldn't parse owner from: {url}"))?;
+    Ok(owner.to_string())
 }
 
 fn fetch_raw_file(owner: &str, repo: &str, path: &str) -> Result<Vec<u8>, String> {
@@ -492,14 +501,6 @@ fn sync_conventions(version_key: String, files: Vec<String>) {
 
     let fingerprint = compute_conventions_fingerprint(&version_key, &owner, &files);
     if load_saved_fingerprint("conventions", &repo_root).as_ref() == Some(&fingerprint) {
-        return;
-    }
-
-    // If the profile repo doesn't exist, persist the fingerprint anyway so we
-    // don't re-check on every rebuild — only when the v_flakes version (or
-    // owner / file list) changes.
-    if !run_gh_success(&["repo", "view", &format!("{owner}/{owner}")]) {
-        save_fingerprint("conventions", &repo_root, &fingerprint);
         return;
     }
 
