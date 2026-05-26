@@ -185,8 +185,14 @@ let
   vFlakesVersion = (builtins.fromTOML (builtins.readFile ../Cargo.toml)).package.version;
 
   #HACK: install expressions are not DRY (could move out binstallPinned, binstallExact; both using binstallCmd for exact expression (as it repeats exactly))
+  # NB: $HOME/.cargo/bin is *appended*, not prepended, on purpose. Prepending
+  # would put the rustup shim ahead of the nix-provided cargo, and rustup would
+  # then dispatch every `cargo` call to a rustup toolchain — which can be
+  # broken (e.g. its ELF interpreter is a nix-store glibc that got GC'd),
+  # surfacing as `error: command failed: 'cargo' / No such file or directory`
+  # right when this hook tries to install tracey / v_flakes.
   binstallHook = ''
-    export PATH="$HOME/.cargo/bin:$PATH"
+    export PATH="$PATH:$HOME/.cargo/bin"
   '' + (if tracey then ''
     _tracey_installed=$(cargo install --list 2>/dev/null | grep "^tracey v" | grep -oP '\d+\.\d+\.\d+' || echo "")
     _tracey_latest=$(${latestCrateVersion "tracey"})
@@ -226,11 +232,12 @@ in
     ${lintsHook}
     ${buildHook}
     ${denyHook}
-    ${binstallHook}
     # Prepend nix rust to PATH so it takes precedence over rustup shims in ~/.cargo/bin.
-    # This is critical for trybuild tests which spawn cargo subprocesses.
-    # Must be AFTER binstallHook which also modifies PATH.
+    # Critical for trybuild tests which spawn cargo subprocesses, AND for the
+    # binstallHook below so its `cargo install` invocations don't dispatch
+    # through a (possibly broken) rustup toolchain.
     export PATH="${rust}/bin:$PATH"
+    ${binstallHook}
   '';
 
   # cargo-binstall for tracey and codestyle

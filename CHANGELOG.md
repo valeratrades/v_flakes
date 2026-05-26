@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.1
+
+- `rs`: **bugfix** — `binstallHook` no longer prepends `$HOME/.cargo/bin` to `PATH`. Doing so put the rustup shim ahead of the nix-provided cargo; if the active rustup toolchain happened to be broken (e.g. its patchelf'd ELF interpreter pointed at a nix-store glibc that had since been GC'd), every `cargo` invocation in the hook failed with `error: command failed: 'cargo' / No such file or directory`, silently broke the installed-version check, and then the install retry failed for the same reason. Now nix rust is prepended before `binstallHook` runs and `~/.cargo/bin` is only appended (so cargo-installed binaries like `tracey`/`v_flakes` stay reachable, but `cargo` itself always resolves to the nix toolchain).
+
 ## v1.6.0
 
 - `github`: **Breaking** — the `excalidraw` param and bundled `ex` / `ex-to-md` / `md-to-ex` tools are removed. The standalone `ex` script now lives in the user's personal scripts (`~/nix/home/scripts/excalidraw.rs`); the markdown/mermaid integration is gone entirely. Drop any `excalidraw = { ... };` from your `github { ... }` call.
