@@ -282,7 +282,7 @@ let
   effectiveSyncFork = syncFork || (jobs.sync_fork or false);
 
   workflows = import ./workflows/nix-parts ({
-    inherit pkgs gistId;
+    inherit pkgs gistId cargoNightly;
     syncFork = effectiveSyncFork;
   } // (if enable then {
     inherit lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release gitlabSync;
@@ -312,14 +312,21 @@ let
     map (l: "-l '" + escapeForBash l.name + ":" + l.color + ":" + escapeForBash (l.description or "") + "'") allLabels
   );
 
-  # Use local cargo, falling back to rustup's nightly if unavailable.
+  # Use local cargo, falling back loudly to rustup's nightly if unavailable.
   # Unset RUSTC_WRAPPER to bypass sccache (its temp dir may not survive backgrounding).
+  # NB: `cargo --version` probe catches the case where a rustup shim exists on
+  # PATH but dispatches to a broken toolchain (e.g. patchelf'd ELF interpreter
+  # GC'd). That should be treated as "no working cargo", not silently retried.
   cargoNightly = pkgs.writeShellScript "cargo-nightly" ''
     export RUSTC_WRAPPER=
-    if command -v cargo &>/dev/null; then
+    if command -v cargo >/dev/null 2>&1 && cargo --version >/dev/null 2>&1; then
       exec cargo "$@"
-    else
+    elif command -v rustup >/dev/null 2>&1 && rustup run nightly cargo --version >/dev/null 2>&1; then
+      echo "warning: v_flakes github (cargoNightly): no working nix cargo on PATH — falling back to 'rustup run nightly cargo'. Add 'rs' to utils.combine to silence." >&2
       exec rustup run nightly cargo "$@"
+    else
+      echo "error: v_flakes github (cargoNightly): needs cargo on PATH (add 'rs' to utils.combine, or install rustup with the nightly toolchain)." >&2
+      exit 1
     fi
   '';
 

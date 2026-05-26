@@ -4,6 +4,9 @@ args@{ pkgs ? null, nixpkgs ? null, lastSupportedVersion ? null, jobsErrors, job
   # Per-section `on` triggers. Default: push + pull_request.
   # workflow_dispatch is always appended unless already present in the provided value.
   hooksErrors ? null, hooksWarnings ? null, hooksOther ? null,
+  # Loud-fallback cargo wrapper (see github/default.nix). Only required when
+  # called via the description-only path below; in normal use it's threaded in.
+  cargoNightly ? null,
 }:
 
 # If called with just nixpkgs (for flake description), return description attribute
@@ -322,7 +325,7 @@ let
       );
     in ''
       ${copyCommands}
-      cargo -Zscript -q ${ensureBinstallScript} ${releaseCargoTomlPath}
+      ${cargoNightly} -Zscript -q ${ensureBinstallScript} ${releaseCargoTomlPath}
     ''
   else "";
 

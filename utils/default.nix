@@ -59,6 +59,38 @@ let
     }
   '';
 
+  # Emit a shell snippet that runs `body` with a `_v_flakes_cargo` shell function
+  # bound to whichever cargo we can find — preferring a working `cargo` on PATH
+  # (i.e. the nix-provided toolchain when `rs` is included in combine), and
+  # only falling back to a *global rustup* invocation if there is no working
+  # cargo on PATH. The fallback is loud (prints a warning naming `caller` and
+  # nudging the user to add `rs` to utils.combine). If neither is available,
+  # we hard-error rather than silently skip the hook.
+  #
+  # The `cargo --version` (and `rustup run nightly cargo --version`) probe is
+  # there to catch the case where a rustup shim exists on PATH but dispatches
+  # to a broken toolchain (e.g. its patchelf'd ELF interpreter is a nix-store
+  # glibc that got GC'd) — `command -v` succeeds for that shim but the shim
+  # itself fails. We want that to be treated as "no working cargo".
+  #
+  # Usage:
+  #   ${withCargo { caller = "py"; body = ''
+  #     _v_flakes_cargo -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${a} ${b}
+  #   ''; }}
+  withCargo = { caller, body }: ''
+    if command -v cargo >/dev/null 2>&1 && cargo --version >/dev/null 2>&1; then
+      _v_flakes_cargo() { command cargo "$@"; }
+    elif command -v rustup >/dev/null 2>&1 && rustup run nightly cargo --version >/dev/null 2>&1; then
+      echo "warning: v_flakes ${caller}: no working nix cargo on PATH — falling back to 'rustup run nightly cargo'. Add 'rs' to utils.combine to silence." >&2
+      _v_flakes_cargo() { rustup run nightly cargo "$@"; }
+    else
+      echo "error: v_flakes ${caller}: needs cargo on PATH (add 'rs' to utils.combine, or install rustup with the nightly toolchain)." >&2
+      exit 1
+    fi
+    ${body}
+    unset -f _v_flakes_cargo
+  '';
+
   # Generate shell command to check if a crate is outdated and auto-bump
   # Uses crates.io API to get latest version, with proper semver comparison
   # If outdated and bumpScript is provided, runs the script to update
@@ -140,7 +172,7 @@ in
     pull_request = { };
   };
 
-  inherit checkCrateVersion optionalDefaults mkShellHook unwrapShellHook;
+  inherit checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
   inherit (core) mergeConfig;
 
   # Combine multiple v-utils modules into a single shell configuration

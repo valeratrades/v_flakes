@@ -225,6 +225,12 @@ in
   buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});
 
   shellHook = utils.mkShellHook ''
+    # Prepend nix rust to PATH FIRST so every cargo/rustfmt invocation below
+    # (lintsHook → cargo -Zscript, buildHook → rustfmt, binstallHook → cargo
+    # install) resolves to the nix toolchain instead of a (possibly broken)
+    # rustup shim in ~/.cargo/bin. Also critical for trybuild tests which
+    # spawn cargo subprocesses.
+    export PATH="${rust}/bin:$PATH"
     mkdir -p ./.cargo
     cp -f ${rustfmtFile} ./rustfmt.toml
     cp -f ${configFile} ./.cargo/config.toml
@@ -232,11 +238,6 @@ in
     ${lintsHook}
     ${buildHook}
     ${denyHook}
-    # Prepend nix rust to PATH so it takes precedence over rustup shims in ~/.cargo/bin.
-    # Critical for trybuild tests which spawn cargo subprocesses, AND for the
-    # binstallHook below so its `cargo install` invocations don't dispatch
-    # through a (possibly broken) rustup toolchain.
-    export PATH="${rust}/bin:$PATH"
     ${binstallHook}
   '';
 

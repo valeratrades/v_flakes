@@ -42,9 +42,17 @@ let
 
   ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 
-  pyprojectHook = ''
-    cargo -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${venv_path} ${src_path}
-  '';
+  # `py` is independent of `rs`, but pyproject_merge.rs is a `cargo -Zscript`.
+  # Route through `utils.withCargo` so we use the nix cargo when `rs` is in
+  # combine, fall back loudly to global rustup otherwise, and hard-error if
+  # neither is reachable (instead of silently dispatching through a broken
+  # rustup shim).
+  pyprojectHook = utils.withCargo {
+    caller = "py";
+    body = ''
+      _v_flakes_cargo -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${venv_path} ${src_path}
+    '';
+  };
 in
 {
   inherit ruffFile;
