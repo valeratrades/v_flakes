@@ -40,16 +40,36 @@ let
     ];
   };
 
+  # Patterns we never want to manually merge: on conflict, keep the current
+  # branch's version (the `ours` driver, registered in the devshell shellHook as
+  # `git config merge.ours.driver true`). Feature branches merge into master, so
+  # "ours" == the newer state in our workflow. Applies regardless of LFS.
+  alwaysOurs = [ "*.pdf" "*.excalidraw" ];
+
+  # Lockfiles get the same treatment, but are never LFS-tracked, so they're
+  # emitted as a standalone section rather than folded into the LFS patterns.
+  lockfiles = [ "Cargo.lock" "flake.lock" ];
+
+  isOurs = pattern: builtins.elem pattern alwaysOurs;
+
   # Generate a single line for a pattern
   # enable = true: add LFS tracking
   # enable = false: explicitly disable LFS tracking (just unset `filter`, keep
   #   git's auto-detection of text vs binary intact — preserves real diffs on
   #   json/csv/svg/excalidraw while still showing "Binary files differ" for
   #   actually-binary content like mp3/png/pdf)
+  # `merge=ours` is appended (lfs=false) or substituted for `merge=lfs`
+  # (lfs=true) on alwaysOurs patterns so a conflict never blocks a merge.
   mkLfsLine = enable: pattern:
     if enable
-    then "${pattern} filter=lfs diff=lfs merge=lfs -text"
-    else "${pattern} -filter";
+    then
+      (if isOurs pattern
+      then "${pattern} filter=lfs diff=lfs merge=ours -text"
+      else "${pattern} filter=lfs diff=lfs merge=lfs -text")
+    else
+      (if isOurs pattern
+      then "${pattern} -filter merge=ours"
+      else "${pattern} -filter");
 
   # Generate a section with a comment header
   mkSection = enable: name: patterns:
@@ -61,6 +81,17 @@ let
       ${builtins.concatStringsSep "\n" lines}
     '';
 
+  # Lockfiles section — independent of LFS, only emitted when we touch the file
+  # at all (i.e. lfs != null).
+  lockSection =
+    let
+      lines = map (p: "${p} merge=ours") lockfiles;
+    in
+    ''
+      # Lockfiles (keep current branch's version on conflict)
+      ${builtins.concatStringsSep "\n" lines}
+    '';
+
   # Generate all LFS-related content
   mkLfsContent = enable:
     builtins.concatStringsSep "\n" [
@@ -68,6 +99,7 @@ let
       (mkSection enable "Image formats" lfsPatterns.images)
       (mkSection enable "Documents" lfsPatterns.documents)
       (mkSection enable "Data" lfsPatterns.data)
+      lockSection
     ];
 
   content =

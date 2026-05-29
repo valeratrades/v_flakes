@@ -374,7 +374,13 @@ warnIfNeeded ({
     install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; }} ./.git/hooks/custom.sh
     '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
-    ${if lfs != null then "cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes" else ""}
+    ${if lfs != null then ''
+    cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
+    ${"# Register the `ours` merge driver referenced by .gitattributes (kept in"}
+    ${"# local .git/config, so it must be (re)applied per clone — `true` always"}
+    ${"# succeeds without touching the file, keeping our version on conflict)."}
+    git config merge.ours.driver true
+    '' else ""}
     ${labelSyncHook}
     ${conventionsHook}
     ''
