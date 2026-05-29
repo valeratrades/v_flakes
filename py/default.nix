@@ -2,6 +2,7 @@
   pkgs ? null,
   nixpkgs ? null,
   # config options
+  python ? (if pkgs != null then pkgs.python312 else null),
   venv_path ? ".devenv/state/venv",
   src_path ? "py_src",
   # Deep-merged into ruff config. Lists are concatenated, attrsets recurse, scalars replace.
@@ -74,5 +75,10 @@ in
     unset _venv_recorded _venv_actual
   '';
 
-  enabledPackages = [];
+  # The shellHook runs `uv venv` and activates a python venv, so `uv` and a
+  # python interpreter must be on PATH. Contribute them here (picked up via
+  # `utils.combine` → `combined.enabledPackages`) rather than relying on the
+  # consumer to supply them — devenv's `languages.python.uv.enable` is no
+  # longer a prerequisite for a plain `mkShell` consumer.
+  enabledPackages = [ pkgs.uv python ];
 }
