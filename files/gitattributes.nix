@@ -48,7 +48,9 @@ let
 
   # Lockfiles get the same treatment, but are never LFS-tracked, so they're
   # emitted as a standalone section rather than folded into the LFS patterns.
-  lockfiles = [ "Cargo.lock" "flake.lock" ];
+  # .pre-commit-config.yaml is generated/managed, not hand-merged, so it rides
+  # along here too.
+  lockfiles = [ "Cargo.lock" "flake.lock" ".pre-commit-config.yaml" ];
 
   isOurs = pattern: builtins.elem pattern alwaysOurs;
 
@@ -88,7 +90,7 @@ let
       lines = map (p: "${p} merge=ours") lockfiles;
     in
     ''
-      # Lockfiles (keep current branch's version on conflict)
+      # Generated/locked files (keep current branch's version on conflict)
       ${builtins.concatStringsSep "\n" lines}
     '';
 

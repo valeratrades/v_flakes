@@ -12,8 +12,10 @@
   style ? {},
   # build.rs options
   build ? {},
-  # rust toolchain package - required to prepend to PATH so nix rust takes precedence over rustup
-  rust,
+  # rust toolchain package - required to prepend to PATH so nix rust takes
+  # precedence over rustup. Defaulted to null so the module can be imported with
+  # just `nixpkgs` to read `.description` (flake.nix); real build paths assert it.
+  rust ? null,
 }:
 # Normalize style.modules: { instrument = true; loops = false; } -> "--instrument=true --loops=false"
 # Accepts both booleans and strings as values
@@ -108,6 +110,9 @@ enabledPackages includes:
 - `codestyle` - code style linter and formatter (if style.format or style.check is true)
 '';
 } else
+
+assert pkgs.lib.assertMsg (rust != null)
+  "rs module: `rust` toolchain package is required for the build/devshell path (only omittable when reading `.description` with just `nixpkgs`)";
 
 let
   files = import ../files;
