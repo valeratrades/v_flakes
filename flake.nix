@@ -24,6 +24,7 @@ See individual component descriptions in their respective directories.'';
         rs = (import ./rs { inherit nixpkgs; }).description;
         py = (import ./py { inherit nixpkgs; }).description;
         tex = (import ./tex { inherit nixpkgs; }).description;
+        js = (import ./js { inherit nixpkgs; }).description;
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
@@ -106,6 +107,9 @@ ${parts.py}
 ## LaTeX
 ${parts.tex}
 
+## JavaScript
+${parts.js}
+
 ## Readme Framework
 Generates README.md from docs/.readme_assets/ directory structure.
 '';
@@ -115,6 +119,7 @@ Generates README.md from docs/.readme_assets/ directory structure.
       rs = import ./rs;
       py = import ./py;
       tex = import ./tex;
+      js = import ./js;
       readme-fw = import ./readme_fw;
       utils = import ./utils;
 

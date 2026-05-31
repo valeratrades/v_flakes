@@ -4,6 +4,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   rs ? null,
   py ? null,
   tex ? null,
+  js ? null,
   # Or override individually (these take precedence over rs)
   traceyCheck ? null, style ? null, styleFormat ? null, styleAssert ? null, moduleFlags ? null,
   # Top-level install applies to all job sections (errors, warnings, other, release)
@@ -34,7 +35,8 @@ let
   inferredLangs =
     (if rs != null then [ "rs" ] else [])
     ++ (if py != null then [ "py" ] else [])
-    ++ (if tex != null then [ "tex" ] else []);
+    ++ (if tex != null then [ "tex" ] else [])
+    ++ (if js != null then [ "js" ] else []);
   #DEPRECATE: when everything has switched to new standard
   effectiveLangs =
     if langs != null then
@@ -208,6 +210,10 @@ let
     tex = {
       errors = [];
       warnings = [];
+    };
+    js = {
+      errors = [ ];
+      warnings = [ ];
     };
   };
 

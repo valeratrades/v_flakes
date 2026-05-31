@@ -6,6 +6,7 @@ let
     go = pkgs.runCommand "go-gitignore" {} ''cat ${./gitignore/go.gitignore} > $out'';
     py = pkgs.runCommand "py-gitignore" {} ''cat ${./gitignore/py.gitignore} > $out'';
     tex = pkgs.runCommand "tex-gitignore" {} ''cat ${./gitignore/tex.gitignore} > $out'';
+    js = pkgs.runCommand "js-gitignore" {} ''cat ${./gitignore/js.gitignore} > $out'';
   };
   extraSection = if extra != "" then "\n\necho '${extra}'" else "";
 in
