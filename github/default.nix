@@ -1,4 +1,4 @@
-args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, lfs ? null, labels ? {}, preCommit ? {}, conventions ? true,
+args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobs ? {}, hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", langs ? null, gitignore ? {}, lfs ? null, labels ? {}, preCommit ? {}, conventions ? false,
   # Pass language module outputs — langs is inferred from whichever are non-null
   # rs also provides the rust toolchain (rs.rust) — required when enable = true
   rs ? null,
@@ -140,8 +140,8 @@ github = v-utils.github {
     semverChecks = false;  # Run cargo-semver-checks (default: false, can be very slow)
   };
   # Copy convention files (e.g. GIT_CONVENTION.md) from github.com/<owner>/<owner>
-  # on shell entry. Cached per v_flakes version, so subsequent rebuilds are no-ops
-  # until v_flakes itself is bumped. Default: true.
+  # or github.com/<owner>/.github on shell entry. Cached per v_flakes version, so
+  # subsequent rebuilds are no-ops until v_flakes itself is bumped. Default: false.
   conventions = true;
   # Style settings are inherited from rs module automatically.
   # Override with style = { ... } or traceyCheck = ... if needed.
@@ -355,8 +355,8 @@ let
     (${git_ops}/bin/git_ops sync-labels >/dev/null 2>/dev/null &)
   '' else "";
 
-  # Convention files copied from github.com/<owner>/<owner> on first rebuild
-  # for each v_flakes version. Expand this list to add more.
+  # Convention files copied from github.com/<owner>/<owner> or github.com/<owner>/.github
+  # on first rebuild for each v_flakes version. Expand this list to add more.
   conventionsFiles = [ "GIT_CONVENTION.md" ];
   # Version key: any change to the script or the file list re-pulls.
   # Tied to v_flakes via the on-disk contents of git_ops.rs (its store path

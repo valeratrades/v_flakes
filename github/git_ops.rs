@@ -40,12 +40,13 @@ enum Commands {
         check_duplicate_colors: bool,
     },
     /// Copy convention files from the owner's profile repo (github.com/<owner>/<owner>)
+    /// or org defaults repo (github.com/<owner>/.github); a file must live in only one
     SyncConventions {
         /// Opaque key tying the cache to the v_flakes version (any change re-pulls)
         #[arg(long)]
         version_key: String,
 
-        /// File path inside the profile repo to copy into the working repo (repeatable)
+        /// File path inside the source repo to copy into the working repo (repeatable)
         #[arg(long, value_name = "PATH")]
         file: Vec<String>,
     },
@@ -505,24 +506,39 @@ fn sync_conventions(version_key: String, files: Vec<String>) {
     }
 
     let repo_path = PathBuf::from(&repo_root);
+    // Convention files may live in the owner's profile repo (`OWNER/OWNER`) or in
+    // their org-wide defaults repo (`OWNER/.github`). A given file must exist in at
+    // most one of them — finding it in both is ambiguous, so we error out.
+    let repos = [owner.as_str(), ".github"];
     let mut wrote = 0;
     for f in &files {
-        match fetch_raw_file(&owner, &owner, f) {
-            Ok(bytes) => {
+        let found: Vec<(&str, Vec<u8>)> = repos
+            .iter()
+            .filter_map(|repo| fetch_raw_file(&owner, repo, f).ok().map(|bytes| (*repo, bytes)))
+            .collect();
+        match found.as_slice() {
+            [] => eprintln!("conventions: skip {f}: not found in {owner}/{owner} or {owner}/.github"),
+            [(_, bytes)] => {
                 let dest = repo_path.join(f);
                 if let Some(parent) = dest.parent() {
                     fs::create_dir_all(parent).expect("failed to create dir for convention file");
                 }
-                fs::write(&dest, &bytes).expect("failed to write convention file");
+                fs::write(&dest, bytes).expect("failed to write convention file");
                 wrote += 1;
             }
-            Err(e) => eprintln!("conventions: skip {f}: {e}"),
+            _ => {
+                eprintln!(
+                    "conventions: {f} found in both {owner}/{owner} and {owner}/.github — \
+                     keep it in exactly one source"
+                );
+                std::process::exit(1);
+            }
         }
     }
 
     save_fingerprint("conventions", &repo_root, &fingerprint);
     if wrote > 0 {
-        println!("conventions: synced {wrote} file(s) from {owner}/{owner}");
+        println!("conventions: synced {wrote} file(s) from {owner}/{{{owner},.github}}");
     }
 }
 
