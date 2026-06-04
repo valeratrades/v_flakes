@@ -64,15 +64,18 @@ See individual component descriptions in their respective directories.'';
           defaults = true;
           badges = [ "ci" ];
         };
-        combined = utils.combine [
-          rsModule
-          github
-          readme
-          { shellHook = utils.mkShellHook ''
-              cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
-            '';
-          }
-        ];
+        combined = utils.combine {
+          inherit rust;
+          modules = [
+            rsModule
+            github
+            readme
+            { shellHook = utils.mkShellHook ''
+                cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
+              '';
+            }
+          ];
+        };
       in
       {
         devShells.default = pkgs.mkShell {

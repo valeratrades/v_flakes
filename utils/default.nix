@@ -179,11 +179,17 @@ in
   # Extracts enabledPackages and shellHook from each module and combines them
   #
   # Usage:
-  #   combined = v-utils.utils.combine [ rs github readme ];
+  #   combined = v-utils.utils.combine { inherit rust; modules = [ rs github readme ]; };
   #   devShells.default = pkgs.mkShell {
   #     packages = combined.enabledPackages;
   #     shellHook = combined.shellHook;
   #   };
+  #
+  # `rust` is the nix rust toolchain package (e.g. `rs.rust`) and is REQUIRED:
+  # combine prepends `${rust}/bin` to PATH before any module hook runs, so every
+  # module is guaranteed a working cargo for the custom rust scripts its hook
+  # invokes (append_custom.rs, pyproject_merge.rs, code-duplication, …). No
+  # rustup fallback, no `rust != null` gates downstream — provision it or fail.
   #
   # Each module should have optional `enabledPackages` (list) and `shellHook` (string) attributes.
   # Missing attributes are treated as empty.
@@ -196,7 +202,8 @@ in
   #     repo root, so e.g. `nix develop ..` from inside a subdirectory never
   #     pollutes that subdirectory with generated `.github/`, `.gitignore`,
   #     `.gitattributes`, etc.
-  combine = modules:
+  combine = { rust, modules }:
+    assert (rust != null) || throw "v_flakes.utils.combine: `rust` is required — pass the nix rust toolchain (e.g. `rs.rust`) so module hooks have a guaranteed cargo on PATH.";
     let
       getPackages = m: m.enabledPackages or [];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
@@ -214,6 +221,8 @@ in
         if [ "$PWD" != "$_v_flakes_repo_root" ]; then
           echo "warning: v_flakes shellHook skipped — CWD is not repo root ($PWD != $_v_flakes_repo_root)" >&2
         else
+          # Guarantee cargo for the rust scripts module hooks invoke.
+          export PATH="${rust}/bin:$PATH"
           ${combinedHooks}
         fi
         unset _v_flakes_repo_root

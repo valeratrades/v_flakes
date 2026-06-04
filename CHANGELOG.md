@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `utils.combine`: **Breaking** — now takes an attrset `{ rust, modules }` instead of a bare module list, and `rust` (the nix rust toolchain, e.g. `rs.rust`) is **required**. combine prepends `${rust}/bin` to PATH before any module hook runs, guaranteeing a working cargo for the custom rust scripts hooks invoke (`append_custom.rs`, `pyproject_merge.rs`, code-duplication, …). No more `rust != null` gates or silent rustup fallback at this layer — provision it or eval fails. Migrate `combine [ rs github readme ]` → `combine { inherit rust; modules = [ rs github readme ]; }`.
+- `github`: with `enable = true`, the rust toolchain is now **asserted** (via the `rs` module) rather than silently skipping hook installation when absent — a missing `rs` fails loud at eval. The per-module `export PATH=${rust}/bin` and the `rust != null` gate around the hook install are gone (combine owns PATH now); `append_custom.rs` runs via plain `cargo`.
+- `js`: new required `preCommit` arg — once the module is built, `preCommit.visual` (true/false) must be set explicitly (no default). When true, the pre-commit `custom.sh` runs `pnpm test:visual` (playwright), auto-locating the package.json that declares the `test:visual` script (repo root or `./frontend`) and re-staging any snapshot diffs. Drive it via `github { js = <js module>; ... }`.
+
 ## v1.6.1
 
 - `rs`: **bugfix** — `binstallHook` no longer prepends `$HOME/.cargo/bin` to `PATH`. Doing so put the rustup shim ahead of the nix-provided cargo; if the active rustup toolchain happened to be broken (e.g. its patchelf'd ELF interpreter pointed at a nix-store glibc that had since been GC'd), every `cargo` invocation in the hook failed with `error: command failed: 'cargo' / No such file or directory`, silently broke the installed-version check, and then the install retry failed for the same reason. Now nix rust is prepended **at the very top** of `rs.shellHook` (covering `lintsHook`, `buildHook`, and `binstallHook` — all of which spawn `cargo` or `rustfmt`) and `~/.cargo/bin` is only appended (so cargo-installed binaries like `tracey`/`v_flakes` stay reachable, but `cargo` itself always resolves to the nix toolchain).
