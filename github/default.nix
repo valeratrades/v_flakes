@@ -379,25 +379,9 @@ warnIfNeeded ({
     ${if enable then ''
     ${if rust != null then ''
     export PATH="${rust}/bin:$PATH"
-    '' else ""}
-    ${"# Install the custom pre-commit hook unconditionally (js-only projects have"}
-    ${"# no rust toolchain, but still need the hook). The git-generated `pre-commit`"}
-    ${"# is patched in pure shell to `source custom.sh` — idempotent: it only"}
-    ${"# inserts when the line before the final `exec` is blank, which it no longer"}
-    ${"# is once patched. Mirrors the old append_custom.rs without needing cargo."}
-    if [ -f ./.git/hooks/pre-commit ] && ! grep -qF 'source "$script_dir"/custom.sh' ./.git/hooks/pre-commit; then
-      mapfile -t _pc_lines < ./.git/hooks/pre-commit
-      _pc_n=''${#_pc_lines[@]}
-      if [ "$_pc_n" -gt 1 ] && [ -z "''${_pc_lines[$((_pc_n-2))]//[[:space:]]/}" ]; then
-        {
-          for _i in $(seq 0 $((_pc_n-2))); do printf '%s\n' "''${_pc_lines[$_i]}"; done
-          printf '%s\n' 'script_dir=$(dirname "$(realpath "''${BASH_SOURCE[0]}")")'
-          printf '%s\n' 'source "$script_dir"/custom.sh'
-          printf '%s\n' "''${_pc_lines[$((_pc_n-1))]}"
-        } > ./.git/hooks/pre-commit
-      fi
-    fi
+    ${cargoNightly} -Zscript -q ${./append_custom.rs} ./.git/hooks/pre-commit
     install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
+    '' else ""}
     cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
     ${if lfs != null then ''
     cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
