@@ -1,5 +1,11 @@
 # JavaScript/TypeScript project configuration module
-{ pkgs ? null, nixpkgs ? null, node ? null, corepack_home ? ".direnv/corepack" }:
+{ pkgs ? null, nixpkgs ? null, node ? null, corepack_home ? ".direnv/corepack",
+  # Pre-commit configuration. No default: once `js` is declared for a build, its
+  # fields are mandatory and must be set explicitly (true/false), so a project
+  # never silently inherits a hook policy it didn't opt into.
+  #   visual : run `pnpm test:visual` (playwright) in the pre-commit hook.
+  preCommit ? null,
+}:
 if pkgs == null then {
   description = ''
 JavaScript/TypeScript project configuration module.
@@ -14,8 +20,18 @@ in the read-only nix store cannot be written to.
 let
   utils = import ../utils;
   nodejs = if node != null then node else pkgs.nodejs;
+  preCommit' =
+    assert pkgs.lib.assertMsg (preCommit != null)
+      "v_flakes.js: `preCommit` is required when the module is built. Pass e.g. `preCommit = { visual = true; };` (no default — opt in explicitly).";
+    assert pkgs.lib.assertMsg (preCommit ? visual)
+      "v_flakes.js: `preCommit.visual` is required (true/false) — whether to run `pnpm test:visual` in the pre-commit hook.";
+    preCommit;
 in
 {
+  # Validated pre-commit policy. Reading this forces the requiredness asserts,
+  # so `github` (which reads `js.preCommit.visual`) gets a clear error rather
+  # than a silent `null` when a field was omitted.
+  preCommit = preCommit';
   enabledPackages = [ nodejs pkgs.corepack ];
 
   shellHook = utils.mkShellHook ''

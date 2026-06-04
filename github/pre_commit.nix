@@ -3,6 +3,9 @@
   codestyleLazyInstall ? "",
   # List of directory paths (relative to repo root) to exclude from sort-derives and codestyle, e.g. ["libs/nautilus_trader"]
   excludeDirs ? [],
+  # Run `pnpm test:visual` (playwright) in the hook. Driven by the js module's
+  # `preCommit.visual`. Runs outside the Cargo.toml guard — it is not rust-gated.
+  jsVisual ? false,
   # backwards compat
   styleCheck ? null,
 }:
@@ -12,6 +15,29 @@ let
   actualStyleAssert = if styleCheck != null then false else styleAssert;
 
   semverChecksCmd = if semverChecks then "cargo semver-checks" else "";
+  # Visual regression hook. Located by the package.json that actually declares a
+  # `test:visual` script (root or ./frontend), so it works for both flat and
+  # frontend-subdir layouts without a project-specific path. Snapshot diffs the
+  # run produces are re-staged, mirroring the rust hooks' staged-only contract.
+  jsVisualCmd = if jsVisual then ''
+    visual_dir=""
+    for d in . frontend; do
+      if [ -f "$d/package.json" ] && grep -q '"test:visual"' "$d/package.json"; then
+        visual_dir="$d"; break
+      fi
+    done
+    if [ -z "$visual_dir" ]; then
+      echo "js.preCommit.visual: no package.json with a \"test:visual\" script found (looked in ./ and ./frontend)"
+      exit 1
+    fi
+    echo "Running: pnpm test:visual ($visual_dir)"
+    ( cd "$visual_dir" && pnpm test:visual )
+    if [ $? -ne 0 ]; then
+      echo "pnpm test:visual failed"
+      exit 1
+    fi
+    git add -u
+  '' else "";
   traceyCmd = if traceyCheck then ''
     if [ -f ".config/tracey/config.kdl" ]; then
       tracey --check
@@ -117,6 +143,8 @@ let
       ${traceyCmd}
       ${styleCmd}
     fi
+
+    ${jsVisualCmd}
 
     rm commit >/dev/null 2>&1 # remove commit message text file if it exists
     echo "Ran custom pre-commit hooks"
