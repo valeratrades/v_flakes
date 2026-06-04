@@ -194,14 +194,22 @@ in
   # Each module should have optional `enabledPackages` (list) and `shellHook` (string) attributes.
   # Missing attributes are treated as empty.
   #
-  # The combined shellHook is wrapped in a guard that:
-  #   - aborts (exit 1) if the shell is not inside a git repository — module
-  #     hooks write files via relative paths, so a missing repo means we have
-  #     no anchor and risk dumping files in arbitrary locations.
-  #   - skips all component hooks (with a warning) when CWD is not the git
-  #     repo root, so e.g. `nix develop ..` from inside a subdirectory never
-  #     pollutes that subdirectory with generated `.github/`, `.gitignore`,
-  #     `.gitattributes`, etc.
+  # The combined shellHook is wrapped in a guard that aborts (exit 1) whenever
+  # the shell is not anchored at the git repo root:
+  #   - no git repository — module hooks write files via relative paths, so a
+  #     missing repo means we have no anchor and risk dumping files in arbitrary
+  #     locations.
+  #   - CWD is not the git repo root (e.g. `nix develop ..` from inside a
+  #     subdirectory) — otherwise generated `.github/`, `.gitignore`,
+  #     `.gitattributes`, etc. would pollute that subdirectory.
+  #
+  # The abort is `exit 1`, not a mere skip of our own hooks. A `nix develop`
+  # shellHook is *sourced* into the bash that drives the dev shell (this is why
+  # the no-git `exit 1` already tears the whole thing down), so exiting here
+  # hijacks and aborts the ENTIRE enclosing flake.nix shellHook — including
+  # whatever the consumer concatenated around `${combined.shellHook}`. That is
+  # the intended blast radius: if we cannot trust the anchor, nothing should
+  # run, not just the parts we own. We still print a warning explaining why.
   combine = { rust, modules }:
     assert (rust != null) || throw "v_flakes.utils.combine: `rust` is required — pass the nix rust toolchain (e.g. `rs.rust`) so module hooks have a guaranteed cargo on PATH.";
     let
@@ -219,13 +227,14 @@ in
           exit 1
         }
         if [ "$PWD" != "$_v_flakes_repo_root" ]; then
-          echo "warning: v_flakes shellHook skipped — CWD is not repo root ($PWD != $_v_flakes_repo_root)" >&2
-        else
-          # Guarantee cargo for the rust scripts module hooks invoke.
-          export PATH="${rust}/bin:$PATH"
-          ${combinedHooks}
+          echo "warning: v_flakes shellHook aborting entire flake.nix hook — CWD is not repo root ($PWD != $_v_flakes_repo_root)" >&2
+          unset _v_flakes_repo_root
+          exit 1
         fi
         unset _v_flakes_repo_root
+        # Guarantee cargo for the rust scripts module hooks invoke.
+        export PATH="${rust}/bin:$PATH"
+        ${combinedHooks}
       '';
     };
 }

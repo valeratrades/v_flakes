@@ -24,6 +24,7 @@ See individual component descriptions in their respective directories.'';
         rs = (import ./rs { inherit nixpkgs; }).description;
         py = (import ./py { inherit nixpkgs; }).description;
         tex = (import ./tex { inherit nixpkgs; }).description;
+        typ = (import ./typ { inherit nixpkgs; }).description;
         js = (import ./js { inherit nixpkgs; }).description;
       };
     in
@@ -82,10 +83,13 @@ See individual component descriptions in their respective directories.'';
           inherit stdenv;
           packages = with pkgs; [ curl mold rust ] ++ combined.enabledPackages;
           shellHook = ''
+            # Guard first: combined.shellHook aborts (exit 1) the entire hook
+            # unless we are anchored at the repo root, so nothing below runs
+            # — and pollutes a subdirectory — when invoked from elsewhere.
+            ${combined.shellHook}
             _bump_script="./__scripts/bump_crate.rs"
             ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
             ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
-            ${combined.shellHook}
             # Bootstrap: build our own binaries and put them on PATH for local testing
             cargo b -q 2>/dev/null
             export PATH="$PWD/target/debug:$PATH"
@@ -110,6 +114,9 @@ ${parts.py}
 ## LaTeX
 ${parts.tex}
 
+## Typst
+${parts.typ}
+
 ## JavaScript
 ${parts.js}
 
@@ -122,6 +129,7 @@ Generates README.md from docs/.readme_assets/ directory structure.
       rs = import ./rs;
       py = import ./py;
       tex = import ./tex;
+      typ = import ./typ;
       js = import ./js;
       readme-fw = import ./readme_fw;
       utils = import ./utils;

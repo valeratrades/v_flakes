@@ -24,6 +24,14 @@ let
         options = ["--tab-spaces" "2" "--max-width" "100"];
         includes = ["*.rs"];
       };
+      # typstyle is CLI-flag configured (no repo config file). Keep these flags
+      # in sync with the `typ` module's lineWidth/indentWidth — override here via
+      # `extend` if a project passes non-default widths to `typ`.
+      typst = {
+        command = "typstyle";
+        options = ["-i" "--line-width" "190" "--indent-width" "2"];
+        includes = ["*.typ"];
+      };
     };
   };
 
