@@ -71,7 +71,7 @@ name: Release macos-x86_64
 'on':
   push:
     branches:
-    - master
+    - main
   workflow_dispatch: {}
 permissions:
   contents: write
