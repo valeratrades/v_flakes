@@ -46,6 +46,11 @@ let
   # "ours" == the newer state in our workflow. Applies regardless of LFS.
   alwaysOurs = [ "*.pdf" "*.excalidraw" ];
 
+  # Patterns that are ALWAYS LFS-tracked, even when the project sets lfs = false.
+  # These are binary-ish, large, and never benefit from text diffs, so we pin
+  # them to LFS regardless of the global flag (as if lfs = true for them alone).
+  alwaysLfs = [ "*.pdf" "*.excalidraw" ];
+
   # Lockfiles get the same treatment, but are never LFS-tracked, so they're
   # emitted as a standalone section rather than folded into the LFS patterns.
   # .pre-commit-config.yaml is generated/managed, not hand-merged, so it rides
@@ -53,6 +58,7 @@ let
   lockfiles = [ "Cargo.lock" "flake.lock" ".pre-commit-config.yaml" ];
 
   isOurs = pattern: builtins.elem pattern alwaysOurs;
+  isAlwaysLfs = pattern: builtins.elem pattern alwaysLfs;
 
   # Generate a single line for a pattern
   # enable = true: add LFS tracking
@@ -62,8 +68,9 @@ let
   #   actually-binary content like mp3/png/pdf)
   # `merge=ours` is appended (lfs=false) or substituted for `merge=lfs`
   # (lfs=true) on alwaysOurs patterns so a conflict never blocks a merge.
+  # alwaysLfs patterns force enable, ignoring the flag entirely.
   mkLfsLine = enable: pattern:
-    if enable
+    if (enable || isAlwaysLfs pattern)
     then
       (if isOurs pattern
       then "${pattern} filter=lfs diff=lfs merge=ours -text"
