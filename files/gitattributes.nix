@@ -94,7 +94,7 @@ let
   # at all (i.e. lfs != null).
   lockSection =
     let
-      lines = map (p: "${p} merge=ours") lockfiles;
+      lines = map (p: "${p} -filter merge=ours") lockfiles; # `-filter` cause `pre-commit-config.yaml` links to store, and shouldn't be git-lfsed ever. And well it doesn't affect the others, so alright to apply to all.
     in
     ''
       # Generated/locked files (keep current branch's version on conflict)
