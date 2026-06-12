@@ -20,14 +20,14 @@ let
       "*.bmp"
       "*.tiff"
       "*.webp"
-      "*.svg"
+      #"*.svg" # useful in git-diff
     ];
     documents = [
       "*.pdf"
       "*.excalidraw"
     ];
     data = [
-      "*.json"
+      #"*.json" # useful in git-diff
       "*.csv"
       "*.parquet"
       "*.pkl"
