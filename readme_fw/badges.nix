@@ -5,6 +5,14 @@
   lastSupportedVersion,
   gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb",
   logo ? "",
+  # Fully-qualified GitHub slug `owner/repo` — the single source of truth for the
+  # CI-status badge URLs. Defaults to `valeratrades/${pname}` (the historical
+  # behaviour). Set it when the repo lives under an org or is named differently
+  # from the project, e.g. `EV-invest/zero_fee_arb` or `EV-invest/site` (pname
+  # `ev_site`). The loc gist below is unaffected — it stays under `valeratrades`,
+  # a personal gist the LOC workflow writes to regardless of where the repo lives.
+  repo ? "valeratrades/${pname}",
+  branch ? "main",
 }: let
   badges = {
     msrv = ''![Minimum Supported Rust Version](https://img.shields.io/badge/${lastSupportedVersion}+-ab6000.svg)'';
@@ -17,10 +25,10 @@
     # Each project gets its own file in the shared gist: ${pname}-loc.json
     loc = ''![Lines Of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/valeratrades/${gistId}/raw/${pname}-loc.json)'';
 
-    # note that it is possible to remove all references to `master` and have it automatically use the current branch. But that would require running them on `on.push.branches: [**]`.
+    # note that it is possible to remove all references to the default branch and have it automatically use the current branch. But that would require running them on `on.push.branches: [**]`.
     ci = ''      <br>
-      [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/${pname}/errors.yml?branch=master&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/${pname}/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->
-      [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/${pname}/warnings.yml?branch=master&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/${pname}/actions?query=branch%3Amaster) <!--NB: Won't find it if repo is private-->'';
+      [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/${repo}/errors.yml?branch=${branch}&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/${repo}/actions?query=branch%3A${branch}) <!--NB: Won't find it if repo is private-->
+      [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/${repo}/warnings.yml?branch=${branch}&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/${repo}/actions?query=branch%3A${branch}) <!--NB: Won't find it if repo is private-->'';
   };
   combineBadges = names: let
     logoSuffix = if logo != "" then " ${logo}" else "";

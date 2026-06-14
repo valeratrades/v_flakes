@@ -23,6 +23,9 @@ args@{
   default ? defaults,
   licenses ? null,
   gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb",
+  # Fully-qualified GitHub slug `owner/repo` for the CI-status badges; see badges.nix.
+  repo ? "valeratrades/${pname}",
+  branch ? "main",
 }:
 
 let
@@ -105,6 +108,8 @@ let
       rootDir
       gistId
       logo
+      repo
+      branch
       ;
   };
 
