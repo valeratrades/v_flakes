@@ -1,5 +1,6 @@
 { gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb" }:
-{
+let utils = import ../../../../utils;
+in {
   name = "Update LOC Badge";
   runs-on = "ubuntu-latest";
   steps = [
@@ -7,21 +8,13 @@
       name = "Checkout repository";
       uses = "actions/checkout@v4";
     }
-    {
-      name = "Check for loc_gist_token secret";
-      env = {
-        LOC_GIST_TOKEN = "\${{ secrets.loc_gist_token }}";
-      };
-      run = ''
-        if [ -z "$LOC_GIST_TOKEN" ]; then
-          echo "::error::Secret 'loc_gist_token' is not set for this repository."
-          echo "::error::To fix this, run one of the following commands:"
-          echo "::error::  1. For this repo only: gh secret set loc_gist_token --repo $GITHUB_REPOSITORY --body YOUR_TOKEN"
-          echo "::error::  2. For all repos: https://github.com/valeratrades/nix/tree/e4338bf5943d7403b949a8e079f9073987d9cd68/home/scripts/shared_github_secrets.bash"
-          exit 1
-        fi
-      '';
-    }
+    (utils.requireSecret {
+      name = "loc_gist_token";
+      hint = [
+        "Create a token, then: gh secret set loc_gist_token --repo <owner>/<repo> --body YOUR_TOKEN"
+        "Bulk-provision all repos: https://github.com/valeratrades/nix/tree/e4338bf5943d7403b949a8e079f9073987d9cd68/home/scripts/shared_github_secrets.bash"
+      ];
+    })
     {
       name = "Install tokei";
       run = "cargo install tokei";

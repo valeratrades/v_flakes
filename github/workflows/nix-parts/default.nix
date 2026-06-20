@@ -4,6 +4,8 @@ args@{ pkgs ? null, nixpkgs ? null, lastSupportedVersion ? null, jobsErrors, job
   # Per-section `on` triggers. Default: push + pull_request.
   # workflow_dispatch is always appended unless already present in the provided value.
   hooksErrors ? null, hooksWarnings ? null, hooksOther ? null,
+  # Claude Code workflows (PR assistant + auto code review). Standalone, generic across repos.
+  claude ? false,
   # Loud-fallback cargo wrapper (see github/default.nix). Only required when
   # called via the description-only path below; in normal use it's threaded in.
   cargoNightly ? null,
@@ -41,6 +43,11 @@ Standalone workflows:
 - gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; }
     Sync to GitLab mirror (triggers on push to any branch/tag)
     Repo name is appended from GitHub context. Requires GITLAB_TOKEN secret
+- claude = true  # on by default for enabled repos
+    Claude Code PR assistant (claude.yml, on @claude mentions) + auto code review
+    (claude-code-review.yml, on PR open/update). Generic across repos.
+    Requires the CLAUDE_CODE_OAUTH_TOKEN secret (org secret w/ "All repositories"
+    visibility shares it across an entire org; personal repos need their own copy).
 '';
 } else
 
@@ -254,6 +261,14 @@ let
     in (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs syncSpec [ "standalone" ])
   else null;
 
+  # Claude Code workflows (standalone, generic). Generated as a pair when `claude` is set.
+  claudeWorkflow = if claude then
+    (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude.nix) [ "standalone" ])
+  else null;
+  claudeReviewWorkflow = if claude then
+    (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude-review.nix) [ "standalone" ])
+  else null;
+
   # GitLab sync workflow (triggers on any push)
   stripTrailingSlash = s:
     let len = builtins.stringLength s;
@@ -361,6 +376,11 @@ let
     cp -f ${gitlabSyncWorkflow} ./.github/workflows/sync_gitlab.yml
   '' else "";
 
+  claudeHook = if claudeWorkflow != null then ''
+    cp -f ${claudeWorkflow} ./.github/workflows/claude.yml
+    cp -f ${claudeReviewWorkflow} ./.github/workflows/claude-code-review.yml
+  '' else "";
+
   errorsHook = if workflows.errors != null then ''
     cp -f ${workflows.errors} ./.github/workflows/errors.yml
   '' else "";
@@ -372,7 +392,7 @@ let
   '' else "";
 in
 workflows // {
-  inherit releaseWorkflows gitlabSyncWorkflow syncForkWorkflow;
+  inherit releaseWorkflows gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow;
   shellHook = utils.mkShellHook ''
     mkdir -p ./.github/workflows
     ${errorsHook}
@@ -382,5 +402,6 @@ workflows // {
     ${releaseStaleWarningHook}
     ${syncForkHook}
     ${gitlabSyncHook}
+    ${claudeHook}
   '';
 }

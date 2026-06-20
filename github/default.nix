@@ -12,6 +12,8 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   install ? {},
   release ? null, gitlabSync ? null,
   syncFork ? false,
+  # Claude Code workflows (PR assistant + auto code review). On by default for enabled repos.
+  claude ? true,
   # Dirs to exclude from sort-derives and codestyle (e.g. vendored code or submodules), e.g. ["libs/nautilus_trader"]
   excludeDirs ? [],
   # Master switch: enables CI workflows, pre-commit hooks, gitignore, label sync, git_ops, etc.
@@ -21,7 +23,7 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "conventions" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "conventions" "release" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != []) then
@@ -200,6 +202,7 @@ let
     inherit lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release gitlabSync;
     inherit installErrors installWarnings installOther;
     inherit hooksErrors hooksWarnings hooksOther;
+    inherit claude;
   } else {
     jobsErrors = [];
     jobsWarnings = [];

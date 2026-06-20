@@ -1,7 +1,8 @@
 # Generates workflow for syncing to a GitLab mirror
 # Requires GITLAB_TOKEN secret in GitHub repo
 mirrorBaseUrl:
-{
+let utils = import ../../../../utils;
+in {
   standalone = true;
 
   name = "Sync to GitLab Mirror";
@@ -19,21 +20,10 @@ mirrorBaseUrl:
     other = {
       runs-on = "ubuntu-latest";
       steps = [
-        {
-          name = "Check required secrets";
-          run = ''
-            if [ -z "${"$"}{{ secrets.GITLAB_TOKEN }}" ]; then
-              echo "::error::Missing required secret GITLAB_TOKEN for GitLab sync"
-              echo ""
-              echo "To configure:"
-              echo "  1. Go to your GitLab account -> Settings -> Access Tokens"
-              echo "  2. Create a token with 'write_repository' scope"
-              echo "  3. In this GitHub repo, go to Settings -> Secrets and variables -> Actions"
-              echo "  4. Add GITLAB_TOKEN with your GitLab access token"
-              exit 1
-            fi
-          '';
-        }
+        (utils.requireSecret {
+          name = "GITLAB_TOKEN";
+          hint = [ "Create a GitLab access token with 'write_repository' scope (GitLab → Settings → Access Tokens)." ];
+        })
         {
           uses = "actions/checkout@v4";
           "with" = {

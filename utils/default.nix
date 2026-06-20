@@ -164,6 +164,23 @@ in
       fi
     '';
 
+  # GitHub Actions step asserting a repo/org secret is present before it gets used.
+  # GitHub substitutes a missing secret with the empty string and would otherwise
+  # fail deep inside whatever consumes it — this surfaces it loud and early.
+  # The secret is injected as an env var (kept off the command line, masked in logs);
+  # `hint` lines are appended as extra `::error::` annotations for setup guidance.
+  requireSecret = { name, hint ? [] }: {
+    name = "Ensure ${name} secret is configured";
+    env = { ${name} = "\${{ secrets.${name} }}"; };
+    run = builtins.concatStringsSep "\n" ([
+      "if [ -z \"\${${name}}\" ]; then"
+      "  echo \"::error::Secret '${name}' is not set. Add it under Settings → Secrets and variables → Actions (repo-level, or org-level with 'All repositories' visibility to cover every repo).\""
+    ] ++ (map (l: "  echo \"::error::${l}\"") hint) ++ [
+      "  exit 1"
+      "fi"
+    ]) + "\n";
+  };
+
   # Default GitHub Actions `on` triggers for standard CI workflows.
   # Fires on every push, every PR, and allows manual dispatch.
   # Override per-section via jobs.errors.hooks = { ... } in github/default.nix.
