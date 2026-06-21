@@ -223,7 +223,10 @@ let
 
           contentWithDemotedHeaders = if demoteHeaders then demoteHeadersFn contentWithPaths else contentWithPaths;
 
-          out = (if (exists || !optional) then (transform contentWithDemotedHeaders singlePath) + "\n" else contentWithDemotedHeaders);
+          out =
+            if contentWithDemotedHeaders == "" then ""
+            else if (exists || !optional) then (transform contentWithDemotedHeaders singlePath) + "\n"
+            else contentWithDemotedHeaders;
         in
         out;
 
@@ -336,7 +339,7 @@ ${contentRendered}
         optional = true;
       };
     in
-    if isMulti then "## Installation\n\n" + folds else folds;
+    if isMulti && folds != "" then "## Installation\n\n" + folds else folds;
 
   usage_out = processSection {
     path = "docs/.readme_assets/usage\\.(sh|md|typ)";
@@ -481,6 +484,11 @@ README_EOF
         mv ./.readme_assets ./docs/.readme_assets
         echo "Moved .readme_assets/ to docs/.readme_assets/"
       fi
+      mkdir -p docs/.readme_assets
+      [ -n "$(ls docs/.readme_assets/description.* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/description.md
+      [ -n "$(ls docs/.readme_assets/usage.* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/usage.md
+      [ -n "$(ls docs/.readme_assets/install* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/installation.md
+      [ -n "$(ls docs/.readme_assets/other.* 2>/dev/null)" ] || : > docs/.readme_assets/other.md
       cp -f ${readme} ./README.md
     '';
 in
