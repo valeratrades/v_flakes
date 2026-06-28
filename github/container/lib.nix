@@ -117,7 +117,9 @@ in
                 image = "${image}:${tag}";
                 ports = [{ containerPort = port; }];
                 env = containerEnv;
-                envFrom = [{ secretRef = { name = "${name}-env"; }; }];
+                # optional: a container with no secret env (e.g. a static frontend)
+                # still starts; a required-but-missing secret crashloops visibly.
+                envFrom = [{ secretRef = { name = "kubernetes-${name}"; optional = true; }; }];
                 livenessProbe = probe;
                 readinessProbe = probe;
                 volumeMounts = volumeMounts;
