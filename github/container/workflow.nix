@@ -1,5 +1,7 @@
-# Tag-driven, versioned-only push of `nix build .#container` to GHCR (aarch64).
-{ registry, pname }:
+# Tag-driven, versioned-only push of every `#containers.<system>.<name>` to GHCR
+# (aarch64). The repo's container set is enumerated at build time, so adding a
+# container needs no workflow change.
+{ registry }:
 let
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
   # clear error (release-gate.nix can only skip silently). Rejects v1, v1.2, vbeta.
@@ -15,7 +17,7 @@ in
   standalone = true;
   filename = "release-container.yml";
 
-  name = "Release container";
+  name = "Release containers";
   on.push.tags = [ "v[0-9]+.*" ];
   permissions = {
     contents = "read";
@@ -42,13 +44,18 @@ in
         };
       }
       {
-        name = "Build + push container";
+        name = "Build + push containers";
         shell = "bash";
         run = ''
-          RESULT="$(nix build .#container --no-link --print-out-paths)"
-          nix run nixpkgs#skopeo -- copy \
-            "docker-archive:$RESULT" \
-            "docker://${registry}/${pname}:''${{ github.ref_name }}"
+          sys="$(nix eval --impure --raw --expr builtins.currentSystem)"
+          for name in $(nix eval --json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]'); do
+            echo "::group::$name"
+            RESULT="$(nix build ".#$name-container" --no-link --print-out-paths)"
+            nix run nixpkgs#skopeo -- copy \
+              "docker-archive:$RESULT" \
+              "docker://${registry}/$name:''${{ github.ref_name }}"
+            echo "::endgroup::"
+          done
         '';
       }
     ];
