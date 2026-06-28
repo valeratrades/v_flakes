@@ -1,4 +1,4 @@
-args@{ pkgs ? null, nixpkgs ? null, lastSupportedVersion ? null, jobsErrors, jobsWarnings, jobsOther ? [], hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", release ? null, gitlabSync ? null, syncFork ? false,
+args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, jobsErrors, jobsWarnings, jobsOther ? [], hookPre ? {}, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb", release ? null, containerRelease ? null, gitlabSync ? null, syncFork ? false,
   # Per-section install dependencies: { packages = [ "pkg1" ]; apt = [ "pkg2" ]; }
   installErrors ? {}, installWarnings ? {}, installOther ? {},
   # Per-section `on` triggers. Default: push + pull_request.
@@ -100,6 +100,7 @@ let
     rust-sorted-derives = ./rust/sorted_derives.nix;
     rust-unused-features = ./rust/unused_features.nix;
     rust-release = ./rust/release.nix;
+    container-release = ../../container/workflow.nix;
 		#,}}}
 
 		# go {{{
@@ -254,6 +255,13 @@ let
     ) spec.workflows
   else {};
 
+  # Opt-in via `github { containerRelease = { registry = "ghcr.io/EV-invest"; }; }`.
+  containerReleaseWorkflow = if containerRelease != null then
+    (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
+      (import files.container-release { inherit pname; registry = containerRelease.registry; })
+      [ "standalone" "filename" ])
+  else null;
+
   # Sync fork workflow (rebase over upstream)
   syncForkWorkflow = if syncFork then
     let
@@ -368,6 +376,10 @@ let
     ''
   else "";
 
+  containerReleaseHook = if containerReleaseWorkflow != null then ''
+    cp -f ${containerReleaseWorkflow} ./.github/workflows/release-container.yml
+  '' else "";
+
   syncForkHook = if syncForkWorkflow != null then ''
     cp -f ${syncForkWorkflow} ./.github/workflows/sync_fork.yml
   '' else "";
@@ -392,7 +404,7 @@ let
   '' else "";
 in
 workflows // {
-  inherit releaseWorkflows gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow;
+  inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow;
   shellHook = utils.mkShellHook ''
     mkdir -p ./.github/workflows
     ${errorsHook}
@@ -400,6 +412,7 @@ workflows // {
     ${otherHook}
     ${releaseHook}
     ${releaseStaleWarningHook}
+    ${containerReleaseHook}
     ${syncForkHook}
     ${gitlabSyncHook}
     ${claudeHook}
