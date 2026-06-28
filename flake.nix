@@ -126,6 +126,7 @@ Generates README.md from docs/.readme_assets/ directory structure.
 
       files = import ./files;
       github = import ./github;
+      container = import ./github/container/lib.nix;
       rs = import ./rs;
       py = import ./py;
       tex = import ./tex;
