@@ -565,23 +565,26 @@ fn deploy_secret_name(basename: &str) -> String {
     format!("DEPLOY_KEY_{sanitized}")
 }
 
-/// Append an idempotent `Host gh-<repo>` block to ~/.ssh/config so local `nix` eval
-/// resolves the aliased flake input (the dev's own key reads it — no IdentityFile, so
-/// the default identity is used; CI overrides this alias with the deploy key).
+/// Ensure a `Host gh-<repo>` block exists in ~/.ssh/config so local `nix` eval resolves
+/// the aliased flake input (the dev's own key reads it — no IdentityFile, default
+/// identity; CI overrides this alias with the deploy key). Best-effort: a read-only
+/// config (e.g. a home-manager symlink into the nix store) just prints the block to add.
 fn ensure_ssh_alias(alias: &str) {
     let home = dirs::home_dir().expect("no home dir");
     let cfg = home.join(".ssh/config");
+    let block = format!("Host {alias}\n  HostName github.com\n  User git\n");
     if fs::read_to_string(&cfg).unwrap_or_default().lines().any(|l| l.split_whitespace().eq(["Host", alias])) {
         return;
     }
-    fs::create_dir_all(home.join(".ssh")).expect("create ~/.ssh");
-    std::fs::OpenOptions::new()
+    let _ = fs::create_dir_all(home.join(".ssh"));
+    let wrote = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&cfg)
-        .expect("open ~/.ssh/config")
-        .write_all(format!("\nHost {alias}\n  HostName github.com\n  User git\n").as_bytes())
-        .expect("append ssh alias");
+        .and_then(|mut f| f.write_all(format!("\n{block}").as_bytes()));
+    if wrote.is_err() {
+        eprintln!("init-deploy-key: {} is not writable — add this block yourself so `nix` resolves the alias:\n\n{block}", cfg.display());
+    }
 }
 
 /// Generate a fresh ed25519 keypair, register the public half as a read-only deploy key
