@@ -1,0 +1,7 @@
+# v_flakes is consumed as a `github:` flake input. GitHub's tarball API smudges
+# LFS non-deterministically (per-rev tarball caching + monthly bandwidth quota),
+# so an LFS-tracked file makes this repo's narHash unstable across fetch time and
+# nix implementation — which silently breaks every consumer's flake.lock.
+# Keep these readme assets as plain git blobs. Overrides any global *.png lfs rule.
+docs/.readme_assets/arch.png -filter -diff -merge
+docs/.readme_assets/assets/arch.svg -filter -diff -merge
