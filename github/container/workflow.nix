@@ -2,11 +2,12 @@
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
-# deployKeys: list of private repo basenames the build pulls as `git+ssh` flake inputs.
-# Each gets its own read-only deploy key (a key can be a deploy key on only one repo),
-# so we write one id file per repo and disambiguate with an ssh host alias `gh-<repo>`
-# (IdentitiesOnly) matching the input URL `git+ssh://git@gh-<repo>/<owner>/<repo>`.
-# Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no SSH step.
+# deployKeys: "<owner>/<repo>" list of private repos the build pulls as flake inputs
+# (URLs stay plain `git+ssh://git@github.com/<owner>/<repo>` so local builds just use the
+# dev's own key). A key can be a deploy key on only one repo, so per repo we write its
+# read-only key, an ssh alias `gh-<repo>` selecting it (IdentitiesOnly), and a git
+# `insteadOf` rewrite steering only that repo's plain github.com URL to the alias — all
+# CI-only. Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no step.
 { registry, deployKeys ? [], lib }:
 let
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
@@ -23,15 +24,18 @@ let
   # ~/.ssh identities are enough — no agent, no daemon forwarding. keyscan pins
   # github.com's host key (non-interactive shells can't answer the trust prompt).
   secretOf = repo: "DEPLOY_KEY_" + builtins.replaceStrings [ "." "-" ] [ "_" "_" ] (lib.toUpper repo);
-  mkKeyBlock = repo: ''
-    key="''${{ secrets.${secretOf repo} }}"
+  mkKeyBlock = ownerRepo:
+    let repo = lib.last (lib.splitString "/" ownerRepo); secret = secretOf repo; in ''
+    key="''${{ secrets.${secret} }}"
     if [ -z "$key" ]; then
-      echo "::error::${secretOf repo} unset — build fetches private git+ssh input '${repo}'. Provision: git_ops init-deploy-key <owner>/${repo}" >&2
+      echo "::error::${secret} unset — build fetches private input '${ownerRepo}'. Provision: git_ops init-deploy-key ${ownerRepo}" >&2
       exit 1
     fi
     printf '%s\n' "$key" > ~/.ssh/${repo}
     chmod 600 ~/.ssh/${repo}
     printf 'Host gh-${repo}\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/${repo}\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+    git config --global url."ssh://git@gh-${repo}/${ownerRepo}".insteadOf "ssh://git@github.com/${ownerRepo}"
+    git config --global url."git@gh-${repo}:${ownerRepo}".insteadOf "git@github.com:${ownerRepo}"
   '';
   deployKeyStep = {
     name = "SSH auth for private flake inputs";

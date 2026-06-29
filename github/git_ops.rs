@@ -565,31 +565,10 @@ fn deploy_secret_name(basename: &str) -> String {
     format!("DEPLOY_KEY_{sanitized}")
 }
 
-/// Ensure a `Host gh-<repo>` block exists in ~/.ssh/config so local `nix` eval resolves
-/// the aliased flake input (the dev's own key reads it — no IdentityFile, default
-/// identity; CI overrides this alias with the deploy key). Best-effort: a read-only
-/// config (e.g. a home-manager symlink into the nix store) just prints the block to add.
-fn ensure_ssh_alias(alias: &str) {
-    let home = dirs::home_dir().expect("no home dir");
-    let cfg = home.join(".ssh/config");
-    let block = format!("Host {alias}\n  HostName github.com\n  User git\n");
-    if fs::read_to_string(&cfg).unwrap_or_default().lines().any(|l| l.split_whitespace().eq(["Host", alias])) {
-        return;
-    }
-    let _ = fs::create_dir_all(home.join(".ssh"));
-    let wrote = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&cfg)
-        .and_then(|mut f| f.write_all(format!("\n{block}").as_bytes()));
-    if wrote.is_err() {
-        eprintln!("init-deploy-key: {} is not writable — add this block yourself so `nix` resolves the alias:\n\n{block}", cfg.display());
-    }
-}
-
 /// Generate a fresh ed25519 keypair, register the public half as a read-only deploy key
-/// on `target`, store the private half as this repo's DEPLOY_KEY_<REPO> secret, and add
-/// the matching local ssh alias. The keypair only ever lives in a temp dir we delete.
+/// on `target`, and store the private half as this repo's DEPLOY_KEY_<REPO> secret. The
+/// key is CI-only: local builds use the dev's own ssh key against plain github.com, so
+/// we never touch local ssh config. The keypair only ever lives in a temp dir we delete.
 fn init_deploy_key(target: String) {
     let current = gh_capture(&["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
         .unwrap_or_else(|| {
@@ -601,7 +580,6 @@ fn init_deploy_key(target: String) {
         std::process::exit(1);
     });
     let secret = deploy_secret_name(basename);
-    let alias = format!("gh-{basename}");
 
     let dir = std::env::temp_dir().join(format!("git_ops_deploy_{}", std::process::id()));
     fs::create_dir_all(&dir).expect("create temp dir");
@@ -648,8 +626,7 @@ fn init_deploy_key(target: String) {
         eprintln!("init-deploy-key: `gh secret set {secret}` failed");
         std::process::exit(1);
     }
-    ensure_ssh_alias(&alias);
-    println!("init-deploy-key: read-only deploy key on {target}; {secret} set on {current}; local alias {alias} -> github.com");
+    println!("init-deploy-key: read-only deploy key on {target}; {secret} set on {current} (CI-only — local uses your own ssh key)");
 }
 
 fn main() {
