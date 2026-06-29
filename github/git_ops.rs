@@ -555,15 +555,50 @@ fn gh_capture(args: &[&str]) -> Option<String> {
     o.status.success().then(|| String::from_utf8_lossy(&o.stdout).trim().to_string())
 }
 
-/// Generate a fresh ed25519 keypair, register the public half as a read-only deploy
-/// key on `target`, and store the private half as this repo's DEPLOY_KEY secret. The
-/// keypair only ever lives in a temp dir we delete before returning.
+/// Secret name for a repo's deploy key. Per-repo so a single runner can hold keys for
+/// several private repos at once (one id file each, disambiguated by ssh host alias).
+fn deploy_secret_name(basename: &str) -> String {
+    let sanitized: String = basename
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_uppercase() } else { '_' })
+        .collect();
+    format!("DEPLOY_KEY_{sanitized}")
+}
+
+/// Append an idempotent `Host gh-<repo>` block to ~/.ssh/config so local `nix` eval
+/// resolves the aliased flake input (the dev's own key reads it — no IdentityFile, so
+/// the default identity is used; CI overrides this alias with the deploy key).
+fn ensure_ssh_alias(alias: &str) {
+    let home = dirs::home_dir().expect("no home dir");
+    let cfg = home.join(".ssh/config");
+    if fs::read_to_string(&cfg).unwrap_or_default().lines().any(|l| l.split_whitespace().eq(["Host", alias])) {
+        return;
+    }
+    fs::create_dir_all(home.join(".ssh")).expect("create ~/.ssh");
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&cfg)
+        .expect("open ~/.ssh/config")
+        .write_all(format!("\nHost {alias}\n  HostName github.com\n  User git\n").as_bytes())
+        .expect("append ssh alias");
+}
+
+/// Generate a fresh ed25519 keypair, register the public half as a read-only deploy key
+/// on `target`, store the private half as this repo's DEPLOY_KEY_<REPO> secret, and add
+/// the matching local ssh alias. The keypair only ever lives in a temp dir we delete.
 fn init_deploy_key(target: String) {
     let current = gh_capture(&["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
         .unwrap_or_else(|| {
             eprintln!("init-deploy-key: run inside a GitHub repo (gh repo view failed)");
             std::process::exit(1);
         });
+    let basename = target.rsplit('/').next().filter(|s| !s.is_empty()).unwrap_or_else(|| {
+        eprintln!("init-deploy-key: target must be OWNER/REPO (got '{target}')");
+        std::process::exit(1);
+    });
+    let secret = deploy_secret_name(basename);
+    let alias = format!("gh-{basename}");
 
     let dir = std::env::temp_dir().join(format!("git_ops_deploy_{}", std::process::id()));
     fs::create_dir_all(&dir).expect("create temp dir");
@@ -598,7 +633,7 @@ fn init_deploy_key(target: String) {
     // gh secret set reads the value from stdin when --body is omitted.
     let priv_key = fs::read(&key).expect("read generated private key");
     let mut child = Command::new("gh")
-        .args(["secret", "set", "DEPLOY_KEY"])
+        .args(["secret", "set", &secret])
         .stdin(std::process::Stdio::piped())
         .spawn()
         .expect("spawn gh secret set");
@@ -607,10 +642,11 @@ fn init_deploy_key(target: String) {
 
     cleanup();
     if !set {
-        eprintln!("init-deploy-key: `gh secret set DEPLOY_KEY` failed");
+        eprintln!("init-deploy-key: `gh secret set {secret}` failed");
         std::process::exit(1);
     }
-    println!("init-deploy-key: read-only deploy key added to {target}; DEPLOY_KEY secret set on {current}");
+    ensure_ssh_alias(&alias);
+    println!("init-deploy-key: read-only deploy key on {target}; {secret} set on {current}; local alias {alias} -> github.com");
 }
 
 fn main() {

@@ -2,10 +2,12 @@
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
-# deployKey: set when the build pulls a private `git+ssh` flake input. Writes the
-# `DEPLOY_KEY` secret to ~/.ssh so the eval-time flake fetch authenticates. Provision
-# the secret with `git_ops init-deploy-key <owner>/<repo>`. False = no SSH step.
-{ registry, deployKey ? false }:
+# deployKeys: list of private repo basenames the build pulls as `git+ssh` flake inputs.
+# Each gets its own read-only deploy key (a key can be a deploy key on only one repo),
+# so we write one id file per repo and disambiguate with an ssh host alias `gh-<repo>`
+# (IdentitiesOnly) matching the input URL `git+ssh://git@gh-<repo>/<owner>/<repo>`.
+# Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no SSH step.
+{ registry, deployKeys ? [], lib }:
 let
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
   # clear error (release-gate.nix can only skip silently). Rejects v1, v1.2, vbeta.
@@ -17,24 +19,27 @@ let
     fi
   '';
 
-  # Read-only deploy key for a private `git+ssh` flake input. The flake fetch runs
-  # in the client `nix` process as the runner user, so its plain ~/.ssh identity is
-  # enough — no agent, no daemon forwarding. The keyscan pins github.com's host key
-  # (non-interactive shells can't answer the trust prompt).
+  # The flake fetch runs in the client `nix` process as the runner user, so plain
+  # ~/.ssh identities are enough — no agent, no daemon forwarding. keyscan pins
+  # github.com's host key (non-interactive shells can't answer the trust prompt).
+  secretOf = repo: "DEPLOY_KEY_" + builtins.replaceStrings [ "." "-" ] [ "_" "_" ] (lib.toUpper repo);
+  mkKeyBlock = repo: ''
+    key="''${{ secrets.${secretOf repo} }}"
+    if [ -z "$key" ]; then
+      echo "::error::${secretOf repo} unset — build fetches private git+ssh input '${repo}'. Provision: git_ops init-deploy-key <owner>/${repo}" >&2
+      exit 1
+    fi
+    printf '%s\n' "$key" > ~/.ssh/${repo}
+    chmod 600 ~/.ssh/${repo}
+    printf 'Host gh-${repo}\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/${repo}\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+  '';
   deployKeyStep = {
     name = "SSH auth for private flake inputs";
     shell = "bash";
     run = ''
       install -d -m 700 ~/.ssh
-      key="''${{ secrets.DEPLOY_KEY }}"
-      if [ -z "$key" ]; then
-        echo "::error::DEPLOY_KEY secret is unset — this build fetches a private git+ssh flake input. Provision it with: git_ops init-deploy-key <owner>/<private-repo>" >&2
-        exit 1
-      fi
-      printf '%s\n' "$key" > ~/.ssh/id_ed25519
-      chmod 600 ~/.ssh/id_ed25519
       ssh-keyscan -t rsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-    '';
+    '' + lib.concatStrings (map mkKeyBlock deployKeys);
   };
 in
 {
@@ -93,7 +98,7 @@ in
         };
       }
     ]
-    ++ (if deployKey then [ deployKeyStep ] else [])
+    ++ (if deployKeys != [] then [ deployKeyStep ] else [])
     ++ [
       {
         name = "Build + push containers";
