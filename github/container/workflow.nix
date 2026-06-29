@@ -32,8 +32,14 @@ in
         shell = "bash";
         run = semverGate;
       }
-      { uses = "DeterminateSystems/nix-installer-action@main"; }
-      { uses = "DeterminateSystems/magic-nix-cache-action@main"; }
+      # Upstream Nix, NOT Determinate: Determinate's lazy-trees recomputes the NAR
+      # hash of git/github flake inputs differently from upstream, so a flake.lock
+      # written by upstream Nix (what everyone here runs locally) fails eval in CI
+      # with "NAR hash mismatch". Upstream Nix in CI hashes identically to the lock.
+      {
+        uses = "cachix/install-nix-action@v30";
+        "with".extra_nix_config = "experimental-features = nix-command flakes";
+      }
       {
         name = "Log in to GHCR";
         uses = "docker/login-action@v3";
@@ -47,8 +53,13 @@ in
         name = "Build + push containers";
         shell = "bash";
         run = ''
+          set -euo pipefail
           sys="$(nix eval --impure --raw --expr builtins.currentSystem)"
-          for name in $(nix eval --json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]'); do
+          # Extract to a var first: `for x in $(cmd)` swallows cmd's exit code, so a
+          # failed eval (e.g. a flake error) would leave the loop empty and the job GREEN.
+          names="$(nix eval --json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
+          [ -n "$names" ] || { echo "::error::no containers found under .#containers.$sys" >&2; exit 1; }
+          for name in $names; do
             echo "::group::$name"
             RESULT="$(nix build ".#$name-container" --no-link --print-out-paths)"
             nix run nixpkgs#skopeo -- copy \
