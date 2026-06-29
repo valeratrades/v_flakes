@@ -26,7 +26,12 @@ in
   jobs.release = {
     runs-on = "ubuntu-24.04-arm";
     steps = [
-      { uses = "actions/checkout@v4"; }
+      # lfs: image/font assets (e.g. the frontend's PNGs) are Git-LFS tracked; without
+      # this the working tree has pointer files and the image build fails decoding them.
+      {
+        uses = "actions/checkout@v4";
+        "with".lfs = true;
+      }
       {
         name = "Validate tag (strict semver)";
         shell = "bash";
