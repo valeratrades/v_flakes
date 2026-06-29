@@ -37,14 +37,16 @@ in
         shell = "bash";
         run = semverGate;
       }
-      # Upstream Nix, NOT Determinate: Determinate's lazy-trees recomputes the NAR
-      # hash of git/github flake inputs differently from upstream, so a flake.lock
-      # written by upstream Nix (what everyone here runs locally) fails eval in CI
-      # with "NAR hash mismatch". Upstream Nix in CI hashes identically to the lock.
+      # Determinate Nix + magic-nix-cache: the cache restores the (expensive, cold)
+      # Rust/npm build store across releases — without it every tag recompiles from
+      # scratch (~25min on the arm runner). lazy-trees is safe now that no flake
+      # input carries Git-LFS content (LFS made input narHashes non-deterministic;
+      # see the de-LFS commit) — both nix implementations agree on the lock.
       {
-        uses = "cachix/install-nix-action@v30";
-        "with".extra_nix_config = "experimental-features = nix-command flakes";
+        uses = "DeterminateSystems/nix-installer-action@main";
+        "with".extra-conf = "lazy-trees = true";
       }
+      { uses = "DeterminateSystems/magic-nix-cache-action@main"; }
       {
         name = "Log in to GHCR";
         uses = "docker/login-action@v3";
