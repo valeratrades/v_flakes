@@ -59,6 +59,10 @@ in
           # failed eval (e.g. a flake error) would leave the loop empty and the job GREEN.
           names="$(nix eval --json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
           [ -n "$names" ] || { echo "::error::no containers found under .#containers.$sys" >&2; exit 1; }
+          # nixpkgs skopeo rejects the GH runner's v1-format /etc/containers/registries.conf
+          # ("must be in v2 format"); point it at our own minimal v2 file so it never reads the host's.
+          export CONTAINERS_REGISTRIES_CONF="$(mktemp)"
+          printf 'unqualified-search-registries = []\n' > "$CONTAINERS_REGISTRIES_CONF"
           for name in $names; do
             echo "::group::$name"
             RESULT="$(nix build ".#$name-container" --no-link --print-out-paths)"
