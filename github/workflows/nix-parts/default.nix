@@ -258,7 +258,7 @@ let
   # Opt-in via `github { containerRelease = { registry = "ghcr.io/EV-invest"; }; }`.
   containerReleaseWorkflow = if containerRelease != null then
     (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
-      (import files.container-release { registry = pkgs.lib.toLower containerRelease.registry; })
+      (import files.container-release { registry = pkgs.lib.toLower containerRelease.registry; deployKey = containerRelease.deployKey or false; })
       [ "standalone" "filename" ])
   else null;
 

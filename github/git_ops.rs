@@ -50,6 +50,14 @@ enum Commands {
         #[arg(long, value_name = "PATH")]
         file: Vec<String>,
     },
+    /// Provision a read-only SSH deploy key so this repo's CI can fetch a private
+    /// `git+ssh` flake input: public half → deploy key on TARGET, private half →
+    /// the DEPLOY_KEY Actions secret on this repo.
+    InitDeployKey {
+        /// The private dependency repo to grant read access to, as OWNER/REPO
+        #[arg(value_name = "OWNER/REPO")]
+        target: String,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -542,6 +550,69 @@ fn sync_conventions(version_key: String, files: Vec<String>) {
     }
 }
 
+fn gh_capture(args: &[&str]) -> Option<String> {
+    let o = run_gh(args).ok()?;
+    o.status.success().then(|| String::from_utf8_lossy(&o.stdout).trim().to_string())
+}
+
+/// Generate a fresh ed25519 keypair, register the public half as a read-only deploy
+/// key on `target`, and store the private half as this repo's DEPLOY_KEY secret. The
+/// keypair only ever lives in a temp dir we delete before returning.
+fn init_deploy_key(target: String) {
+    let current = gh_capture(&["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+        .unwrap_or_else(|| {
+            eprintln!("init-deploy-key: run inside a GitHub repo (gh repo view failed)");
+            std::process::exit(1);
+        });
+
+    let dir = std::env::temp_dir().join(format!("git_ops_deploy_{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let key = dir.join("id_ed25519");
+    let cleanup = || { let _ = fs::remove_dir_all(&dir); }; // best-effort: temp dir, removed even on the error paths below
+
+    let keygen = Command::new("ssh-keygen")
+        .args(["-t", "ed25519", "-N", "", "-C", &format!("{current} CI -> {target}"), "-f"])
+        .arg(&key)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !keygen {
+        cleanup();
+        eprintln!("init-deploy-key: ssh-keygen failed");
+        std::process::exit(1);
+    }
+
+    let add = Command::new("gh")
+        .args(["repo", "deploy-key", "add"])
+        .arg(key.with_extension("pub"))
+        .args(["--repo", &target, "--title", &format!("{current} CI (ro)")])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !add {
+        cleanup();
+        eprintln!("init-deploy-key: `gh repo deploy-key add` failed (need admin on {target})");
+        std::process::exit(1);
+    }
+
+    // gh secret set reads the value from stdin when --body is omitted.
+    let priv_key = fs::read(&key).expect("read generated private key");
+    let mut child = Command::new("gh")
+        .args(["secret", "set", "DEPLOY_KEY"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn gh secret set");
+    child.stdin.take().unwrap().write_all(&priv_key).expect("pipe key to gh");
+    let set = child.wait().map(|s| s.success()).unwrap_or(false);
+
+    cleanup();
+    if !set {
+        eprintln!("init-deploy-key: `gh secret set DEPLOY_KEY` failed");
+        std::process::exit(1);
+    }
+    println!("init-deploy-key: read-only deploy key added to {target}; DEPLOY_KEY secret set on {current}");
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -560,5 +631,6 @@ fn main() {
             }
             sync_conventions(version_key, file);
         }
+        Commands::InitDeployKey { target } => init_deploy_key(target),
     }
 }

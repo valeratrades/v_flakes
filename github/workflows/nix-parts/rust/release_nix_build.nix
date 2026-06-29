@@ -89,7 +89,11 @@ in
         }
         {
           name = "Setup Nix cache";
-          uses = "DeterminateSystems/magic-nix-cache-action@main";
+          uses = "nix-community/cache-nix-action@v7";
+          "with" = {
+            primary-key = "nix-\${{ runner.os }}-\${{ hashFiles('**/flake.lock') }}";
+            restore-prefixes-first-match = "nix-\${{ runner.os }}-";
+          };
         }
         {
           name = "Build release binary";
