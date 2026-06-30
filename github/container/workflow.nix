@@ -107,7 +107,7 @@ in
           printf 'unqualified-search-registries = []\n' > "$CONTAINERS_REGISTRIES_CONF"
           for name in $names; do
             echo "::group::$name"
-            RESULT="$(nix build ".#$name-container" --no-link --print-out-paths)"
+            RESULT="$(nix build ".#$name-container" --no-link --print-out-paths --quiet)"
             nix run nixpkgs#skopeo -- copy \
               "docker-archive:$RESULT" \
               "docker://${registry}/$name:''${{ github.ref_name }}"
