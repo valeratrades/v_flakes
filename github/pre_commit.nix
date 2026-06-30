@@ -14,7 +14,7 @@ let
   actualStyleFormat = if styleCheck != null then styleCheck else styleFormat;
   actualStyleAssert = if styleCheck != null then false else styleAssert;
 
-  semverChecksCmd = if semverChecks then "cargo semver-checks" else "";
+  semverChecksCmd = if semverChecks then ''require_tool cargo-semver-checks "cargo install cargo-semver-checks" && cargo semver-checks'' else "";
   # Visual regression hook. Located by the package.json that actually declares a
   # `test:visual` script (root or ./frontend), so it works for both flat and
   # frontend-subdir layouts without a project-specific path. Snapshot diffs the
@@ -87,6 +87,15 @@ let
   ''
   else "";
   script = ''
+    # Optional pre-commit tools warn loudly (not silently no-op) when absent, so
+    # a missing `cargo install` isn't mistaken for a clean sort.
+    require_tool() {
+      if ! command -v "$1" >/dev/null 2>&1; then
+        echo "⚠ pre-commit: $1 not installed — skipping its step (install: $2)" >&2
+        return 1
+      fi
+    }
+
     config_filepath_nix="''${HOME}/.config/${pname}.nix"
     config_filepath_toml="''${HOME}/.config/${pname}.toml"
     config_dir="''${HOME}/.config/${pname}"
@@ -127,6 +136,7 @@ let
         echo "$patched_manifests" | sed 's|^\./||;s|^|	|'
       fi
       staged_files=$(git diff --name-only --cached --diff-filter=ACMR)
+      if require_tool cargo-sort "cargo install cargo-sort"; then
       cargo_sort_out=$(cargo sort --workspace --grouped 2>&1)
       cargo_sort_rewritten=$(echo "$cargo_sort_out" | grep -oP 'Cargo\.toml for "?\K[^" ]+(?="? has been rewritten)')
       if [ -n "$cargo_sort_rewritten" ]; then
@@ -135,8 +145,9 @@ let
           echo "	rewrote Cargo.toml for \"$name\""
         done
       fi
-      ${sortDerivesCmd}
-      if grep -q '^\[workspace\]' Cargo.toml; then cargo autoinherit; fi
+      fi
+      if require_tool cargo-sort-derives "cargo install cargo-sort-derives"; then ${sortDerivesCmd}; fi
+      if grep -q '^\[workspace\]' Cargo.toml && require_tool cargo-autoinherit "cargo install cargo-autoinherit"; then cargo autoinherit; fi
       # idea is: if all these functions are ran on every commit, then the only files impacted will be those with changes yet to be committed; hence if tool affects something outside of staged, it was outside of the scope meant to be committed anyways.
       echo "$staged_files" | xargs -r git add
       ${semverChecksCmd}

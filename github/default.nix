@@ -10,6 +10,10 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   # Top-level install applies to all job sections (errors, warnings, other, release)
   # Per-section install overrides this.
   install ? {},
+  # CI binary-cache mechanism for every nix-using workflow (install steps, load_nix,
+  # container release). Exactly one of { nix-action = true; } (default, private GH cache)
+  # or { cachix = "<name>"; } (public/org cache; push needs CACHIX_AUTH_TOKEN). See cache.nix.
+  cache ? { nix-action = true; },
   release ? null, containerRelease ? null, gitlabSync ? null,
   syncFork ? false,
   # Claude Code workflows (PR assistant + auto code review). On by default for enabled repos.
@@ -196,7 +200,7 @@ let
   effectiveSyncFork = syncFork || (jobs.sync_fork or false);
 
   workflows = import ./workflows/nix-parts ({
-    inherit pkgs gistId cargoNightly;
+    inherit pkgs gistId cargoNightly cache;
     syncFork = effectiveSyncFork;
   } // (if enable then {
     inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync;

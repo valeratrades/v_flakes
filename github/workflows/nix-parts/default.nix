@@ -9,6 +9,8 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   # Loud-fallback cargo wrapper (see github/default.nix). Only required when
   # called via the description-only path below; in normal use it's threaded in.
   cargoNightly ? null,
+  # CI cache mechanism, threaded to every nix-using workflow. See github/cache.nix.
+  cache ? { nix-action = true; },
 }:
 
 # If called with just nixpkgs (for flake description), return description attribute
@@ -57,13 +59,14 @@ let
 
   # Generate load_nix workflow for a section if it has packages
   makeLoadNixWorkflow = installConfig:
-    import ./shared/load_nix.nix { packages = installConfig.packages or []; };
+    import ./shared/load_nix.nix { packages = installConfig.packages or []; inherit cache; };
 
   # Generate install steps for jobs (just cache restore, actual install done by load_nix)
   makeInstallSteps = installConfig: import ./shared/install.nix {
     packages = installConfig.packages or [];
     apt = installConfig.apt or [];
     debug = installConfig.debug or false;
+    inherit cache;
   };
 
   # Check if section has nix packages
@@ -258,7 +261,7 @@ let
   # Opt-in via `github { containerRelease = { registry = "ghcr.io/EV-invest"; }; }`.
   containerReleaseWorkflow = if containerRelease != null then
     (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
-      (import files.container-release { inherit (pkgs) lib; registry = pkgs.lib.toLower containerRelease.registry; deployKeys = containerRelease.deployKeys or []; })
+      (import files.container-release { inherit (pkgs) lib; inherit cache; registry = pkgs.lib.toLower containerRelease.registry; deployKeys = containerRelease.deployKeys or []; })
       [ "standalone" "filename" ])
   else null;
 

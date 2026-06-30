@@ -2,8 +2,9 @@
 # These steps restore the nix cache populated by load_nix
 # Also supports legacy apt (deprecated)
 # packages: list of nixpkgs attribute name strings
-{ packages ? [], apt ? [], linuxOnly ? true, debug ? false }:
+{ packages ? [], apt ? [], linuxOnly ? true, debug ? false, cache ? { nix-action = true; } }:
 let
+  nixCi = import ../../../cache.nix { inherit cache; };
   # Always include openssl.out (runtime libs), openssl.dev (headers), and pkg-config
   # because "openssl" alone resolves to openssl-bin which has no libraries,
   # and pkg-config is needed so openssl-sys finds nix headers, not system ones
@@ -90,18 +91,8 @@ let
 
   # Nix restore steps - restore from cache, then make packages available
   nixSteps = if packages != [] then [
-    {
-      name = "Install Nix";
-      uses = "DeterminateSystems/nix-installer-action@main";
-    }
-    {
-      name = "Restore Nix cache";
-      uses = "nix-community/cache-nix-action@v7";
-      "with" = {
-        primary-key = "nix-\${{ runner.os }}-\${{ hashFiles('**/flake.lock') }}";
-        restore-prefixes-first-match = "nix-\${{ runner.os }}-";
-      };
-    }
+    nixCi.installStep
+    nixCi.cacheStep
   ] ++ (if debug then [{
     name = "Debug nix environment";
     run = debugScript;

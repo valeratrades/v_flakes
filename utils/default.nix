@@ -227,9 +227,23 @@ in
   # whatever the consumer concatenated around `${combined.shellHook}`. That is
   # the intended blast radius: if we cannot trust the anchor, nothing should
   # run, not just the parts we own. We still print a warning explaining why.
-  combine = { rust, modules }:
+  # determinate_nix (default true): abort the dev shell unless the evaluating nix
+  # has lazy-trees on (i.e. Determinate Nix). Stock nix produces flake.lock NAR
+  # hashes that diverge from CI, so private git inputs fail to verify. There is no
+  # eval-time way to detect Determinate (nixVersion is identical, settings aren't
+  # readable from eval), so the check lives here in the sourced shellHook.
+  combine = { rust, modules, determinate_nix ? true }:
     assert (rust != null) || throw "v_flakes.utils.combine: `rust` is required — pass the nix rust toolchain (e.g. `rs.rust`) so module hooks have a guaranteed cargo on PATH.";
     let
+      determinateGuard = if !determinate_nix then "" else ''
+        if [ "$(nix config show lazy-trees 2>/dev/null)" != true ]; then
+          printf '%s\n' \
+            "✘ This repo requires Determinate Nix (lazy-trees=true)." \
+            "  Stock nix produces flake.lock NAR hashes that diverge from CI — private inputs fail to verify." \
+            "  Install: https://determinate.systems/nix   NixOS: nix.settings.lazy-trees = true" >&2
+          exit 1
+        fi
+      '';
       getPackages = m: m.enabledPackages or [];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
       # if a plain string slipped in — that's a programmer error we want loud.
@@ -252,7 +266,7 @@ in
               printf '%s\t%s\n' "$_n" "$(du -sm "$_p" 2>/dev/null | cut -f1)"
             done | awk -F'\t' '
               { tot[$1] += $2; if ($2+0 > max[$1]) max[$1] = $2; cnt[$1]++ }
-              END { for (n in tot) { w = tot[n] - max[n]; if (w > ${max_duplication_mb}) printf "%s\t%d\t%d\n", n, w, cnt[n] } }')"
+              END { for (n in tot) { w = tot[n] - max[n]; if (w > ${toString max_duplication_mb}) printf "%s\t%d\t%d\n", n, w, cnt[n] } }')"
             if [ -n "$_vf_over" ]; then
               echo "" >&2
               echo "⚠️  v_flakes: duplicate flake inputs — redundant copies re-fetched after every GC:" >&2
@@ -281,6 +295,7 @@ in
           exit 1
         fi
         unset _v_flakes_repo_root
+        ${determinateGuard}
         # Guarantee cargo for the rust scripts module hooks invoke.
         export PATH="${rust}/bin:$PATH"
         ${combinedHooks}

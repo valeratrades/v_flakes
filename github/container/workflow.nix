@@ -8,8 +8,9 @@
 # read-only key, an ssh alias `gh-<repo>` selecting it (IdentitiesOnly), and a git
 # `insteadOf` rewrite steering only that repo's plain github.com URL to the alias — all
 # CI-only. Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no step.
-{ registry, deployKeys ? [], lib }:
+{ registry, deployKeys ? [], lib, cache ? { nix-action = true; } }:
 let
+  nixCi = import ../cache.nix { inherit cache; };
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
   # clear error (release-gate.nix can only skip silently). Rejects v1, v1.2, vbeta.
   semverGate = ''
@@ -73,25 +74,11 @@ in
         shell = "bash";
         run = semverGate;
       }
-      # Determinate Nix + nix store cache: the cache restores the (expensive, cold)
-      # Rust/npm build store across releases — without it every tag recompiles from
-      # scratch (~25min on the arm runner). lazy-trees is safe now that no flake
-      # input carries Git-LFS content (LFS made input narHashes non-deterministic;
-      # see the de-LFS commit) — both nix implementations agree on the lock.
-      # cache-nix-action over magic-nix-cache: the latter's post-step uploads against
-      # GitHub's undocumented (reverse-engineered) cache API and hangs for tens of
-      # minutes on failed jobs; this one uses the official actions/cache backend.
-      {
-        uses = "DeterminateSystems/nix-installer-action@main";
-        "with".extra-conf = "lazy-trees = true";
-      }
-      {
-        uses = "nix-community/cache-nix-action@v7";
-        "with" = {
-          primary-key = "nix-\${{ runner.os }}-\${{ hashFiles('**/flake.lock') }}";
-          restore-prefixes-first-match = "nix-\${{ runner.os }}-";
-        };
-      }
+      # Determinate Nix (lazy-trees) + binary cache (cache.nix). The cache restores the
+      # expensive cold Rust/npm build store across releases — without it every tag
+      # recompiles from scratch (~25min on the arm runner).
+      nixCi.installStep
+      nixCi.cacheStep
       {
         name = "Log in to GHCR";
         uses = "docker/login-action@v3";
