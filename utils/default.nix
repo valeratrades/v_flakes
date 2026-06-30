@@ -236,11 +236,10 @@ in
       getHook = m: if m ? shellHook then unwrapShellHook m.shellHook else "";
       combinedHooks = builtins.concatStringsSep "\n" (builtins.filter (h: h != "") (map getHook modules));
 
-      # Advisory: flag heavyweight duplicated flake inputs (e.g. several nixpkgs
-      # revs pulled in because sub-inputs don't `follows` the root nixpkgs). Each
+      # Advisory: flag heavyweight duplicated flake inputs (e.g. several nixpkgs revs pulled in because sub-inputs don't `follows` the root nixpkgs). Each
       # redundant copy is eval-only, so GC reaps it and the next full eval
-      # re-fetches hundreds of MB. `--offline` guarantees the check itself never
-      # fetches; the 15MB floor ignores trivia (flake-utils, systems).
+      # re-fetches hundreds of MB. `--offline` guarantees the check itself never fetches
+      max_duplication_mb = 20;
       dedupeCheck = ''
         if command -v jq >/dev/null 2>&1; then
           _vf_dups="$(nix flake archive --json --offline 2>/dev/null | jq -r '
@@ -253,7 +252,7 @@ in
               printf '%s\t%s\n' "$_n" "$(du -sm "$_p" 2>/dev/null | cut -f1)"
             done | awk -F'\t' '
               { tot[$1] += $2; if ($2+0 > max[$1]) max[$1] = $2; cnt[$1]++ }
-              END { for (n in tot) { w = tot[n] - max[n]; if (w > 15) printf "%s\t%d\t%d\n", n, w, cnt[n] } }')"
+              END { for (n in tot) { w = tot[n] - max[n]; if (w > ${max_duplication_mb}) printf "%s\t%d\t%d\n", n, w, cnt[n] } }')"
             if [ -n "$_vf_over" ]; then
               echo "" >&2
               echo "⚠️  v_flakes: duplicate flake inputs — redundant copies re-fetched after every GC:" >&2
