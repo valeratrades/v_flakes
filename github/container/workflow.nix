@@ -8,7 +8,11 @@
 # read-only key, an ssh alias `gh-<repo>` selecting it (IdentitiesOnly), and a git
 # `insteadOf` rewrite steering only that repo's plain github.com URL to the alias — all
 # CI-only. Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no step.
-{ registry, deployKeys ? [], lib, cache ? { nix-action = true; } }:
+#
+# impure: add `--impure` to the container build/eval. Needed when the flake pulls
+# sources via `builtins.getFlake "…?ref=main"` (unlocked, no narHash) instead of
+# flake inputs — the way to keep private content repos off flake.lock entirely.
+{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false }:
 let
   nixCi = import ../cache.nix { inherit cache; };
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
@@ -99,7 +103,7 @@ in
           sys="$(nix eval --impure --raw --expr builtins.currentSystem)"
           # Extract to a var first: `for x in $(cmd)` swallows cmd's exit code, so a
           # failed eval (e.g. a flake error) would leave the loop empty and the job GREEN.
-          names="$(nix eval --json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
+          names="$(nix eval ${lib.optionalString impure "--impure "}--json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
           [ -n "$names" ] || { echo "::error::no containers found under .#containers.$sys" >&2; exit 1; }
           # nixpkgs skopeo rejects the GH runner's v1-format /etc/containers/registries.conf
           # ("must be in v2 format"); point it at our own minimal v2 file so it never reads the host's.
@@ -107,7 +111,7 @@ in
           printf 'unqualified-search-registries = []\n' > "$CONTAINERS_REGISTRIES_CONF"
           for name in $names; do
             echo "::group::$name"
-            RESULT="$(nix build ".#$name-container" --no-link --print-out-paths --quiet)"
+            RESULT="$(nix build ${lib.optionalString impure "--impure "}".#$name-container" --no-link --print-out-paths --quiet)"
             nix run nixpkgs#skopeo -- copy \
               "docker-archive:$RESULT" \
               "docker://${registry}/$name:''${{ github.ref_name }}"
