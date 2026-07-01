@@ -90,4 +90,27 @@ assert (modeCount == 1) || throw
         restore-prefixes-first-match = "nix-\${{ runner.os }}-";
       };
     };
+
+  # Split restore/save, for tag-triggered workflows: GitHub scopes caches per ref, so a
+  # tag run can't read another tag's cache — only its own ref or the default branch. So
+  # restore always (this picks up the default-branch cache), but save ONLY on `main`
+  # (a tag-scoped save is unshareable and would evict main's). null unless lean.
+  cacheRestoreStep = if hasLean then {
+    name = "Restore lean nix cache";
+    uses = "actions/cache/restore@v4";
+    "with" = {
+      path = leanDir;
+      key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
+      restore-keys = "nix-lean-\${{ runner.os }}-";
+    };
+  } else null;
+  cacheSaveStep = if hasLean then {
+    name = "Save lean nix cache";
+    "if" = "github.ref == 'refs/heads/main'";
+    uses = "actions/cache/save@v4";
+    "with" = {
+      path = leanDir;
+      key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
+    };
+  } else null;
 }

@@ -19,6 +19,10 @@
 { registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false, buildTiming ? false }:
 let
   nixCi = import ../cache.nix { inherit cache; };
+  # Lean cache can't be shared between tag runs (GitHub scopes caches per ref). So under
+  # lean we ALSO build on `main` (seeding a default-branch-scoped cache that tag runs can
+  # read) — that build skips the GHCR push; the tag run restores it and pushes.
+  hasLean = (cache.lean or false) != false;
 
   # buildTiming: -L for streamed, drv-prefixed build logs; --quiet otherwise.
   verbosity = if buildTiming then "-L" else "--quiet";
@@ -107,7 +111,7 @@ in
   filename = "release-container.yml";
 
   name = "Release containers";
-  on.push.tags = [ "v[0-9]+.*" ];
+  on.push = { tags = [ "v[0-9]+.*" ]; } // (if hasLean then { branches = [ "main" ]; } else { });
   permissions = {
     contents = "read";
     packages = "write";
@@ -126,6 +130,8 @@ in
       }
       {
         name = "Validate tag (strict semver)";
+        # Skipped on the `main` cache-seed build (no tag to validate).
+        "if" = "github.ref_type == 'tag'";
         shell = "bash";
         run = semverGate;
       }
@@ -137,9 +143,11 @@ in
       # expensive cold Rust/npm build store across releases — without it every tag
       # recompiles from scratch (~25min on the arm runner).
       nixCi.installStep
-      nixCi.cacheStep
+      (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
       {
         name = "Log in to GHCR";
+        # Only the tag build pushes to GHCR; the `main` seed build just warms the cache.
+        "if" = "github.ref_type == 'tag'";
         uses = "docker/login-action@v3";
         "with" = {
           registry = "ghcr.io";
@@ -167,13 +175,20 @@ in
           for name in $names; do
             echo "::group::$name"
             RESULT="$(nix build ${lib.optionalString impure "--impure "}".#$name-container" --no-link --print-out-paths ${verbosity}${timingWrap})"
-            nix run nixpkgs#skopeo -- copy \
-              "docker-archive:$RESULT" \
-              "docker://${registry}/$name:''${{ github.ref_name }}"
+            if [ "''${{ github.ref_type }}" = "tag" ]; then
+              nix run nixpkgs#skopeo -- copy \
+                "docker-archive:$RESULT" \
+                "docker://${registry}/$name:''${{ github.ref_name }}"
+            else
+              echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
+            fi
             echo "::endgroup::"
           done
         '';
       }
-    ];
+    ]
+    # Persist the lean cache to the default-branch scope — only fires on `main` (its own
+    # `if`); a no-op list entry on tag runs. Empty for non-lean modes.
+    ++ (if hasLean then [ nixCi.cacheSaveStep ] else [ ]);
   };
 }
