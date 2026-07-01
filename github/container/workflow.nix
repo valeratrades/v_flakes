@@ -12,9 +12,60 @@
 # impure: add `--impure` to the container build/eval. Needed when the flake pulls
 # sources via `builtins.getFlake "…?ref=main"` (unlocked, no narHash) instead of
 # flake inputs — the way to keep private content repos off flake.lock entirely.
-{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false }:
+#
+# buildTiming: build verbose (-L) and pipe stderr through a gawk filter that, at
+# the end, prints an ASCII bar chart of when each component (rust toolchain/deps,
+# backend, wasm, docs, npm/next, packaging) was active — a per-release profile.
+{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false, buildTiming ? false }:
 let
   nixCi = import ../cache.nix { inherit cache; };
+
+  # buildTiming: -L for streamed, drv-prefixed build logs; --quiet otherwise.
+  verbosity = if buildTiming then "-L" else "--quiet";
+  # gawk filter: passes every build line through to the console (so failures stay
+  # visible) and records, per component, the wall-clock window it was active in
+  # (first→last log line matching it). Prints a bar chart in END. Writes only to
+  # /dev/stderr — never stdout — so the captured `--print-out-paths` stays clean.
+  timingAwk = ''
+    function cat(n) {
+      if      (n ~ /\.tar\.gz|layers\.json|stream-|customisation-layer|-conf\.json|-base\.json|excludePaths/) return "packaging"
+      else if (n ~ /landing-frontend|next/)      return "frontend/next"
+      else if (n ~ /-mfe|wasm/)                  return "wasm-mfe"
+      else if (n ~ /(^|-)backend/)               return "backend"
+      else if (n ~ /blog/)                       return "blog"
+      else if (n ~ /whitepaper/)                 return "whitepaper"
+      else if (n ~ /rust-std|cargo-nightly|rust-analyzer|cranelift|rust-docs/) return "rust-toolchain"
+      else if (n ~ /\.tgz/)                       return "npm-deps"
+      return "other-crates"
+    }
+    {
+      print $0 > "/dev/stderr"
+      n = ""
+      if (match($0, /\/nix\/store\/[a-z0-9]+-[^ ]*\.drv/)) { n = substr($0, RSTART, RLENGTH) }
+      else if (match($0, /^[A-Za-z0-9._-]+> /))            { n = substr($0, 1, RLENGTH-2) }
+      else next
+      c = cat(n); now = systime()
+      if (!(c in st)) st[c] = now
+      en[c] = now
+      if (t0 == 0) t0 = now
+    }
+    END {
+      if (t0 == 0) exit
+      tmax = 0; for (c in en) if (en[c] > tmax) tmax = en[c]
+      span = tmax - t0; if (span < 1) span = 1
+      W = 50; unit = (span/W >= 1 ? int(span/W) : 1)
+      printf "\n== build timeline (%dm%02ds total, each # ~ %ds) ==\n", span/60, span%60, unit > "/dev/stderr"
+      PROCINFO["sorted_in"] = "@val_num_asc"
+      for (c in st) {
+        a = int((st[c]-t0)/span*W); b = int((en[c]-t0)/span*W); if (b <= a) b = a+1
+        pad = ""; for (i=0;i<a;i++) pad = pad " "
+        fill = ""; for (i=0;i<b-a;i++) fill = fill "#"
+        printf "%-15s |%s%s  %dm%02ds\n", c, pad, fill, (en[c]-st[c])/60, (en[c]-st[c])%60 > "/dev/stderr"
+      }
+    }
+  '';
+  timingWrap = lib.optionalString buildTiming " 2> >(gawk '${timingAwk}' >&2)";
+
   # The `v[0-9]+.*` trigger is coarse; this is what refuses a malformed tag with a
   # clear error (release-gate.nix can only skip silently). Rejects v1, v1.2, vbeta.
   semverGate = ''
@@ -111,7 +162,7 @@ in
           printf 'unqualified-search-registries = []\n' > "$CONTAINERS_REGISTRIES_CONF"
           for name in $names; do
             echo "::group::$name"
-            RESULT="$(nix build ${lib.optionalString impure "--impure "}".#$name-container" --no-link --print-out-paths --quiet)"
+            RESULT="$(nix build ${lib.optionalString impure "--impure "}".#$name-container" --no-link --print-out-paths ${verbosity}${timingWrap})"
             nix run nixpkgs#skopeo -- copy \
               "docker-archive:$RESULT" \
               "docker://${registry}/$name:''${{ github.ref_name }}"
