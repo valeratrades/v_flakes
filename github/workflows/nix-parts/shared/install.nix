@@ -90,7 +90,7 @@ let
   '';
 
   # Nix restore steps - restore from cache, then make packages available
-  nixSteps = if packages != [] then [
+  nixSteps = if packages != [] then nixCi.setupSteps ++ [
     nixCi.installStep
     nixCi.cacheStep
   ] ++ (if debug then [{

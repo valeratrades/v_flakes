@@ -129,6 +129,10 @@ in
         shell = "bash";
         run = semverGate;
       }
+    ]
+    # setupSteps precedes installStep (lean writes its post-build-hook there); [] for other modes.
+    ++ nixCi.setupSteps
+    ++ [
       # Determinate Nix (lazy-trees) + binary cache (cache.nix). The cache restores the
       # expensive cold Rust/npm build store across releases — without it every tag
       # recompiles from scratch (~25min on the arm runner).
