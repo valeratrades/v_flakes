@@ -6,6 +6,7 @@
   { name = "breaking"; color = "000000"; description = "Implementing should be postponed until next major version"; }
   { name = "hack"; color = "FF8C00"; description = "Hacky feature"; }
   { name = "rewrite"; color = "008672"; description = "Code quality"; }
+  { name = "claude"; color = "D97706"; description = "Hand this issue to Claude to implement"; }
   # Default GitHub labels
   { name = "enhancement"; color = "a2eeef"; description = "New feature or request"; }
   { name = "bug"; color = "d73a4a"; description = "Something isn't working"; }

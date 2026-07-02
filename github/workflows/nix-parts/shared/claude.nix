@@ -1,7 +1,6 @@
 # Claude Code PR assistant — responds to `@claude` mentions in issues, PR comments and reviews,
 # and to the `claude` label on issues (bots can't be assignees, so labeling stands in for assignment).
-# The label itself is repo state, not creatable from here: `gh label create claude` per repo, and add
-# it to org default labels (Settings → Repository defaults, UI-only) to cover future repos.
+# The label is seeded by github/labels.nix (synced on dev-shell entry).
 # Generic across repos: no repo-specific values. Requires the CLAUDE_CODE_OAUTH_TOKEN secret.
 # Share it across a whole org by setting it as an *organization* secret with "All repositories"
 # visibility (personal accounts have no equivalent — each personal repo needs its own copy).
