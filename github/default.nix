@@ -256,7 +256,9 @@ let
 
   # Label sync runs in background to avoid blocking shell startup.
   labelSyncHook = if labelsEnabled then ''
-    (${git_ops}/bin/git_ops sync-labels >/dev/null 2>/dev/null &)
+    ${"# </dev/null: backgrounded job must not inherit tty stdin, or the label-delete"}
+    ${"# prompt path sees a terminal and the job can hang on SIGTTIN."}
+    (${git_ops}/bin/git_ops sync-labels </dev/null >/dev/null 2>/dev/null &)
   '' else "";
 
   # Convention files copied from github.com/<owner>/<owner> or github.com/<owner>/.github

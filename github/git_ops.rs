@@ -13,11 +13,11 @@ serde_json = "1"
 
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead, IsTerminal, Write as _};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Parser)]
 #[command(name = "vgit")]
@@ -139,7 +139,8 @@ struct GhLabel {
 }
 
 fn run_gh(args: &[&str]) -> io::Result<std::process::Output> {
-    Command::new("gh").args(args).output()
+    // gh must never prompt from within the tool (often backgrounded with a tty stdin)
+    Command::new("gh").args(args).stdin(Stdio::null()).output()
 }
 
 fn run_gh_success(args: &[&str]) -> bool {
@@ -387,8 +388,222 @@ fn lint_issues() {
     }
 }
 
+// Built from parts so this file's own literals never match the scan.
+const TODO_NEEDLE: &str = concat!("TO", "DO");
+const TODO_MARKER: &str = concat!("<!-- ", "todo-id: ");
+
+/// Identity of a logical comment across machines/contributors: (bang count, raw content),
+/// never file/line. Lives on the issue itself as an invisible body marker.
+fn todo_id(bangs: usize, content: &str) -> String {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in format!("{bangs}:{content}").bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    format!("{h:016x}")
+}
+
+#[derive(Debug)]
+struct Todo {
+    id: String,
+    importance: usize,
+    title: String,
+    description: String,
+    location: String,
+}
+
+fn scan_todos(repo_root: &str) -> Vec<Todo> {
+    let output = Command::new("git")
+        .args(["grep", "-In", "-E", &format!("{TODO_NEEDLE}!*:")])
+        .current_dir(repo_root)
+        .output()
+        .unwrap_or_else(|e| {
+            eprintln!("todo-sync: failed to run git grep: {e}");
+            std::process::exit(1);
+        });
+    match output.status.code() {
+        Some(0) => {}
+        // exit 1 + empty stderr = legitimately zero matches; anything else must be loud —
+        // misreading a grep failure as "no TODOs" would mass-close every generated issue
+        Some(1) if output.stderr.is_empty() => return Vec::new(),
+        _ => {
+            eprintln!("todo-sync: git grep failed: {}", String::from_utf8_lossy(&output.stderr));
+            std::process::exit(1);
+        }
+    }
+
+    let mut seen: HashMap<(usize, String), Vec<String>> = HashMap::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let mut parts = line.splitn(3, ':');
+        let (Some(file), Some(lineno), Some(rest)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        // first needle occurrence may be a bare mention; walk to the one grep matched
+        let mut search = rest;
+        while let Some(pos) = search.find(TODO_NEEDLE) {
+            let after = &search[pos + TODO_NEEDLE.len()..];
+            let bangs = after.bytes().take_while(|&b| b == b'!').count();
+            if let Some(content) = after[bangs..].strip_prefix(':') {
+                seen.entry((bangs, content.trim().to_string()))
+                    .or_default()
+                    .push(format!("{file}:{lineno}"));
+                break;
+            }
+            search = after;
+        }
+    }
+
+    let mut todos = Vec::new();
+    for ((bangs, content), mut occurrences) in seen {
+        occurrences.sort();
+        if content.is_empty() {
+            eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {}", occurrences[0]);
+            continue;
+        }
+        let (title, description) = match content.split_once(". ") {
+            Some((t, d)) => (t.to_string(), d.trim().to_string()),
+            None => (content.strip_suffix('.').unwrap_or(&content).to_string(), String::new()),
+        };
+        if title.len() > 256 {
+            eprintln!("todo-sync: skipping (title > 256 chars, gh would reject) at {}", occurrences[0]);
+            continue;
+        }
+        todos.push(Todo {
+            id: todo_id(bangs, &content),
+            importance: bangs.min(9),
+            title,
+            description,
+            location: occurrences[0].clone(),
+        });
+    }
+    todos.sort_by(|a, b| a.location.cmp(&b.location));
+    todos
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GhTodoIssue {
+    number: u64,
+    state: String,
+    state_reason: Option<String>,
+    body: String,
+}
+
+fn extract_todo_id(body: &str) -> Option<&str> {
+    let rest = &body[body.find(TODO_MARKER)? + TODO_MARKER.len()..];
+    Some(rest[..rest.find(" -->")?].trim())
+}
+
+/// Reconcile generated issues against the working tree, converging toward
+/// code-as-source-of-truth from any remote state. Runs every invocation like
+/// lint — remote state can't be fingerprint-gated.
+fn sync_todos(repo_root: &str) {
+    let todos = scan_todos(repo_root);
+
+    let output = match run_gh(&["issue", "list", "--state", "all", "--label", "ext:from_todo",
+                                "--json", "number,state,stateReason,body", "--limit", "1000"]) {
+        Ok(o) if o.status.success() => o,
+        // issues may be disabled on this repo — same policy as lint_issues
+        Ok(o) => {
+            eprintln!("todo-sync: skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
+            return;
+        }
+        Err(e) => {
+            eprintln!("todo-sync: skipped: {}", e);
+            return;
+        }
+    };
+    let issues: Vec<GhTodoIssue> = match serde_json::from_slice(&output.stdout) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("todo-sync: failed to parse issues: {}", e);
+            std::process::exit(1);
+        }
+    };
+    if issues.len() == 1000 {
+        eprintln!("todo-sync: fetch cap hit — reconciling against a truncated view could duplicate issues");
+        std::process::exit(1);
+    }
+
+    let mut by_id: HashMap<&str, &GhTodoIssue> = HashMap::new();
+    for issue in &issues {
+        match extract_todo_id(&issue.body) {
+            Some(id) => {
+                // should never happen, but if an id is duplicated prefer the open issue
+                // so we don't reopen a second copy next to it
+                let slot = by_id.entry(id).or_insert(issue);
+                if issue.state == "OPEN" {
+                    *slot = issue;
+                }
+            }
+            None if issue.state == "OPEN" => {
+                eprintln!("todo-sync: #{} has ext:from_todo but no id marker — leaving it alone", issue.number)
+            }
+            None => {}
+        }
+    }
+
+    for todo in &todos {
+        match by_id.get(todo.id.as_str()) {
+            None => {
+                let mut body = String::new();
+                if !todo.description.is_empty() {
+                    body.push_str(&todo.description);
+                    body.push_str("\n\n");
+                }
+                body.push_str(&format!(
+                    "_From `{}` at generation time._\n\n{}{} -->",
+                    todo.location, TODO_MARKER, todo.id
+                ));
+                // t:chore keeps the exactly-one-t:* lint green; user retags freely — identity is the marker
+                let labels = format!("ext:from_todo,i:{},t:chore", todo.importance);
+                if !run_gh_success(&["issue", "create", "--title", &todo.title, "--body", &body, "--label", &labels]) {
+                    eprintln!("todo-sync: failed to create issue for '{}'", todo.title);
+                }
+            }
+            // closed as not-planned means we closed it when the comment was hidden (branch
+            // switch, edit churn) — reopen the same issue, never create a duplicate. Closed
+            // as completed stays closed: that's the contract for killing a generated issue.
+            Some(i) if i.state != "OPEN" && i.state_reason.as_deref() == Some("NOT_PLANNED") => {
+                if !run_gh_success(&["issue", "reopen", &i.number.to_string()]) {
+                    eprintln!("todo-sync: failed to reopen #{}", i.number);
+                }
+            }
+            Some(_) => {}
+        }
+    }
+
+    let scanned: HashSet<&str> = todos.iter().map(|t| t.id.as_str()).collect();
+    for issue in &issues {
+        if issue.state != "OPEN" {
+            continue;
+        }
+        let Some(id) = extract_todo_id(&issue.body) else { continue };
+        if scanned.contains(id) {
+            continue;
+        }
+        let comment = format!("{TODO_NEEDLE} comment no longer in code — closed by sync.");
+        if !run_gh_success(&["issue", "close", &issue.number.to_string(), "--reason", "not planned", "--comment", &comment]) {
+            eprintln!("todo-sync: failed to close #{}", issue.number);
+        }
+    }
+}
+
 fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
-    lint_issues();
+    let repo_root = get_repo_root().expect("not in a git repository");
+
+    // Concurrent shell-start runs must not race: `gh issue create` is not
+    // idempotent (unlike label create --force). Held lock → someone else is on it.
+    let lock_path = state_file_for_repo("lock", &repo_root);
+    fs::create_dir_all(lock_path.parent().expect("state path always has a parent"))
+        .expect("failed to create state directory");
+    let lock = fs::File::create(&lock_path).expect("failed to open lock file");
+    match lock.try_lock() {
+        Ok(()) => {}
+        Err(e) if matches!(e, fs::TryLockError::WouldBlock) => return,
+        Err(e) => {
+            eprintln!("ERROR: lock {}: {}", lock_path.display(), e);
+            std::process::exit(1);
+        }
+    }
 
     if check_colors {
         if let Err(e) = check_duplicate_colors(&local_labels) {
@@ -398,14 +613,19 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
         println!("Color check passed.");
     }
 
-    // Check if we've already synced this exact label configuration for this repo
+    // Fingerprint gates only the label block (not an early return): on a fresh repo
+    // labels must exist before `gh issue create --label ...` below can succeed.
     let fingerprint = compute_labels_fingerprint(&local_labels);
-    let repo_root = get_repo_root().expect("not in a git repository");
-
-    if load_saved_fingerprint("labels", &repo_root).as_ref() == Some(&fingerprint) {
-        return;
+    if load_saved_fingerprint("labels", &repo_root).as_ref() != Some(&fingerprint) {
+        sync_labels_remote(local_labels);
+        save_fingerprint("labels", &repo_root, &fingerprint);
     }
 
+    lint_issues();
+    sync_todos(&repo_root);
+}
+
+fn sync_labels_remote(local_labels: Vec<LabelSpec>) {
     let remote_labels = match get_remote_labels() {
         Ok(labels) => labels,
         Err(e) => {
@@ -478,8 +698,6 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
             }
         }
     }
-
-    save_fingerprint("labels", &repo_root, &fingerprint);
 
     // Only print summary if there were actual changes
     if created > 0 || updated > 0 || deleted > 0 {
