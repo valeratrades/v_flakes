@@ -32,7 +32,7 @@ in {
             claude_code_oauth_token = "\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}";
             plugin_marketplaces = "https://github.com/anthropics/claude-code.git";
             plugins = "code-review@claude-code-plugins";
-            prompt = "/code-review:code-review \${{ github.repository }}/pull/\${{ github.event.pull_request.number }}";
+            prompt = "/code-review:code-review \${{ github.repository }}/pull/\${{ github.event.pull_request.number }} --comment\nWhen no issues are found, instead of the boilerplate no-issues body, post a short summary: what was checked (areas of the diff, classes of issues looked for) and why the changes are acceptable.";
           };
         }
       ];
