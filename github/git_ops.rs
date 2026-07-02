@@ -31,7 +31,7 @@ struct Args {
 enum Commands {
     /// Sync repository labels with local configuration
     SyncLabels {
-        /// Labels in format "name:color[:description]" (color without #), can be repeated
+        /// Labels in format "name:color[:description]" (leading # optional), can be repeated
         #[arg(short, long, value_parser = parse_label)]
         label: Vec<LabelSpec>,
 
