@@ -9,17 +9,23 @@
 # `insteadOf` rewrite steering only that repo's plain github.com URL to the alias — all
 # CI-only. Provision each with `git_ops init-deploy-key <owner>/<repo>`. Empty = no step.
 #
-# impure: add `--impure` (and `--refresh`) to the container build/eval. Needed when
-# the flake pulls sources via `builtins.getFlake "…?ref=main"` (unlocked, no narHash)
-# instead of flake inputs — the way to keep private content repos off flake.lock
-# entirely. `--refresh` re-resolves those mutable refs every build so a release always
-# bakes the latest `main`; locked inputs (nixpkgs/rust) are content-pinned and untouched.
+# impure: add `--impure` to the container build/eval. Needed when the flake pulls
+# sources via `builtins.getFlake "…?ref=main"` (unlocked, no narHash) instead of flake
+# inputs — the way to keep private content repos off flake.lock entirely.
+#
+# refresh: add `--refresh` (implies `--impure`) so each release re-resolves those
+# unlocked mutable refs fresh — otherwise a warm nix cache can re-resolve a stale
+# `main` and bake an old bundle. Locked inputs (nixpkgs/rust) are content-pinned, so
+# `--refresh` only moves the getFlake refs, never toolchain versions.
 #
 # buildTiming: build verbose (-L) and pipe stderr through a gawk filter that, at
 # the end, prints an ASCII bar chart of when each component (rust toolchain/deps,
 # backend, wasm, docs, npm/next, packaging) was active — a per-release profile.
-{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false, buildTiming ? false }:
+{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false, refresh ? false, buildTiming ? false }:
 let
+  # --impure whenever the flake has unlocked getFlake sources; --refresh (which
+  # implies impure) additionally forces those mutable refs to re-resolve each build.
+  flakeFlags = lib.optionalString (impure || refresh) "--impure " + lib.optionalString refresh "--refresh ";
   nixCi = import ../cache.nix { inherit cache; };
   # Lean cache can't be shared between tag runs (GitHub scopes caches per ref). So under
   # lean we ALSO build on `main` (seeding a default-branch-scoped cache that tag runs can
@@ -168,7 +174,7 @@ in
           sys="$(nix eval --impure --raw --expr builtins.currentSystem)"
           # Extract to a var first: `for x in $(cmd)` swallows cmd's exit code, so a
           # failed eval (e.g. a flake error) would leave the loop empty and the job GREEN.
-          names="$(nix eval ${lib.optionalString impure "--impure --refresh "}--json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
+          names="$(nix eval ${flakeFlags}--json ".#containers.$sys" --apply builtins.attrNames | jq -r '.[]')"
           [ -n "$names" ] || { echo "::error::no containers found under .#containers.$sys" >&2; exit 1; }
           # nixpkgs skopeo rejects the GH runner's v1-format /etc/containers/registries.conf
           # ("must be in v2 format"); point it at our own minimal v2 file so it never reads the host's.
@@ -176,7 +182,7 @@ in
           printf 'unqualified-search-registries = []\n' > "$CONTAINERS_REGISTRIES_CONF"
           for name in $names; do
             echo "::group::$name"
-            RESULT="$(nix build ${lib.optionalString impure "--impure --refresh "}".#$name-container" --no-link --print-out-paths ${verbosity}${timingWrap})"
+            RESULT="$(nix build ${flakeFlags}".#$name-container" --no-link --print-out-paths ${verbosity}${timingWrap})"
             if [ "''${{ github.ref_type }}" = "tag" ]; then
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
