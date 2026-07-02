@@ -28,6 +28,16 @@ README generation framework from `docs/.readme_assets/` directory.
 - Supports `.md` and `.typ` sources
 - Badge generation (msrv, crates.io, docs.rs, loc, ci)
 - License file management
+<!-- markdownlint-disable -->
+<details>
+<summary>
+<h2>Installation</h2>
+</summary>
+
+TODO
+
+</details>
+<!-- markdownlint-restore -->
 
 ## Usage
 ```nix
