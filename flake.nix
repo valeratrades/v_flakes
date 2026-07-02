@@ -36,9 +36,7 @@ See individual component descriptions in their respective directories.'';
           overlays = [ (import rust-overlay) ];
           config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "drawio" ];
         };
-        rust = pkgs.rust-bin.selectLatestNightlyWith (t: t.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
-        });
+        rust = (import ./rs).default_nightly system;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
         utils = import ./utils;
         files = import ./files;
