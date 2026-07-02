@@ -31,9 +31,9 @@ struct Args {
 enum Commands {
     /// Sync repository labels with local configuration
     SyncLabels {
-        /// Labels in format "name:color[:description]" (leading # optional), can be repeated
-        #[arg(short, long, value_parser = parse_label)]
-        label: Vec<LabelSpec>,
+        /// JSON array of {name, color, description?} (leading # in color optional)
+        #[arg(long)]
+        labels_json: String,
 
         /// Check for duplicate or too-similar colors
         #[arg(long)]
@@ -60,25 +60,23 @@ enum Commands {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 struct LabelSpec {
     name: String,
     color: String,
     description: Option<String>,
 }
 
-fn parse_label(s: &str) -> Result<LabelSpec, String> {
-    let parts: Vec<&str> = s.splitn(3, ':').collect();
-    if parts.len() < 2 {
-        return Err(format!("Invalid label format '{}', expected 'name:color[:description]'", s));
+fn parse_labels_json(s: &str) -> Result<Vec<LabelSpec>, String> {
+    let mut labels: Vec<LabelSpec> = serde_json::from_str(s).map_err(|e| format!("Invalid labels JSON: {}", e))?;
+    for l in &mut labels {
+        l.color = l.color.trim_start_matches('#').to_string();
+        if l.color.len() != 6 || !l.color.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(format!("Invalid color '{}' for label '{}', expected 6-digit hex", l.color, l.name));
+        }
+        l.description = l.description.take().filter(|d| !d.is_empty());
     }
-    let name = parts[0].to_string();
-    let color = parts[1].trim_start_matches('#').to_string();
-    if color.len() != 6 || !color.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err(format!("Invalid color '{}', expected 6-digit hex", parts[1]));
-    }
-    let description = parts.get(2).filter(|d| !d.is_empty()).map(|d| d.to_string());
-    Ok(LabelSpec { name, color, description })
+    Ok(labels)
 }
 
 /// Compute a stable, deterministic fingerprint of the label configuration.
@@ -341,7 +339,57 @@ fn report_mismatches(local_map: &HashMap<String, (String, Option<String>)>, remo
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct GhIssue {
+    number: u64,
+    title: String,
+    labels: Vec<GhLabel>,
+}
+
+/// Lint open issues against label conventions. Operates on live remote state,
+/// so unlike label sync it cannot be fingerprint-gated.
+fn lint_issues() {
+    let output = match run_gh(&["issue", "list", "--json", "number,title,labels", "--limit", "1000"]) {
+        Ok(o) if o.status.success() => o,
+        // issues may be disabled on this repo — that shouldn't fail label sync
+        Ok(o) => {
+            eprintln!("issue-lint: skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
+            return;
+        }
+        Err(e) => {
+            eprintln!("issue-lint: skipped: {}", e);
+            return;
+        }
+    };
+    let issues: Vec<GhIssue> = match serde_json::from_slice(&output.stdout) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("issue-lint: failed to parse issues: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Each check maps an issue to Some(warning); extend as more rules land.
+    let exactly_one = |i: &GhIssue, series: &str| {
+        let n = i.labels.iter().filter(|l| l.name.starts_with(series)).count();
+        (n != 1).then(|| format!("#{} '{}' has {} {}* labels, expected exactly one", i.number, i.title, n, series))
+    };
+    let checks: &[&dyn Fn(&GhIssue) -> Option<String>] = &[
+        &|i| exactly_one(i, "t:"),
+        &|i| exactly_one(i, "i:"),
+    ];
+    for issue in &issues {
+        for check in checks {
+            if let Some(warning) = check(issue) {
+                eprintln!("issue-lint: {}", warning);
+            }
+        }
+    }
+}
+
 fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
+    lint_issues();
+
     if check_colors {
         if let Err(e) = check_duplicate_colors(&local_labels) {
             eprintln!("ERROR: {}", e);
@@ -633,12 +681,19 @@ fn main() {
     let args = Args::parse();
 
     match args.command {
-        Commands::SyncLabels { label, check_duplicate_colors } => {
-            if label.is_empty() {
-                eprintln!("ERROR: No labels specified. Use -l 'name:color' to specify labels.");
-                std::process::exit(1);
-            }
-            sync_labels(label, check_duplicate_colors);
+        Commands::SyncLabels { labels_json, check_duplicate_colors } => {
+            let labels = match parse_labels_json(&labels_json) {
+                Ok(l) if !l.is_empty() => l,
+                Ok(_) => {
+                    eprintln!("ERROR: No labels specified. Pass --labels-json '[{{\"name\":..,\"color\":..}}]'.");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("ERROR: {}", e);
+                    std::process::exit(1);
+                }
+            };
+            sync_labels(labels, check_duplicate_colors);
         }
         Commands::SyncConventions { version_key, file } => {
             if file.is_empty() {

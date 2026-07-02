@@ -227,9 +227,7 @@ let
   # These are interpolated directly into a bash script (no eval), so we just need to escape
   # single quotes for the bash 'literal string' context.
   escapeForBash = s: builtins.replaceStrings ["'"] ["'\\''"] s;
-  labelArgs = builtins.concatStringsSep " " (
-    map (l: "-l '" + escapeForBash l.name + ":" + l.color + ":" + escapeForBash (l.description or "") + "'") allLabels
-  );
+  labelArgs = "--labels-json '" + escapeForBash (builtins.toJSON allLabels) + "'";
 
   # Use local cargo, falling back loudly to rustup's nightly if unavailable.
   # Unset RUSTC_WRAPPER to bypass sccache (its temp dir may not survive backgrounding).
