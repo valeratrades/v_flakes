@@ -14,13 +14,7 @@
 # difference — even a nixpkgs rev — changes rustc bytes and kills cache sharing.
 system:
 let
-  nixpkgs = builtins.fetchTree {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-    rev = "e73de5be04e0eff4190a1432b946d469c794e7b4";
-    narHash = "sha256-pGvFkM8N0xEkIIXDe5YYfbEAvHrk4IxBrjB/x8OomhE=";
-  };
+  nixpkgs = import ../default_nixpkgs.nix;
   rust-overlay = builtins.fetchTree {
     type = "github";
     owner = "oxalica";

@@ -123,6 +123,7 @@ ${parts.js}
 Generates README.md from docs/.readme_assets/ directory structure.
 '';
 
+      default_nixpkgs = import ./default_nixpkgs.nix;
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;
