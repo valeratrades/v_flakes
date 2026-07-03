@@ -41,6 +41,10 @@ in {
             claude_code_oauth_token = "\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}";
             label_trigger = "claude";
             additional_permissions = "actions: read\n";
+            # By default the action only pushes a branch and posts a quick-pull link; the app
+            # token it exports as GH_TOKEN has PR write, so allowing `gh pr create` + telling
+            # Claude to use it is all that's needed.
+            claude_args = ''--allowedTools "Bash(gh pr create:*),Bash(gh pr list:*)" --append-system-prompt "Whenever you push commits to a branch, always finish by opening a pull request against the default branch with gh pr create (check gh pr list --head <branch> first; if one already exists, pushing was enough)."'';
           };
         }
       ];
