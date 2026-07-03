@@ -1,6 +1,6 @@
 {
   jobs.pre_ci = {
-    uses = "valeratrades/.github/.github/workflows/pre_ci.yml@master";
+    uses = "valeratrades/.github/.github/workflows/pre_ci.yml@main";
   };
   env = {
     CARGO_INCREMENTAL = "0"; # on large changes this just bloats ./target
