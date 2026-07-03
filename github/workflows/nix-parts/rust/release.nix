@@ -12,6 +12,7 @@
   default ? defaults,
   targets ? [
     "x86_64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu"
     "x86_64-apple-darwin"
     "aarch64-apple-darwin"
   ],
@@ -35,7 +36,9 @@ let
     else hooks // { workflow_dispatch = {}; };
 
   targetToOs = target:
-    if builtins.match ".*-linux-.*" target != null then "ubuntu-latest"
+    # native arm runners are free for public repos
+    if builtins.match "aarch64-.*-linux-.*" target != null then "ubuntu-24.04-arm"
+    else if builtins.match ".*-linux-.*" target != null then "ubuntu-latest"
     else if builtins.match ".*-apple-.*" target != null then "macos-latest"
     else if builtins.match ".*-windows-.*" target != null then "windows-latest"
     else "ubuntu-latest";
