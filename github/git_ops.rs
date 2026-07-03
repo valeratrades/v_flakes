@@ -391,6 +391,26 @@ fn lint_issues() {
 // Built from parts so this file's own literals never match the scan.
 const TODO_NEEDLE: &str = concat!("TO", "DO");
 const TODO_MARKER: &str = concat!("<!-- ", "todo-id: ");
+// Stamped on issues our close pass closes. Its absence on a closed issue whose
+// comment is still in code means a human closed it — a verdict we mirror by
+// deleting the comment.
+const AUTO_CLOSE_MARKER: &str = "<!-- todo-sync: auto-closed -->";
+
+/// Walk past bare needle mentions to the `<needle>!*:` occurrence grep matched.
+/// Returns (needle position, bang count, content after the colon).
+fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
+    let mut base = 0;
+    while let Some(pos) = line[base..].find(TODO_NEEDLE) {
+        let start = base + pos;
+        let after = &line[start + TODO_NEEDLE.len()..];
+        let bangs = after.bytes().take_while(|&b| b == b'!').count();
+        if let Some(content) = after[bangs..].strip_prefix(':') {
+            return Some((start, bangs, content));
+        }
+        base = start + TODO_NEEDLE.len();
+    }
+    None
+}
 
 /// Identity of a logical comment across machines/contributors: (bang count, raw content),
 /// never file/line. Lives on the issue itself as an invisible body marker.
@@ -409,7 +429,7 @@ struct Todo {
     importance: usize,
     title: String,
     description: String,
-    location: String,
+    occurrences: Vec<(String, usize)>,
 }
 
 fn scan_todos(repo_root: &str) -> Vec<Todo> {
@@ -432,30 +452,24 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
         }
     }
 
-    let mut seen: HashMap<(usize, String), Vec<String>> = HashMap::new();
+    let mut seen: HashMap<(usize, String), Vec<(String, usize)>> = HashMap::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         let mut parts = line.splitn(3, ':');
         let (Some(file), Some(lineno), Some(rest)) = (parts.next(), parts.next(), parts.next()) else { continue };
-        // first needle occurrence may be a bare mention; walk to the one grep matched
-        let mut search = rest;
-        while let Some(pos) = search.find(TODO_NEEDLE) {
-            let after = &search[pos + TODO_NEEDLE.len()..];
-            let bangs = after.bytes().take_while(|&b| b == b'!').count();
-            if let Some(content) = after[bangs..].strip_prefix(':') {
-                seen.entry((bangs, content.trim().to_string()))
-                    .or_default()
-                    .push(format!("{file}:{lineno}"));
-                break;
-            }
-            search = after;
+        if let Some((_, bangs, content)) = split_todo(rest) {
+            let lineno = lineno.parse().expect("git grep -n emits numeric line numbers");
+            seen.entry((bangs, content.trim().to_string()))
+                .or_default()
+                .push((file.to_string(), lineno));
         }
     }
 
     let mut todos = Vec::new();
     for ((bangs, content), mut occurrences) in seen {
         occurrences.sort();
+        let at = format!("{}:{}", occurrences[0].0, occurrences[0].1);
         if content.is_empty() {
-            eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {}", occurrences[0]);
+            eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {at}");
             continue;
         }
         let (title, description) = match content.split_once(". ") {
@@ -463,7 +477,7 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
             None => (content.strip_suffix('.').unwrap_or(&content).to_string(), String::new()),
         };
         if title.len() > 256 {
-            eprintln!("todo-sync: skipping (title > 256 chars, gh would reject) at {}", occurrences[0]);
+            eprintln!("todo-sync: skipping (title > 256 chars, gh would reject) at {at}");
             continue;
         }
         todos.push(Todo {
@@ -471,10 +485,10 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
             importance: bangs.min(9),
             title,
             description,
-            location: occurrences[0].clone(),
+            occurrences,
         });
     }
-    todos.sort_by(|a, b| a.location.cmp(&b.location));
+    todos.sort_by(|a, b| a.occurrences[0].cmp(&b.occurrences[0]));
     todos
 }
 
@@ -541,17 +555,19 @@ fn sync_todos(repo_root: &str) {
         }
     }
 
+    let mut removals: Vec<(&Todo, u64)> = Vec::new();
     for todo in &todos {
         match by_id.get(todo.id.as_str()) {
             None => {
+                let (file, line) = &todo.occurrences[0];
                 let mut body = String::new();
                 if !todo.description.is_empty() {
                     body.push_str(&todo.description);
                     body.push_str("\n\n");
                 }
                 body.push_str(&format!(
-                    "_From `{}` at generation time._\n\n{}{} -->",
-                    todo.location, TODO_MARKER, todo.id
+                    "_From `{file}:{line}` at generation time._\n\n{}{} -->",
+                    TODO_MARKER, todo.id
                 ));
                 // t:chore keeps the exactly-one-t:* lint green; user retags freely — identity is the marker
                 let labels = format!("ext:from_todo,i:{},t:chore", todo.importance);
@@ -559,17 +575,32 @@ fn sync_todos(repo_root: &str) {
                     eprintln!("todo-sync: failed to create issue for '{}'", todo.title);
                 }
             }
-            // closed as not-planned means we closed it when the comment was hidden (branch
-            // switch, edit churn) — reopen the same issue, never create a duplicate. Closed
-            // as completed stays closed: that's the contract for killing a generated issue.
-            Some(i) if i.state != "OPEN" && i.state_reason.as_deref() == Some("NOT_PLANNED") => {
-                if !run_gh_success(&["issue", "reopen", &i.number.to_string()]) {
-                    eprintln!("todo-sync: failed to reopen #{}", i.number);
+            // auto-close marker + not-planned = we closed it when the comment was hidden
+            // (branch switch, edit churn) — reopen the same issue, never create a duplicate.
+            // Reopen before stripping the marker: a stale marker mis-reopens later at worst,
+            // while a stripped marker on a still-closed issue would read as a human close
+            // and delete the comment.
+            Some(i) if i.state != "OPEN"
+                && i.state_reason.as_deref() == Some("NOT_PLANNED")
+                && i.body.contains(AUTO_CLOSE_MARKER) =>
+            {
+                let n = i.number.to_string();
+                if run_gh_success(&["issue", "reopen", &n]) {
+                    let stripped = i.body.replace(&format!("\n\n{AUTO_CLOSE_MARKER}"), "").replace(AUTO_CLOSE_MARKER, "");
+                    if !run_gh_success(&["issue", "edit", &n, "--body", &stripped]) {
+                        eprintln!("todo-sync: failed to strip auto-close marker from #{n}");
+                    }
+                } else {
+                    eprintln!("todo-sync: failed to reopen #{n}");
                 }
             }
+            // any other close (completed, or not-planned without our marker) is a human
+            // verdict on a comment still in code — mirror it by deleting the comment
+            Some(i) if i.state != "OPEN" => removals.push((todo, i.number)),
             Some(_) => {}
         }
     }
+    remove_todo_comments(repo_root, &removals);
 
     let scanned: HashSet<&str> = todos.iter().map(|t| t.id.as_str()).collect();
     for issue in &issues {
@@ -580,9 +611,75 @@ fn sync_todos(repo_root: &str) {
         if scanned.contains(id) {
             continue;
         }
+        let n = issue.number.to_string();
+        // stamp before closing: an unmarked sync-close would later read as a human
+        // verdict and get the reappeared comment deleted — so no stamp, no close
+        if !issue.body.contains(AUTO_CLOSE_MARKER) {
+            let marked = format!("{}\n\n{AUTO_CLOSE_MARKER}", issue.body);
+            if !run_gh_success(&["issue", "edit", &n, "--body", &marked]) {
+                eprintln!("todo-sync: failed to stamp #{n} before close — skipping close");
+                continue;
+            }
+        }
         let comment = format!("{TODO_NEEDLE} comment no longer in code — closed by sync.");
-        if !run_gh_success(&["issue", "close", &issue.number.to_string(), "--reason", "not planned", "--comment", &comment]) {
-            eprintln!("todo-sync: failed to close #{}", issue.number);
+        if !run_gh_success(&["issue", "close", &n, "--reason", "not planned", "--comment", &comment]) {
+            eprintln!("todo-sync: failed to close #{n}");
+        }
+    }
+}
+
+/// A human closed the issue while its comment is still in code: delete the comment.
+/// Comment-only lines are dropped whole; a trailing comment is cut off its code line.
+fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
+    let mut by_file: HashMap<&str, Vec<(usize, &Todo, u64)>> = HashMap::new();
+    for (todo, number) in removals {
+        for (file, line) in &todo.occurrences {
+            by_file.entry(file).or_default().push((*line, todo, *number));
+        }
+    }
+    for (file, edits) in by_file {
+        let path = PathBuf::from(repo_root).join(file);
+        let text = match fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("todo-sync: can't read {file}: {e}");
+                continue;
+            }
+        };
+        // split('\n') keeps \r on CRLF lines and a "" tail for the trailing newline,
+        // so join('\n') reproduces the file byte-for-byte around our edits
+        let mut lines: Vec<Option<String>> = text.split('\n').map(|l| Some(l.to_string())).collect();
+        for (lineno, todo, number) in edits {
+            let Some(slot) = lines.get_mut(lineno - 1) else {
+                eprintln!("todo-sync: {file}:{lineno} vanished since scan — not removing");
+                continue;
+            };
+            let replacement = {
+                let line = slot.as_deref().expect("each scanned line is edited at most once");
+                // re-verify identity at the exact line before touching it: scan and edit
+                // are milliseconds apart, but deleting the wrong code is unrecoverable
+                let verified = split_todo(line).filter(|(_, bangs, content)| todo_id(*bangs, content.trim()) == todo.id);
+                let Some((pos, ..)) = verified else {
+                    eprintln!("todo-sync: {file}:{lineno} changed since scan — not removing");
+                    continue;
+                };
+                let mut prefix = line[..pos].trim_end();
+                // ponytail: one trailing comment-leader heuristic instead of per-language
+                // syntax; upgrade to real comment parsing if a language defeats it
+                for lead in ["<!--", "/*", "//", "--", "#", "*", ";", "%"] {
+                    if let Some(s) = prefix.strip_suffix(lead) {
+                        prefix = s.trim_end();
+                        break;
+                    }
+                }
+                eprintln!("todo-sync: #{number} closed by human — removing comment at {file}:{lineno}");
+                (!prefix.is_empty()).then(|| prefix.to_string())
+            };
+            *slot = replacement;
+        }
+        let kept: Vec<&str> = lines.iter().flatten().map(String::as_str).collect();
+        if let Err(e) = fs::write(&path, kept.join("\n")) {
+            eprintln!("todo-sync: can't write {file}: {e}");
         }
     }
 }
