@@ -169,12 +169,20 @@ in
   # fail deep inside whatever consumes it — this surfaces it loud and early.
   # The secret is injected as an env var (kept off the command line, masked in logs);
   # `hint` lines are appended as extra `::error::` annotations for setup guidance.
+  # A private repo on a Free-plan org can't see org secrets, so an empty value there
+  # most likely means "set org-wide but unreachable" rather than "never set" — the
+  # message branches on github.event.repository.private to say which.
   requireSecret = { name, hint ? [] }: {
     name = "Ensure ${name} secret is configured";
     env = { ${name} = "\${{ secrets.${name} }}"; };
     run = builtins.concatStringsSep "\n" ([
       "if [ -z \"\${${name}}\" ]; then"
-      "  echo \"::error::Secret '${name}' is not set. Add it under Settings → Secrets and variables → Actions (repo-level, or org-level with 'All repositories' visibility to cover every repo).\""
+      "  echo \"::error::Secret '${name}' is not set (empty in this job).\""
+      "  if [ \"\${{ github.event.repository.private }}\" = \"true\" ]; then"
+      "    echo \"::error::This repo is PRIVATE. On GitHub Free-plan orgs, organization secrets are NOT exposed to private repos — if '${name}' is set org-wide it still won't reach here. Fix: set it repo-level (gh secret set ${name} -R \${{ github.repository }}), or upgrade the org to Team/Enterprise.\""
+      "  else"
+      "    echo \"::error::Add it under Settings → Secrets and variables → Actions (repo-level, or org-level with 'All repositories' visibility — org secrets reach public repos on any plan).\""
+      "  fi"
     ] ++ (map (l: "  echo \"::error::${l}\"") hint) ++ [
       "  exit 1"
       "fi"

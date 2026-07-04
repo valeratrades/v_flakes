@@ -3,7 +3,8 @@
 # The label is seeded by github/labels.nix (synced on dev-shell entry).
 # Generic across repos: no repo-specific values. Requires the CLAUDE_CODE_OAUTH_TOKEN secret.
 # Share it across a whole org by setting it as an *organization* secret with "All repositories"
-# visibility (personal accounts have no equivalent — each personal repo needs its own copy).
+# visibility. Caveat: on the Free plan org secrets reach public repos only — private repos need
+# a repo-level copy (or a Team/Enterprise org). Personal accounts have no org secrets at all.
 let utils = import ../../../../utils;
 in {
   standalone = true;
