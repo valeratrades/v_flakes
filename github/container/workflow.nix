@@ -186,7 +186,7 @@ in
             if [ "''${{ github.ref_type }}" = "tag" ]; then
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
-                "docker://${registry}/$name:''${{ github.ref_name }}"
+                "docker://${registry}/''${name,,}:''${{ github.ref_name }}"
             else
               echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
             fi

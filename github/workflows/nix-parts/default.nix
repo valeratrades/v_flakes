@@ -258,7 +258,7 @@ let
     ) spec.workflows
   else {};
 
-  # Opt-in via `github { containerRelease = { registry = "ghcr.io/EV-invest"; }; }`.
+  # Opt-in via `github { containerRelease = { registry = "ghcr.io/ev-invest"; }; }`.
   containerReleaseWorkflow = if containerRelease != null then
     # Unknown keys must fail loudly: an option this version doesn't know (or a typo)
     # would otherwise silently vanish from the generated workflow.
