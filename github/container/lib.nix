@@ -3,6 +3,12 @@
 # name. The key is the one identifier — image name, package name, contract name,
 # and the Flux image-policy marker all reuse it.
 let
+  # k8s resource names are RFC1123 — no underscores (image refs allow them). The
+  # one sanctioned translation from a container's name to its k8s identity;
+  # everything downstream (Deployment/Service names, ImagePolicy names, secret
+  # names `kubernetes-<k8sName>`) derives through here.
+  k8sName = builtins.replaceStrings [ "_" ] [ "-" ];
+
   # Set only by `implement`, so a container can't ship without its contract baked
   # into the image labels.
   ociLabels = c: {
@@ -41,6 +47,15 @@ let
     { inherit image contract; };
 in
 {
+  inherit k8sName;
+
+  # The gitops-side complement of `implement`: a repo's `containers.<system>`
+  # output → the `{ name = k8s/ImagePolicy name; image = registry path segment }`
+  # pairs the Flux glue consumes. Naming flows one way — repos pick keys via
+  # `implement`, gitops enumerates them here — so nothing is ever spelled twice.
+  fluxContainers = containers:
+    map (n: { name = k8sName n; image = n; }) (builtins.attrNames containers);
+
   # Repos call this with their `pname` and a set of containers keyed by
   # sub-variant ("" = the primary). The image name joins them: `pname` for "",
   # else `pname-<sub>`. Each spec: { port; healthPath; entrypoint;
