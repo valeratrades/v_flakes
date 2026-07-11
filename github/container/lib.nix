@@ -123,6 +123,9 @@ in
         metadata = { inherit name; inherit labels; };
         spec = {
           replicas = 1;
+          # a rollout that can't go Ready must announce itself fast — the
+          # release-deprecator keys off ProgressDeadlineExceeded.
+          progressDeadlineSeconds = 180;
           selector.matchLabels = labels;
           template = {
             metadata.labels = labels;
