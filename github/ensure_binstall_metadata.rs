@@ -29,6 +29,29 @@ use std::{env, fs, path::Path};
 
 use toml_edit::{DocumentMut, Item, Table};
 
+/// `cargo publish` resolves `repository.workspace = true`, so binstall's `{ repo }` works either way; here we just need to confirm it resolves to something.
+fn resolve_repository(doc: &DocumentMut, cargo_toml_path: &Path) -> Option<String> {
+	let repo = doc.get("package")?.get("repository")?;
+	if let Some(s) = repo.as_str() {
+		return Some(s.to_string());
+	}
+	if repo.get("workspace").and_then(|w| w.as_bool()) != Some(true) {
+		return None;
+	}
+	let mut dir = cargo_toml_path.canonicalize().ok()?.parent()?.parent().map(Path::to_path_buf);
+	while let Some(d) = dir {
+		let candidate = d.join("Cargo.toml");
+		if candidate.exists() {
+			let ws_doc = fs::read_to_string(&candidate).ok()?.parse::<DocumentMut>().ok()?;
+			if let Some(ws) = ws_doc.get("workspace") {
+				return ws.get("package")?.get("repository")?.as_str().map(str::to_string);
+			}
+		}
+		dir = d.parent().map(Path::to_path_buf);
+	}
+	None
+}
+
 fn ensure_binstall_metadata(cargo_toml_path: &Path) -> Result<bool, Box<dyn std::error::Error>> {
 	let content = fs::read_to_string(cargo_toml_path)?;
 	let mut doc = content.parse::<DocumentMut>()?;
@@ -43,11 +66,7 @@ fn ensure_binstall_metadata(cargo_toml_path: &Path) -> Result<bool, Box<dyn std:
 	}
 
 	// Verify repository URL exists in [package] (required for binstall)
-	let _repo = doc
-		.get("package")
-		.and_then(|p| p.get("repository"))
-		.and_then(|r| r.as_str())
-		.ok_or("No repository field in [package] - required for binstall")?;
+	resolve_repository(&doc, cargo_toml_path).ok_or("No repository field in [package] - required for binstall")?;
 
 	// Ensure [package.metadata] exists
 	let package = doc["package"].as_table_mut().ok_or("No [package] table")?;

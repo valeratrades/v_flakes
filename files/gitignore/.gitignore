@@ -65,6 +65,7 @@ venv/
 **/node_modules/
 **/.next/
 **/.turbo/
+**/dist/
 
 ## LLMs
 AGENTS.md
