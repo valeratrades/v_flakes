@@ -9,8 +9,10 @@ See individual component descriptions in their respective directories.'';
   inputs.rust-overlay.url = "github:oxalica/rust-overlay";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs.pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks }:
     let
       pname = "v_flakes";
 
@@ -124,6 +126,9 @@ Generates README.md from docs/.readme_assets/ directory structure.
 '';
 
       default_nixpkgs = import ./default_nixpkgs.nix;
+      # Re-exported so consumers pin one input (v_flakes) instead of each carrying
+      # their own copies — same rev everywhere means nix store dedup, shared caches.
+      inherit flake-utils rust-overlay pre-commit-hooks;
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;
