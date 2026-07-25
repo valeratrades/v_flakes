@@ -48,4 +48,4 @@ if [[ "$src_changed" == "true" ]]; then
     git commit --amend --no-edit
 fi
 
-"$cnix_release_link" --ignore_cargo "$flag"
+"$cnix_release_link" --ignore-cargo "$flag"
