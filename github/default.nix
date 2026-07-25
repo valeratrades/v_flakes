@@ -14,6 +14,9 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   # container release). Exactly one of { nix-action = true; } (default, private GH cache)
   # or { cachix = "<name>"; } (public/org cache; push needs CACHIX_AUTH_TOKEN). See cache.nix.
   cache ? { nix-action = true; },
+  # Cachix cache name to publish `packages.default` to on every push to main, so
+  # downstream flakes substitute instead of rebuilding. Needs CACHIX_AUTH_TOKEN.
+  publishCachix ? null,
   release ? null, containerRelease ? null, gitlabSync ? null,
   syncFork ? false,
   # Claude Code workflows (PR assistant + auto code review). On by default for enabled repos.
@@ -200,7 +203,7 @@ let
   effectiveSyncFork = syncFork || (jobs.sync_fork or false);
 
   workflows = import ./workflows/nix-parts ({
-    inherit pkgs gistId cargoNightly cache;
+    inherit pkgs gistId cargoNightly cache publishCachix;
     syncFork = effectiveSyncFork;
   } // (if enable then {
     inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync;

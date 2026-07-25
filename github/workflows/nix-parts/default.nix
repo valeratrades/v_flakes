@@ -11,6 +11,8 @@ args@{ pkgs ? null, nixpkgs ? null, pname ? null, lastSupportedVersion ? null, j
   cargoNightly ? null,
   # CI cache mechanism, threaded to every nix-using workflow. See github/cache.nix.
   cache ? { nix-action = true; },
+  # Cachix cache name to publish `packages.default` to. See shared/cachix.nix.
+  publishCachix ? null,
 }:
 
 # If called with just nixpkgs (for flake description), return description attribute
@@ -89,6 +91,7 @@ let
     tokei = ./shared/tokei.nix;
     loc-badge = ./shared/loc-badge.nix;
     sync-gitlab = ./shared/sync-gitlab.nix;
+    cachix = ./shared/cachix.nix;
     code-duplication = ./shared/code-duplication.nix;
 		#,}}}
 
@@ -269,6 +272,11 @@ let
       [ "standalone" "filename" ])
   else null;
 
+  cachixWorkflow = if publishCachix != null then
+    (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
+      (import files.cachix { name = publishCachix; }) [ "standalone" ])
+  else null;
+
   # Sync fork workflow (rebase over upstream)
   syncForkWorkflow = if syncFork then
     let
@@ -387,6 +395,10 @@ let
     cp -f ${containerReleaseWorkflow} ./.github/workflows/release-container.yml
   '' else "";
 
+  cachixHook = if cachixWorkflow != null then ''
+    cp -f ${cachixWorkflow} ./.github/workflows/cachix.yml
+  '' else "";
+
   syncForkHook = if syncForkWorkflow != null then ''
     cp -f ${syncForkWorkflow} ./.github/workflows/sync_fork.yml
   '' else "";
@@ -411,7 +423,7 @@ let
   '' else "";
 in
 workflows // {
-  inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow;
+  inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
   shellHook = utils.mkShellHook ''
     mkdir -p ./.github/workflows
     ${errorsHook}
@@ -423,5 +435,6 @@ workflows // {
     ${syncForkHook}
     ${gitlabSyncHook}
     ${claudeHook}
+    ${cachixHook}
   '';
 }
