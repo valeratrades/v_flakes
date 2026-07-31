@@ -5,14 +5,20 @@
 Collection of reusable Nix components.
 See individual component descriptions in their respective directories.'';
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.rust-overlay.url = "github:oxalica/rust-overlay";
+  # Revs must equal ./default_nixpkgs.nix and ./default_rust_overlay.nix (asserted
+  # below). Flake inputs can't reference those files, so they are restated here —
+  # otherwise this repo, and every consumer of the re-exported inputs, would drift
+  # off the pins we hand out.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/e73de5be04e0eff4190a1432b946d469c794e7b4";
+  inputs.rust-overlay.url = "github:oxalica/rust-overlay/5106a604b3d67cffe8eb51a8bd9f04e607f0d31d";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.pre-commit-hooks.url = "github:cachix/git-hooks.nix";
   inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks }:
+    assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
+    assert rust-overlay.rev == (import ./default_rust_overlay.nix).rev;
     let
       pname = "v_flakes";
 

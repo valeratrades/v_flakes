@@ -2,20 +2,18 @@
   description = "Example usage";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/23e89b7da85c3640bbc2173fe04f4bd114342367";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
     {
       self,
-      nixpkgs,
       flake-utils,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import (import ../default_nixpkgs.nix) { inherit system; };
         utils = import ../utils;
         readme-fw = import ./.;
 

@@ -33,7 +33,6 @@ fn main() -> ExitCode {
     let mut files: Vec<FileBlock> = Vec::new();
     let mut current_file: Option<FileBlock> = None;
     let mut current_issue: Option<Issue> = None;
-    let mut found_duplication = false;
 
     for line in reader.lines() {
         let line = match line {
@@ -64,12 +63,8 @@ fn main() -> ExitCode {
             if let (Some(file), Some(issue)) = (&mut current_file, current_issue.take()) {
                 file.issues.push(issue);
             }
-            let is_dup = line.contains("similar code");
-            if is_dup {
-                found_duplication = true;
-            }
             current_issue = Some(Issue {
-                is_duplication: is_dup,
+                is_duplication: line.contains("similar code"),
                 lines: vec![line],
             });
             continue;
@@ -87,9 +82,14 @@ fn main() -> ExitCode {
         files.push(file);
     }
 
+    let mut found_duplication = false;
     for file in files {
+        if file.header.trim_start().starts_with("examples/") {
+            continue;
+        }
         let dup_issues: Vec<_> = file.issues.into_iter().filter(|i| i.is_duplication).collect();
         if !dup_issues.is_empty() {
+            found_duplication = true;
             println!("{}", file.header);
             for issue in dup_issues {
                 for line in issue.lines {

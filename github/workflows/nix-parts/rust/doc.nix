@@ -1,8 +1,13 @@
 { package ? null }:
 let
+  # `cargo docs-rs` refuses to guess a member, so drive it once per workspace member.
   cargoDocsCmd = if package != null
                  then "cargo docs-rs -p ${package}"
-                 else "cargo docs-rs";
+                 else ''
+                   for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
+                     cargo docs-rs -p "$p"
+                   done
+                 '';
 in
 {
   name = "Documentation";

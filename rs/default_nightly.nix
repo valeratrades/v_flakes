@@ -15,13 +15,7 @@
 system:
 let
   nixpkgs = import ../default_nixpkgs.nix;
-  rust-overlay = builtins.fetchTree {
-    type = "github";
-    owner = "oxalica";
-    repo = "rust-overlay";
-    rev = "5106a604b3d67cffe8eb51a8bd9f04e607f0d31d";
-    narHash = "sha256-WJPfr9EAWVIuTMyb/ilHKUYlg/RNa0xrNiWR+p1iHUg=";
-  };
+  rust-overlay = import ../default_rust_overlay.nix;
   pkgs = import nixpkgs { inherit system; overlays = [ (import rust-overlay) ]; };
 in
 # Targets are the union of fleet needs (wasm frontends, musl static deploys):
