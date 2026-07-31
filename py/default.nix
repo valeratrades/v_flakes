@@ -2,6 +2,9 @@
   pkgs ? null,
   nixpkgs ? null,
   # config options
+  # Canonical interpreter for the fleet — consumers should not name a version.
+  # Re-exported below so the devShell and the consumer's `packages.default`
+  # cannot drift onto different pythons.
   python ? (if pkgs != null then pkgs.python312 else null),
   venv_path ? ".devenv/state/venv",
   src_path ? "py_src",
@@ -18,6 +21,7 @@ py = v-utils.py {
   inherit pkgs;
   venv_path = ".devenv/state/venv";  # Venv path for ty (default)
   src_path = "py_src";               # Source path for tools (default)
+  # python = pkgs.python313;         # Override the canonical interpreter
 };
 ```
 
@@ -27,6 +31,14 @@ devShells.default = pkgs.mkShell {
   shellHook = py.shellHook;
   packages = [ ... ] ++ py.enabledPackages;
 };
+```
+
+`py.python` re-exports the interpreter in use — build `packages.default` and any
+version string off it (`py.python.pythonVersion` is "3.12") instead of naming a
+version, so the shell and the package can never diverge:
+```nix
+packages.default = pkgs.writeShellScriptBin pname "exec ''${pyEnv}/bin/python -m src \"$@\"";
+github = v-utils.github { lastSupportedVersion = "python-''${py.python.pythonVersion}"; ... };
 ```
 
 The shellHook will:
@@ -56,7 +68,7 @@ let
   };
 in
 {
-  inherit ruffFile;
+  inherit ruffFile python;
 
   shellHook = utils.mkShellHook ''
     cp -f ${ruffFile} ./ruff.toml
