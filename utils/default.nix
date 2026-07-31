@@ -243,14 +243,28 @@ in
   combine = { rust, modules, determinate_nix ? true }:
     assert (rust != null) || throw "v_flakes.utils.combine: `rust` is required — pass the nix rust toolchain (e.g. `rs.rust`) so module hooks have a guaranteed cargo on PATH.";
     let
+      # `nix` is usually NOT on the devShell's own PATH — mkShell does not inherit the
+      # user profile. On NixOS it leaks in via /run/current-system/sw/bin, which is the
+      # only reason this ever passed; against a profile-based install the probe found
+      # nothing, that read as "lazy-trees != true", and every shell hard-failed on a
+      # machine which was in fact running Determinate. So locate nix before judging, and
+      # when it genuinely cannot be found, warn rather than fail — unverifiable is not
+      # the same as violated, and we necessarily got here via a working nix anyway.
       determinateGuard = if !determinate_nix then "" else ''
-        if [ "$(nix config show lazy-trees 2>/dev/null)" != true ]; then
+        _vf_nix=
+        for _vf_cand in nix "$HOME/.nix-profile/bin/nix" /nix/var/nix/profiles/default/bin/nix /run/current-system/sw/bin/nix; do
+          if command -v "$_vf_cand" >/dev/null 2>&1; then _vf_nix="$_vf_cand"; break; fi
+        done
+        if [ -z "$_vf_nix" ]; then
+          echo "warning: v_flakes: found no 'nix' to verify lazy-trees with — skipping the Determinate Nix check." >&2
+        elif [ "$("$_vf_nix" config show lazy-trees 2>/dev/null)" != true ]; then
           printf '%s\n' \
             "✘ This repo requires Determinate Nix (lazy-trees=true)." \
             "  Stock nix produces flake.lock NAR hashes that diverge from CI — private inputs fail to verify." \
             "  Install: https://determinate.systems/nix   NixOS: nix.settings.lazy-trees = true" >&2
           exit 1
         fi
+        unset _vf_nix _vf_cand
       '';
       getPackages = m: m.enabledPackages or [];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
