@@ -20,6 +20,10 @@ See individual component descriptions in their respective directories.'';
   inputs.process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
   inputs.devenv.url = "github:cachix/devenv/v1.6.1";
   inputs.devenv.inputs.nixpkgs.follows = "nixpkgs";
+  # devenv's cachix and vendored-nix each pin their own nixpkgs; unfollowed that is
+  # ~800MB of duplicate store paths in EVERY repo consuming v_flakes, devenv or not.
+  inputs.devenv.inputs.cachix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.devenv.inputs.nix.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv }:
     assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
