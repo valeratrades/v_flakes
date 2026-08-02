@@ -147,6 +147,37 @@ let
   #  # builtins.trace ''TRACE: ${path}: "${out}"''
   #  out;
 
+  # A source holding nothing but comments is the user opting out of that section
+  hasContent = path: text:
+    let
+      isTyp = pkgs.lib.hasSuffix ".typ" path;
+      isSh = pkgs.lib.hasSuffix ".sh" path;
+      open = if isTyp then "/*" else "<!--";
+      close = if isTyp then "*/" else "-->";
+      lineMark = if isTyp then "//" else if isSh then "#" else null;
+      isBlank = s: builtins.match "[[:space:]]*" s != null;
+      scan =
+        state: s:
+        if state.inBlock then
+          let parts = pkgs.lib.splitString close s;
+          in if builtins.length parts == 1 then state
+            else scan (state // { inBlock = false; }) (builtins.concatStringsSep close (builtins.tail parts))
+        else
+          let
+            parts = pkgs.lib.splitString open s;
+            beforeOpen = builtins.head parts;
+            code = if lineMark == null then beforeOpen else builtins.head (pkgs.lib.splitString lineMark beforeOpen);
+            state' = state // { found = state.found || !(isBlank code); };
+          in if builtins.length parts == 1 then state'
+            else scan (state' // { inBlock = true; }) (builtins.concatStringsSep open (builtins.tail parts));
+    in
+    (builtins.foldl' scan { inBlock = false; found = false; } (pkgs.lib.splitString "\n" text)).found;
+
+  fileHasContent =
+    relPath:
+    let fullPath = "${rootStr}/${relPath}";
+    in builtins.pathExists fullPath && hasContent relPath (builtins.readFile fullPath);
+
   processSection =
     {
       path, # Regex pattern for file(s) relative to root
@@ -224,7 +255,8 @@ let
           contentWithDemotedHeaders = if demoteHeaders then demoteHeadersFn contentWithPaths else contentWithPaths;
 
           out =
-            if contentWithDemotedHeaders == "" then ""
+            if exists && !(fileHasContent singlePath) then ""
+            else if contentWithDemotedHeaders == "" then ""
             else if (exists || !optional) then (transform contentWithDemotedHeaders singlePath) + "\n"
             else contentWithDemotedHeaders;
         in
@@ -287,7 +319,7 @@ let
       installDir = "${rootStr}/docs/.readme_assets";
       installDirExists = builtins.pathExists installDir;
       allInstallFiles = if installDirExists then builtins.attrNames (builtins.readDir installDir) else [ ];
-      matchingInstallFiles = builtins.filter (name: builtins.match installPattern name != null) allInstallFiles;
+      matchingInstallFiles = builtins.filter (name: builtins.match installPattern name != null && fileHasContent "docs/.readme_assets/${name}") allInstallFiles;
       isMulti = builtins.length matchingInstallFiles >= 2;
 
       folds = processSection {
