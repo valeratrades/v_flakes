@@ -15,8 +15,13 @@ See individual component descriptions in their respective directories.'';
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.pre-commit-hooks.url = "github:cachix/git-hooks.nix";
   inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
+  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  inputs.process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
+  inputs.devenv.url = "github:cachix/devenv/v1.6.1";
+  inputs.devenv.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv }:
     assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
     assert rust-overlay.rev == (import ./default_rust_overlay.nix).rev;
     let
@@ -134,7 +139,9 @@ Generates README.md from docs/.readme_assets/ directory structure.
       default_nixpkgs = import ./default_nixpkgs.nix;
       # Re-exported so consumers pin one input (v_flakes) instead of each carrying
       # their own copies — same rev everywhere means nix store dedup, shared caches.
-      inherit flake-utils rust-overlay pre-commit-hooks;
+      # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
+      # is the same rev as a bare source tree, for `import`.
+      inherit nixpkgs flake-utils rust-overlay pre-commit-hooks flake-parts process-compose-flake devenv;
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;
