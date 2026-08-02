@@ -23,8 +23,6 @@ args@{
   default ? defaults,
   licenses ? null,
   gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb",
-  # Fully-qualified GitHub slug `owner/repo` for the CI-status badges; see badges.nix.
-  repo ? "valeratrades/${pname}",
   branch ? "main",
 }:
 
@@ -108,7 +106,6 @@ let
       rootDir
       gistId
       logo
-      repo
       branch
       ;
   };
@@ -492,6 +489,7 @@ README_EOF
   # Expected loc badge URL for this pname/gistId
   expectedLocBadge = "https://gist.githubusercontent.com/valeratrades/${gistId}/raw/${pname}-loc.json";
   hasLocBadge = builtins.elem "loc" badges;
+  hasCiBadge = builtins.elem "ci" badges;
 
   shellHook =
     let
@@ -505,6 +503,17 @@ README_EOF
         if [ -f ./README.md ] && grep -qF "gist.githubusercontent.com/valeratrades/${gistId}/raw/" ./README.md && ! grep -qF "${expectedLocBadge}" ./README.md; then
           ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
         fi
+      '' else "";
+      # `origin` is the only place owner/repo actually lives; a repo that has never
+      # been pushed has no correct answer, so refuse rather than guess an owner.
+      ciSlugResolve = if hasCiBadge then ''
+        __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+        case "$__slug" in
+          */*) ;;
+          *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; CI badges need it)" >&2; exit 1 ;;
+        esac
+        sed -i "s#@@REPO_SLUG@@#$__slug#g" ./README.md
+        unset __slug
       '' else "";
     in
     utils.mkShellHook ''
@@ -522,6 +531,7 @@ README_EOF
       [ -n "$(ls docs/.readme_assets/install* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/installation.md
       [ -n "$(ls docs/.readme_assets/other.* 2>/dev/null)" ] || : > docs/.readme_assets/other.md
       cp -f ${readme} ./README.md
+      ${ciSlugResolve}
     '';
 in
 {

@@ -5,15 +5,11 @@
   lastSupportedVersion,
   gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb",
   logo ? "",
-  # Fully-qualified GitHub slug `owner/repo` — the single source of truth for the
-  # CI-status badge URLs. Defaults to `valeratrades/${pname}` (the historical
-  # behaviour). Set it when the repo lives under an org or is named differently
-  # from the project, e.g. `EV-invest/zero_fee_arb` or `EV-invest/site` (pname
-  # `ev_site`). The loc gist below is unaffected — it stays under `valeratrades`,
-  # a personal gist the LOC workflow writes to regardless of where the repo lives.
-  repo ? "valeratrades/${pname}",
   branch ? "main",
 }: let
+  # Owner/repo can't be known at eval time (the flake source has no `.git`), so the
+  # CI badges carry a sentinel that readme_fw's shellHook resolves from `origin`.
+  repo = "@@REPO_SLUG@@";
   badges = {
     msrv = ''![Minimum Supported Rust Version](https://img.shields.io/badge/${lastSupportedVersion}+-ab6000.svg)'';
 

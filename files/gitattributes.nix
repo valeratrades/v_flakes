@@ -53,9 +53,7 @@ let
 
   # Lockfiles get the same treatment, but are never LFS-tracked, so they're
   # emitted as a standalone section rather than folded into the LFS patterns.
-  # .pre-commit-config.yaml is generated/managed, not hand-merged, so it rides
-  # along here too.
-  lockfiles = [ "Cargo.lock" "flake.lock" ".pre-commit-config.yaml" ];
+  lockfiles = [ "Cargo.lock" "flake.lock" ];
 
   isOurs = pattern: builtins.elem pattern alwaysOurs;
   isAlwaysLfs = pattern: builtins.elem pattern alwaysLfs;
@@ -94,7 +92,7 @@ let
   # at all (i.e. lfs != null).
   lockSection =
     let
-      lines = map (p: "${p} -filter merge=ours") lockfiles; # `-filter` cause `pre-commit-config.yaml` links to store, and shouldn't be git-lfsed ever. And well it doesn't affect the others, so alright to apply to all.
+      lines = map (p: "${p} -filter merge=ours") lockfiles;
     in
     ''
       # Generated/locked files (keep current branch's version on conflict)
