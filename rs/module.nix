@@ -78,6 +78,19 @@ build.workspace: Map of directories to their build.rs module lists.
     - "git_version": Embed GIT_HASH at compile time
     - "log_directives": Embed LOG_DIRECTIVES from .cargo/log_directives
     - "deprecate": Deprecation enforcement (see below)
+    - { lightweight_charts = { version; sha256; }; }: Fetch lightweight-charts (see below)
+
+  lightweight_charts module:
+    Under the crate's `lightweight_charts` cargo feature, downloads
+    lightweight-charts@<version>/dist/lightweight-charts.standalone.production.mjs into OUT_DIR
+    and asserts it hashes to <sha256>, so the crate can `include_str!` it rather than vendoring
+    196 KB of third-party JS into its published tarball. Needs `curl` and `sha256sum` on PATH.
+    A rebuild that already holds the right bytes skips the download, so it stays offline.
+
+    Both fields are required — the pin belongs next to the JS written against that API, so there
+    is deliberately no default and no bare-string form.
+
+      { lightweight_charts = { version = "5.2.0"; sha256 = "66ac22df..."; }; }
 
   deprecate module:
     Checks that #[deprecated] items are removed by their specified version.
