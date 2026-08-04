@@ -97,7 +97,7 @@ See individual component descriptions in their respective directories.'';
       {
         # Exposed as a package (not just `rs.sort_derives`) so CI can `nix run` the same
         # binary the dev shells get, instead of a divergent upstream build.
-        packages.cargo-sort-derives = (import ./rs).sort_derives pkgs;
+        packages.cargo-sort-derives = (import ./rs).sort_derives system;
 
         devShells.default = pkgs.mkShell {
           inherit stdenv;
