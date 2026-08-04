@@ -14,6 +14,7 @@
     toolchain = import ./rust/toolchain.nix;
     config = import ./rust/config.nix;
 		clippy = import ./rust/clippy.nix;
+		sort_derives = import ./rust/sort_derives.nix;
 		lints = import ./rust/lints.nix;
 		build = import ./rust/build.nix;
   };

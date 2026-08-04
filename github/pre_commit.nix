@@ -47,6 +47,17 @@ let
   excludeFlags = builtins.concatStringsSep " " (map (d: "--exclude ${d}") excludeDirs);
   codestyleBase = "codestyle ${excludeFlags} rust ${moduleFlags}";
 
+  # Upstream's cargo-sort-derives ignores unknown config keys, so an unpatched binary would
+  # sort qualified derives mid-list, silently, while CI (which runs the patched build)
+  # rejects it. Fail here instead, where the fix is obvious.
+  sortDerivesGuard = ''
+    if grep -qs qualified_last .sort-derives.toml && ! cargo sort-derives --help | grep -q -- --qualified-last; then
+      echo "pre-commit: .sort-derives.toml sets qualified_last but cargo-sort-derives on PATH does not support it" >&2
+      echo "  install the patched build: nix profile install github:valeratrades/v_flakes#cargo-sort-derives" >&2
+      exit 1
+    fi
+  '';
+
   # cargo sort-derives: exclude specified dirs by using find+xargs when excludeDirs is set
   # (sort-derives has no native --exclude flag)
   sortDerivesCmd = if excludeDirs == [] then "cargo sort-derives"
@@ -146,7 +157,10 @@ let
         done
       fi
       fi
-      if require_tool cargo-sort-derives "nix profile install github:valeratrades/v_flakes#cargo-sort-derives"; then ${sortDerivesCmd}; fi
+      if require_tool cargo-sort-derives "nix profile install github:valeratrades/v_flakes#cargo-sort-derives"; then
+        ${sortDerivesGuard}
+        ${sortDerivesCmd}
+      fi
       if grep -q '^\[workspace\]' Cargo.toml && require_tool cargo-autoinherit "cargo install cargo-autoinherit"; then cargo autoinherit; fi
       # idea is: if all these functions are ran on every commit, then the only files impacted will be those with changes yet to be committed; hence if tool affects something outside of staged, it was outside of the scope meant to be committed anyways.
       echo "$staged_files" | xargs -r git add

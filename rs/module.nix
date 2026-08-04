@@ -7,6 +7,7 @@
   config ? {},
   deny ? false,
   clippy ? {},
+  sortDerives ? {},
   lints ? true,
   tracey ? true,
   style ? {},
@@ -52,6 +53,7 @@ rs = v-utils.rs {
   cranelift = true;  # Enable cranelift backend (default: true)
   deny = false;      # Copy deny.toml for cargo-deny (default: false)
   clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see files/rust/clippy.nix)
+  sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see files/rust/sort_derives.nix)
   lints = true;     # `false` disables Cargo.toml [lints.rust] (or [workspace.lints.rust]) management. Pass an attrset to extend defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
   tracey = true;     # Enable tracey spec coverage (default: true)
   style = {
@@ -165,6 +167,7 @@ let
   denyExtend = if builtins.isAttrs deny then deny else {};
   denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
   clippyFile = files.rust.clippy { inherit pkgs; extend = clippy; };
+  sortDerivesFile = files.rust.sort_derives { inherit pkgs; extend = sortDerives; };
   lintsExtend = if builtins.isAttrs lints then lints else {};
   lintsEnabled = if builtins.isBool lints then lints else true;
   lintsFile = files.rust.lints { inherit pkgs; extend = lintsExtend; };
@@ -238,7 +241,7 @@ let
   '' else "";
 in
 {
-  inherit rust rustfmtFile configFile denyFile clippyFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
+  inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
 
   # For backwards compatibility, expose the first build file
   buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});
@@ -254,6 +257,7 @@ in
     cp -f ${rustfmtFile} ./rustfmt.toml
     cp -f ${configFile} ./.cargo/config.toml
     cp -f ${clippyFile} ./.cargo/clippy.toml
+    cp -f ${sortDerivesFile} ./.sort-derives.toml
     ${lintsHook}
     ${buildHook}
     ${denyHook}
