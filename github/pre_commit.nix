@@ -146,7 +146,7 @@ let
         done
       fi
       fi
-      if require_tool cargo-sort-derives "cargo install cargo-sort-derives"; then ${sortDerivesCmd}; fi
+      if require_tool cargo-sort-derives "nix profile install github:valeratrades/v_flakes#cargo-sort-derives"; then ${sortDerivesCmd}; fi
       if grep -q '^\[workspace\]' Cargo.toml && require_tool cargo-autoinherit "cargo install cargo-autoinherit"; then cargo autoinherit; fi
       # idea is: if all these functions are ran on every commit, then the only files impacted will be those with changes yet to be committed; hence if tool affects something outside of staged, it was outside of the scope meant to be committed anyways.
       echo "$staged_files" | xargs -r git add

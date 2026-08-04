@@ -1,0 +1,240 @@
+diff --git a/src/config.rs b/src/config.rs
+index e6f2f60..4943d46 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -10,6 +10,7 @@ const CONFIG_FILE_NAMES: &[&str] = &[".sort-derives.toml", "sort-derives.toml"];
+ pub struct Config {
+     pub order: Option<Vec<String>>,
+     pub preserve: Option<bool>,
++    pub qualified_last: Option<bool>,
+     pub exclude: Option<Vec<String>>,
+ }
+ 
+@@ -18,6 +19,7 @@ impl From<InternalConfig> for Config {
+         Config {
+             order: internal_config.order.map(Into::into),
+             preserve: internal_config.preserve,
++            qualified_last: internal_config.qualified_last,
+             exclude: internal_config.exclude,
+         }
+     }
+@@ -27,6 +29,7 @@ impl From<InternalConfig> for Config {
+ struct InternalConfig {
+     order: Option<OrderType>,
+     preserve: Option<bool>,
++    qualified_last: Option<bool>,
+     exclude: Option<Vec<String>>,
+ }
+ 
+@@ -95,6 +98,7 @@ mod tests {
+         let toml = r#"
+             order = "A, B, C"
+             preserve = true
++            qualified_last = true
+             exclude = ["D", "E"]
+         "#;
+         let expected = config(&["A", "B", "C"], true, &["D", "E"]);
+@@ -109,6 +113,7 @@ mod tests {
+         let toml = r#"
+             order = ["A", "B", "C"]
+             preserve = true
++            qualified_last = true
+             exclude = ["D", "E"]
+         "#;
+         let expected = config(&["A", "B", "C"], true, &["D", "E"]);
+@@ -122,6 +127,7 @@ mod tests {
+         Config {
+             order: Some(order.iter().map(|s| s.to_string()).collect()),
+             preserve: Some(preserve),
++            qualified_last: Some(preserve),
+             exclude: Some(exclude.iter().map(|s| s.to_string()).collect()),
+         }
+     }
+diff --git a/src/main.rs b/src/main.rs
+index e707d46..50b1df3 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -40,6 +40,10 @@ struct SortDerivesArgs {
+     #[clap(long)]
+     preserve: bool,
+ 
++    /// Sort path-qualified derives (e.g. `derive_more::Deref`) after unqualified ones
++    #[clap(long)]
++    qualified_last: bool,
++
+     /// Check if the derive attributes are sorted
+     #[clap(long)]
+     check: bool,
+@@ -91,6 +95,10 @@ fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
+     args.preserve || config.preserve.unwrap_or(false)
+ }
+ 
++fn read_qualified_last(config: &Config, args: &SortDerivesArgs) -> bool {
++    args.qualified_last || config.qualified_last.unwrap_or(false)
++}
++
+ fn read_exclude(config: &Config) -> Vec<String> {
+     config.exclude.clone().unwrap_or_default()
+ }
+@@ -101,6 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+     let custom_order = read_custom_order(&config, &args)?;
+     let preserve = read_preserve(&config, &args);
++    let qualified_last = read_qualified_last(&config, &args);
+     let exclude = read_exclude(&config);
+     let path = args.path;
+     let check = args.check;
+@@ -111,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
+         let mut input = String::new();
+         std::io::stdin().read_to_string(&mut input)?;
+         // stdin input is already the whole target, so file discovery via grep is not needed.
+-        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
++        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve, qualified_last)?;
+ 
+         if check {
+             if !process(
+@@ -133,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+     let mut no_diff = true;
+     for (file_path, line_numbers) in grep(path, exclude)? {
+-        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
++        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve, qualified_last)?;
+         no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
+     }
+ 
+diff --git a/src/sort.rs b/src/sort.rs
+index 64a626b..78c1a34 100644
+--- a/src/sort.rs
++++ b/src/sort.rs
+@@ -24,19 +24,27 @@ pub fn sort(
+     line_numbers: HashSet<usize>,
+     custom_order: &Option<Vec<String>>,
+     preserve: bool,
++    qualified_last: bool,
+ ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+     let file = std::fs::File::open(file_path)?;
+     let reader = std::io::BufReader::new(file);
+-    sort_reader(reader, Some(&line_numbers), custom_order, preserve)
++    sort_reader(
++        reader,
++        Some(&line_numbers),
++        custom_order,
++        preserve,
++        qualified_last,
++    )
+ }
+ 
+ pub fn sort_stdin(
+     input: &str,
+     custom_order: &Option<Vec<String>>,
+     preserve: bool,
++    qualified_last: bool,
+ ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+     let reader = std::io::Cursor::new(input);
+-    sort_reader(reader, None, custom_order, preserve)
++    sort_reader(reader, None, custom_order, preserve, qualified_last)
+ }
+ 
+ fn sort_reader<R: BufRead>(
+@@ -44,6 +52,7 @@ fn sort_reader<R: BufRead>(
+     line_numbers: Option<&HashSet<usize>>,
+     custom_order: &Option<Vec<String>>,
+     preserve: bool,
++    qualified_last: bool,
+ ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+     let capacity = line_numbers.map_or(0, HashSet::len);
+     let mut old_lines = Vec::with_capacity(capacity);
+@@ -59,7 +68,7 @@ fn sort_reader<R: BufRead>(
+         let should_sort = line_numbers.is_none_or(|line_numbers| line_numbers.contains(&n));
+         let new_line = if !disable_next_line && !disable_range && should_sort {
+             if let Some(derives) = parse_derive_traits(&line) {
+-                let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
++                let sorted_derives = sort_derive_traits(&derives, custom_order, preserve, qualified_last);
+                 replace_line(&line, &sorted_derives)
+             } else {
+                 line.clone()
+@@ -121,6 +130,7 @@ fn sort_derive_traits(
+     derives: &[DeriveTrait],
+     custom_order: &Option<Vec<String>>,
+     preserve: bool,
++    qualified_last: bool,
+ ) -> Vec<DeriveTrait> {
+     const IGNORE: &usize = &10_000; // large enough
+ 
+@@ -152,6 +162,13 @@ fn sort_derive_traits(
+         } else {
+             priority_a
+                 .cmp(priority_b)
++                .then_with(|| {
++                    if qualified_last {
++                        a.s.contains("::").cmp(&b.s.contains("::"))
++                    } else {
++                        std::cmp::Ordering::Equal
++                    }
++                })
+                 .then_with(|| a.base_name.cmp(&b.base_name))
+                 .then_with(|| a.s.cmp(&b.s))
+         }
+@@ -242,7 +259,7 @@ mod tests {
+             dt("foo::bar::Bar", "Bar"),
+         ];
+         let order = None;
+-        let actual = sort_derive_traits(&derives, &order, false);
++        let actual = sort_derive_traits(&derives, &order, false, false);
+         let expected = vec![
+             dt("foo::bar::Bar", "Bar"),
+             dt("std::clone::Clone", "Clone"),
+@@ -292,7 +309,7 @@ mod tests {
+             .map(Into::into)
+             .collect(),
+         );
+-        let actual = sort_derive_traits(&derives, &order, false);
++        let actual = sort_derive_traits(&derives, &order, false, false);
+         let expected = vec![
+             dt("Debug", "Debug"),
+             dt("std::clone::Clone", "Clone"),
+@@ -342,7 +359,7 @@ mod tests {
+             .map(Into::into)
+             .collect(),
+         );
+-        let actual = sort_derive_traits(&derives, &order, true);
++        let actual = sort_derive_traits(&derives, &order, true, false);
+         let expected = vec![
+             dt("Debug", "Debug"),
+             dt("std::clone::Clone", "Clone"),
+@@ -372,7 +389,7 @@ mod tests {
+             dt("G", "G"),
+         ];
+         let order = Some(vec!["...", "D", "A"].into_iter().map(Into::into).collect());
+-        let actual = sort_derive_traits(&derives, &order, false);
++        let actual = sort_derive_traits(&derives, &order, false, false);
+         let expected = vec![
+             // ellipsis
+             dt("B", "B"),
+@@ -404,7 +421,7 @@ mod tests {
+                 .map(Into::into)
+                 .collect(),
+         );
+-        let actual = sort_derive_traits(&derives, &order, false);
++        let actual = sort_derive_traits(&derives, &order, false, false);
+         let expected = vec![
+             // head
+             dt("B", "B"),
+@@ -432,7 +449,7 @@ mod tests {
+             dt("G", "G"),
+         ];
+         let order = Some(vec!["B", "G", "..."].into_iter().map(Into::into).collect());
+-        let actual = sort_derive_traits(&derives, &order, false);
++        let actual = sort_derive_traits(&derives, &order, false, false);
+         let expected = vec![
+             // head
+             dt("B", "B"),
+@@ -464,7 +481,7 @@ mod tests {
+                 .map(Into::into)
+                 .collect(),
+         );
+-        let actual = sort_derive_traits(&derives, &order, true);
++        let actual = sort_derive_traits(&derives, &order, true, false);
+         let expected = vec![
+             // head
+             dt("B", "B"),
