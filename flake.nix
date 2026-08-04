@@ -63,7 +63,7 @@ See individual component descriptions in their respective directories.'';
           inherit pkgs pname;
           rs = rsModule;
           enable = true;
-          lastSupportedVersion = "nightly-2025-10-10";
+          lastSupportedVersion = "nightly-${(import ./rs).nightly_version}";
           jobs = {
             default = true;
             errors.hooks = { push.paths = [ "src/**" ]; };

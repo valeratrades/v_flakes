@@ -21,7 +21,7 @@ in
 # Targets are the union of fleet needs (wasm frontends, musl static deploys):
 # an extra rust-std component is ~free, while omitting one in some repos would
 # fork the toolchain drv (see rpath note above).
-pkgs.rust-bin.nightly."2026-06-29".default.override {
+pkgs.rust-bin.nightly.${import ./nightly_version.nix}.default.override {
   extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
   targets = [ "wasm32-unknown-unknown" "x86_64-unknown-linux-musl" ];
 }
