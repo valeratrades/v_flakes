@@ -1,5 +1,5 @@
 diff --git a/src/config.rs b/src/config.rs
-index e6f2f60..4943d46 100644
+index e6f2f60..4029ab9 100644
 --- a/src/config.rs
 +++ b/src/config.rs
 @@ -10,6 +10,7 @@ const CONFIG_FILE_NAMES: &[&str] = &[".sort-derives.toml", "sort-derives.toml"];
@@ -46,7 +46,7 @@ index e6f2f60..4943d46 100644
          Config {
              order: Some(order.iter().map(|s| s.to_string()).collect()),
              preserve: Some(preserve),
-+            qualified_last: Some(preserve),
++            qualified_last: Some(true),
              exclude: Some(exclude.iter().map(|s| s.to_string()).collect()),
          }
      }
