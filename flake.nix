@@ -160,6 +160,7 @@ Generates README.md from docs/.readme_assets/ directory structure.
       js = import ./js;
       readme-fw = import ./readme_fw;
       utils = import ./utils;
+      qlty = import ./qlty.nix;
 
       # Backward compatibility aliases
       hooks = {
