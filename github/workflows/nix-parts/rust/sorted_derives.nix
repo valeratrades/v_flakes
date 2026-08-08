@@ -10,7 +10,9 @@
 			# locally and fail --check here.
 			name = "Assert derives are sorted";
 			run = ''
-				nix run github:valeratrades/v_flakes#cargo-sort-derives -- --check
+				# `sort-derives` is argv[1] here: the binary is a cargo subcommand, and `nix run` invokes
+				# it directly rather than through `cargo`, so nothing else supplies that word.
+				nix run github:valeratrades/v_flakes#cargo-sort-derives -- sort-derives --check
 				exit_code=$?
 				if [ $exit_code != 0 ]; then
 					echo "Derives are not sorted. Run \`cargo sort-derives\` to fix it."
