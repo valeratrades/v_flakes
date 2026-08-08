@@ -1,9 +1,9 @@
 {
   description = ''
-# Nix parts collection
+    # Nix parts collection
 
-Collection of reusable Nix components.
-See individual component descriptions in their respective directories.'';
+    Collection of reusable Nix components.
+    See individual component descriptions in their respective directories.'';
 
   # Revs must equal ./default_nixpkgs.nix and ./default_rust_overlay.nix (asserted
   # below). Flake inputs can't reference those files, so they are restated here —
@@ -46,104 +46,115 @@ See individual component descriptions in their respective directories.'';
         js = (import ./js { inherit nixpkgs; }).description;
       };
     in
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ (import rust-overlay) ];
-          config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "drawio" ];
-        };
-        rust = (import ./rs).default_nightly system;
-        stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
-        utils = import ./utils;
-        files = import ./files;
-
-        rsModule = (import ./rs) { inherit pkgs rust; };
-        github = (import ./github) {
-          inherit pkgs pname;
-          rs = rsModule;
-          enable = true;
-          lastSupportedVersion = "nightly-${(import ./rs).nightly_version}";
-          jobs = {
-            default = true;
-            errors.hooks = { push.paths = [ "src/**" ]; };
-            warnings.hooks = { push.paths = [ "src/**" ]; };
+    flake-utils.lib.eachDefaultSystem
+      (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ (import rust-overlay) ];
+            config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "drawio" ];
           };
-          release = {
-            hooks = { push.branches = [ "main" ]; };
-            gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
-          };
-        };
-        readme = (import ./readme_fw) {
-          inherit pkgs pname;
-          rootDir = ./.;
-          lastSupportedVersion = null;
-          defaults = true;
-          badges = [ "ci" ];
-        };
-        combined = utils.combine {
-          inherit rust;
-          modules = [
-            rsModule
-            github
-            readme
-            { shellHook = utils.mkShellHook ''
-                cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
-              '';
-            }
-          ];
-        };
-      in
-      {
-        # Exposed as a package (not just `rs.sort_derives`) so CI can `nix run` the same
-        # binary the dev shells get, instead of a divergent upstream build.
-        packages.cargo-sort-derives = (import ./rs).sort_derives system;
-        packages.cargo-machete = (import ./rs).machete system;
+          rust = (import ./rs).default_nightly system;
+          stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
+          utils = import ./utils;
+          files = import ./files;
 
-        devShells.default = pkgs.mkShell {
-          inherit stdenv;
-          packages = with pkgs; [ curl mold rust ] ++ combined.enabledPackages;
-          shellHook = ''
-            # Guard first: combined.shellHook aborts (exit 1) the entire hook
-            # unless we are anchored at the repo root, so nothing below runs
-            # — and pollutes a subdirectory — when invoked from elsewhere.
-            ${combined.shellHook}
-            _bump_script="./__scripts/bump_crate.rs"
-            ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
-            ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
-            # Bootstrap: build our own binaries and put them on PATH for local testing
-            cargo b -q 2>/dev/null
-            export PATH="$PWD/target/debug:$PATH"
-          '';
-          env.RUST_BACKTRACE = 1;
-        };
-      }
-    ) // {
+          rsModule = (import ./rs) { inherit pkgs rust; };
+          github = (import ./github) {
+            inherit pkgs pname;
+            rs = rsModule;
+            enable = true;
+            lastSupportedVersion = "nightly-${(import ./rs).nightly_version}";
+            jobs = {
+              default = true;
+              errors.hooks = { push.paths = [ "src/**" ]; };
+              warnings.hooks = { push.paths = [ "src/**" ]; };
+            };
+            release = {
+              hooks = { push.branches = [ "main" ]; };
+              gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
+            };
+          };
+          readme = (import ./readme_fw) {
+            inherit pkgs pname;
+            rootDir = ./.;
+            lastSupportedVersion = null;
+            defaults = true;
+            badges = [ "ci" ];
+          };
+          # Dogfooding: this repo consumes its own commit-msg hook.
+          preCommitCheck = pre-commit-hooks.lib.${system}.run (files.preCommit {
+            inherit pkgs;
+            stripClaudeSignature = true;
+          });
+          combined = utils.combine {
+            inherit rust;
+            modules = [
+              rsModule
+              github
+              readme
+              {
+                shellHook = utils.mkShellHook ''
+                  cp -f ${(files.gitignore { inherit pkgs; langs = [ "rs" ];})} ./.gitignore
+                '';
+              }
+            ];
+          };
+        in
+        {
+          # Exposed as a package (not just `rs.sort_derives`) so CI can `nix run` the same
+          # binary the dev shells get, instead of a divergent upstream build.
+          packages.cargo-sort-derives = (import ./rs).sort_derives system;
+          packages.cargo-machete = (import ./rs).machete system;
+
+          devShells.default = pkgs.mkShell {
+            inherit stdenv;
+            packages = with pkgs; [ curl mold rust ] ++ preCommitCheck.enabledPackages ++ combined.enabledPackages;
+            shellHook = ''
+              # Before combined: append_custom.rs only patches .git/hooks/pre-commit
+              # if it already exists, and this is what writes it.
+              ${preCommitCheck.shellHook}
+              # Guard first: combined.shellHook aborts (exit 1) the entire hook
+              # unless we are anchored at the repo root, so nothing below runs
+              # — and pollutes a subdirectory — when invoked from elsewhere.
+              ${combined.shellHook}
+              cp -f ${files.treefmt { inherit pkgs; }} ./.treefmt.toml
+              _bump_script="./__scripts/bump_crate.rs"
+              ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
+              ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
+              # Bootstrap: build our own binaries and put them on PATH for local testing
+              cargo b -q 2>/dev/null
+              export PATH="$PWD/target/debug:$PATH"
+            '';
+            env.RUST_BACKTRACE = 1;
+          };
+        }
+      ) // {
       description = ''
-## Files
-${parts.files}
+        ## Files
+        ${parts.files}
 
-## GitHub
-${parts.github}
+        ## GitHub
+        ${parts.github}
 
-## Rust
-${parts.rs}
+        ## Rust
+        ${parts.rs}
 
-## Python
-${parts.py}
+        ## Python
+        ${parts.py}
 
-## LaTeX
-${parts.tex}
+        ## LaTeX
+        ${parts.tex}
 
-## Typst
-${parts.typ}
+        ## Typst
+        ${parts.typ}
 
-## JavaScript
-${parts.js}
+        ## JavaScript
+        ${parts.js}
 
-## Readme Framework
-Generates README.md from docs/.readme_assets/ directory structure.
-'';
+        ## Readme Framework
+        Generates README.md from docs/.readme_assets/ directory structure.
+      '';
 
       default_nixpkgs = import ./default_nixpkgs.nix;
       # Re-exported so consumers pin one input (v_flakes) instead of each carrying

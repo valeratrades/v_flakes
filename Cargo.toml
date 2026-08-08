@@ -14,16 +14,6 @@ pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 bin-dir = "{ bin }{ binary-ext }"
 pkg-fmt = "tgz"
 
-[lints.rust]
-unused_features = "allow"
-
-[lints.clippy]
-float_cmp = "allow"
-len_zero = "allow"
-comparison_to_empty = "allow"
-undocumented_unsafe_blocks = "warn"
-tabs_in_doc_comments = "allow"
-
 [features]
 toml = ["dep:clap", "dep:toml_edit"]
 
@@ -35,3 +25,13 @@ toml_edit = { version = "0.25", optional = true }
 insta = "1"
 toml_edit = "0.25"
 v_fixtures.version = "0.3.4"
+
+[lints.rust]
+unused_features = "allow"
+
+[lints.clippy]
+float_cmp = "allow"
+len_zero = "allow"
+comparison_to_empty = "allow"
+undocumented_unsafe_blocks = "warn"
+tabs_in_doc_comments = "allow"
