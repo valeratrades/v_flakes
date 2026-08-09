@@ -24,6 +24,11 @@
   # ~800MB of duplicate store paths in EVERY repo consuming v_flakes, devenv or not.
   inputs.devenv.inputs.cachix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.devenv.inputs.nix.inputs.nixpkgs.follows = "nixpkgs";
+  # devenv's subtree pins its own git-hooks.nix / flake-parts / flake-compat at
+  # revs we already carry — ~700KB of second copies in every consumer's lock.
+  inputs.devenv.inputs.git-hooks.follows = "pre-commit-hooks";
+  inputs.devenv.inputs.flake-compat.follows = "pre-commit-hooks/flake-compat";
+  inputs.devenv.inputs.nix.inputs.flake-parts.follows = "flake-parts";
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv }:
     assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
