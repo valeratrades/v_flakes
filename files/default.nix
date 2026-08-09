@@ -4,7 +4,7 @@
   licenses = {
     blue_oak = { name = "Blue Oak 1.0.0"; path = ./licenses/blue_oak.md; };
     agpl = { name = "AGPL-3.0"; path = ./licenses/agpl.txt; };
-    nsfw = { name = "GLWTS"; path = ./licenses/nsfw.txt; };
+    gl = { name = "GLWTS"; path = ./licenses/glwts.txt; };
   };
   preCommit = import ./pre_commit.nix;
   treefmt = import ./treefmt.nix;
@@ -13,17 +13,17 @@
     deny = import ./rust/deny.nix;
     toolchain = import ./rust/toolchain.nix;
     config = import ./rust/config.nix;
-		clippy = import ./rust/clippy.nix;
-		sort_derives = import ./rust/sort_derives.nix;
-		lints = import ./rust/lints.nix;
-		build = import ./rust/build.nix;
+    clippy = import ./rust/clippy.nix;
+    sort_derives = import ./rust/sort_derives.nix;
+    lints = import ./rust/lints.nix;
+    build = import ./rust/build.nix;
   };
   python = {
     ruff = import ./python/ruff.nix;
   };
-	golang = {
-		gofumpt = import ./golang/gofumpt.nix;
-	};
+  golang = {
+    gofumpt = import ./golang/gofumpt.nix;
+  };
   gitignore = import ./gitignore.nix;
   gitattributes = import ./gitattributes.nix;
 }
