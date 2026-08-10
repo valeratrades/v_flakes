@@ -40,6 +40,7 @@
       # Use partial semver (major.minor) - patch versions auto-resolve via cargo-binstall
       traceyVersion = "1.3";
       codestyleVersion = "0.2";
+      steCheckerVersion = "0.1";
 
       parts = {
         files = (import ./files).description;
@@ -127,6 +128,7 @@
               _bump_script="./__scripts/bump_crate.rs"
               ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
+              ${utils.checkCrateVersion { name = "ste_checker"; currentVersion = steCheckerVersion; bumpScript = "$_bump_script"; }}
               # Bootstrap: build our own binaries and put them on PATH for local testing
               cargo b -q 2>/dev/null
               export PATH="$PWD/target/debug:$PATH"

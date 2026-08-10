@@ -13,17 +13,17 @@ let
   # Default width for logo images when not specified in the logo file
   defaultLogoWidth = "25%";
 in
-args@{
-  pkgs,
-  rootDir,
-  pname,
-  badges,
-  lastSupportedVersion,
-  defaults ? false,
-  default ? defaults,
-  licenses ? null,
-  gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb",
-  branch ? "main",
+args@{ pkgs
+, rootDir
+, pname
+, badges
+, lastSupportedVersion
+, defaults ? false
+, default ? defaults
+, licenses ? null
+, gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
+, branch ? "main"
+,
 }:
 
 let
@@ -47,13 +47,15 @@ assert builtins.isAttrs pkgs && builtins.hasAttr "lib" pkgs && builtins.hasAttr 
 assert builtins.isPath rootDir;
 assert builtins.isString pname && pname != "";
 assert builtins.isList licensesNormalized && licensesNormalized != [ ];
-assert builtins.all (
-  item: builtins.isAttrs item
-    && builtins.hasAttr "outPath" item && builtins.isString item.outPath && item.outPath != ""
-    && builtins.hasAttr "license" item && builtins.isAttrs item.license
-    && builtins.hasAttr "name" item.license && builtins.isString item.license.name
-    && builtins.hasAttr "path" item.license
-) licensesNormalized;
+assert builtins.all
+  (
+    item: builtins.isAttrs item
+      && builtins.hasAttr "outPath" item && builtins.isString item.outPath && item.outPath != ""
+      && builtins.hasAttr "license" item && builtins.isAttrs item.license
+      && builtins.hasAttr "name" item.license && builtins.isString item.license.name
+      && builtins.hasAttr "path" item.license
+  )
+  licensesNormalized;
 assert !hasDuplicates || throw "licenses have duplicate outPaths: ${builtins.concatStringsSep ", " outPaths}";
 assert builtins.isList badges && badges != [ ];
 assert builtins.all builtins.isString badges;
@@ -87,15 +89,16 @@ let
             if hasWidth then line
             else builtins.replaceStrings [ "<img " ] [ ''<img width="${defaultLogoWidth}" '' ] line
           else
-            # For markdown images, wrap in HTML with defaultLogoWidth
+          # For markdown images, wrap in HTML with defaultLogoWidth
             let
               match = builtins.match "!\\[([^]]*)\\]\\(([^)]+)\\)" line;
             in
-              if match != null then
-                ''<img src="${builtins.elemAt match 1}" alt="${builtins.elemAt match 0}" width="${defaultLogoWidth}">''
-              else
-                line;
-      in withFixedWidth;
+            if match != null then
+              ''<img src="${builtins.elemAt match 1}" alt="${builtins.elemAt match 0}" width="${defaultLogoWidth}">''
+            else
+              line;
+      in
+      withFixedWidth;
 
   #Q: theoretically could have this thing right here count the LoC itself. Could be cleaner.
   badgeModule = import ./badges.nix {
@@ -158,15 +161,16 @@ let
         if state.inBlock then
           let parts = pkgs.lib.splitString close s;
           in if builtins.length parts == 1 then state
-            else scan (state // { inBlock = false; }) (builtins.concatStringsSep close (builtins.tail parts))
+          else scan (state // { inBlock = false; }) (builtins.concatStringsSep close (builtins.tail parts))
         else
           let
             parts = pkgs.lib.splitString open s;
             beforeOpen = builtins.head parts;
             code = if lineMark == null then beforeOpen else builtins.head (pkgs.lib.splitString lineMark beforeOpen);
             state' = state // { found = state.found || !(isBlank code); };
-          in if builtins.length parts == 1 then state'
-            else scan (state' // { inBlock = true; }) (builtins.concatStringsSep open (builtins.tail parts));
+          in
+          if builtins.length parts == 1 then state'
+          else scan (state' // { inBlock = true; }) (builtins.concatStringsSep open (builtins.tail parts));
     in
     (builtins.foldl' scan { inBlock = false; found = false; } (pkgs.lib.splitString "\n" text)).found;
 
@@ -176,11 +180,14 @@ let
     in builtins.pathExists fullPath && hasContent relPath (builtins.readFile fullPath);
 
   processSection =
-    {
-      path, # Regex pattern for file(s) relative to root
-      optional ? false, # Whether to warn on missing source for a section
-      transform ? (content: actualPath: content), # Function that transforms content, taking actual path
-      demoteHeaders ? true, # Whether to demote markdown headers by one level
+    { path
+    , # Regex pattern for file(s) relative to root
+      optional ? false
+    , # Whether to warn on missing source for a section
+      transform ? (content: actualPath: content)
+    , # Function that transforms content, taking actual path
+      demoteHeaders ? true
+    , # Whether to demote markdown headers by one level
     }:
     let
       # Get directory and pattern from path
@@ -206,14 +213,15 @@ let
           isMd = pkgs.lib.hasSuffix ".md" singlePath;
 
           # For .typ files, compile to markdown using pandoc (which can read typst)
-          typstContent = if isTyp && exists then
-            let
-              typFile = builtins.path { path = fullPath; };
-            in
-            builtins.readFile (pkgs.runCommand "typst-to-markdown" { buildInputs = [ pkgs.pandoc ]; } ''
-              pandoc -f typst -t gfm ${typFile} -o $out
-            '')
-          else "";
+          typstContent =
+            if isTyp && exists then
+              let
+                typFile = builtins.path { path = fullPath; };
+              in
+              builtins.readFile (pkgs.runCommand "typst-to-markdown" { buildInputs = [ pkgs.pandoc ]; } ''
+                pandoc -f typst -t gfm ${typFile} -o $out
+              '')
+            else "";
 
           rawContent =
             if isTyp && exists then
@@ -225,12 +233,13 @@ let
             else
               builtins.trace "WARNING: ${toString fullPath} is missing" "TODO";
 
-          contentWithPaths = if isMd && exists then
-            builtins.replaceStrings
-              [ "(../../" "(./"  "(../"       "[../../" "[./"  "[../"       " ../../" " ./"  " ../"      ]
-              [ "(./"     "(./docs/.readme_assets/" "(./docs/" "[./"     "[./docs/.readme_assets/" "[./docs/" " ./"  " ./docs/.readme_assets/" " ./docs/" ]
-              rawContent
-          else rawContent;
+          contentWithPaths =
+            if isMd && exists then
+              builtins.replaceStrings
+                [ "(../../" "(./" "(../" "[../../" "[./" "[../" " ../../" " ./" " ../" ]
+                [ "(./" "(./docs/.readme_assets/" "(./docs/" "[./" "[./docs/.readme_assets/" "[./docs/" " ./" " ./docs/.readme_assets/" " ./docs/" ]
+                rawContent
+            else rawContent;
 
           # Demote all markdown headers by one level (# -> ##, ## -> ###, etc.)
           # Tracks whether we're inside a ``` code block to avoid demoting comments
@@ -238,14 +247,17 @@ let
             let
               lines = pkgs.lib.splitString "\n" text;
               isCodeFence = line: builtins.match "^```.*" line != null;
-              processLines = builtins.foldl' (acc: line:
-                let
-                  inCode = if isCodeFence line then !acc.inCode else acc.inCode;
-                  isHeader = builtins.match "^(#+) .*" line != null;
-                  newLine = if isHeader && !acc.inCode then "#" + line else line;
-                in
-                { inCode = inCode; result = acc.result ++ [ newLine ]; }
-              ) { inCode = false; result = []; } lines;
+              processLines = builtins.foldl'
+                (acc: line:
+                  let
+                    inCode = if isCodeFence line then !acc.inCode else acc.inCode;
+                    isHeader = builtins.match "^(#+) .*" line != null;
+                    newLine = if isHeader && !acc.inCode then "#" + line else line;
+                  in
+                  { inCode = inCode; result = acc.result ++ [ newLine ]; }
+                )
+                { inCode = false; result = [ ]; }
+                lines;
             in
             builtins.concatStringsSep "\n" processLines.result;
 
@@ -279,9 +291,9 @@ let
 
   hasMermaid = builtins.pathExists (rootDir + "/docs/.readme_assets/arch.mermaid");
   readmeAssetsDir = rootDir + "/docs/.readme_assets";
-  readmeAssetFiles = if builtins.pathExists readmeAssetsDir then builtins.attrNames (builtins.readDir readmeAssetsDir) else [];
+  readmeAssetFiles = if builtins.pathExists readmeAssetsDir then builtins.attrNames (builtins.readDir readmeAssetsDir) else [ ];
   archPngFiles = builtins.filter (name: builtins.match "arch(_[0-9]+)?\\.png" name != null) readmeAssetFiles;
-  hasPng = archPngFiles != [];
+  hasPng = archPngFiles != [ ];
   archCount = (if hasMermaid then 1 else 0) + (if hasPng then 1 else 0);
 
   arch_out =
@@ -355,16 +367,16 @@ ${content}
 ```'';
           in
           ''
-<!-- markdownlint-disable -->
-<details>
-<summary>
-<${headerTag}>${headerText}</${headerTag}>
-</summary>
+            <!-- markdownlint-disable -->
+            <details>
+            <summary>
+            <${headerTag}>${headerText}</${headerTag}>
+            </summary>
 
-${contentRendered}
+            ${contentRendered}
 
-</details>
-<!-- markdownlint-restore -->'';
+            </details>
+            <!-- markdownlint-restore -->'';
         optional = true;
       };
     in
@@ -378,12 +390,13 @@ ${contentRendered}
         fileName = builtins.baseNameOf path;
         fileExt = builtins.elemAt (pkgs.lib.splitString "." fileName) 1;
         isSh = fileExt == "sh";
-        contentRendered = if isSh then
-          ''```sh
+        contentRendered =
+          if isSh then
+            ''```sh
 ${content}
 ```''
-        else
-          content;
+          else
+            content;
       in
       ''
         ## Usage
@@ -401,10 +414,11 @@ ${content}
     else
       builtins.trace "WARNING: docs/ARCHITECTURE.md is missing. Consider adding one, following https://matklad.github.io/2021/02/06/ARCHITECTURE.md.html" false;
 
-  architectureSentence = if architectureExists then
-    " For project's architecture, see <a href=\"./docs/ARCHITECTURE.md\">ARCHITECTURE.md</a>."
-  else
-    "";
+  architectureSentence =
+    if architectureExists then
+      " For project's architecture, see <a href=\"./docs/ARCHITECTURE.md\">ARCHITECTURE.md</a>."
+    else
+      "";
 
   best_practices_out = pkgs.runCommand "" { } ''
     		cat > $out <<'EOF'
@@ -477,13 +491,13 @@ ${content}
     '';
 
   readme = builtins.seq _warnUnrecognized (pkgs.runCommand "README.md" { } ''
-    cat > $out <<'README_EOF'
-${warning_out}${builtins.readFile badges_out}
-${description_out}${installation_out}
-${usage_out}${arch_out}${other_out}
-${builtins.readFile best_practices_out}
-${builtins.readFile licenses_out}
-README_EOF
+        cat > $out <<'README_EOF'
+    ${warning_out}${builtins.readFile badges_out}
+    ${description_out}${installation_out}
+    ${usage_out}${arch_out}${other_out}
+    ${builtins.readFile best_practices_out}
+    ${builtins.readFile licenses_out}
+    README_EOF
   '');
 
   # Expected loc badge URL for this pname/gistId
@@ -499,22 +513,38 @@ README_EOF
       # Run init-loc-gist only if loc badge is used AND README exists with a DIFFERENT loc badge URL
       # (indicates project was renamed). Don't run if README doesn't exist or has no loc badge -
       # the CI workflow will create the gist file on first push.
-      locGistCheck = if hasLocBadge then ''
-        if [ -f ./README.md ] && grep -qF "gist.githubusercontent.com/valeratrades/${gistId}/raw/" ./README.md && ! grep -qF "${expectedLocBadge}" ./README.md; then
-          ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
-        fi
-      '' else "";
+      locGistCheck =
+        if hasLocBadge then ''
+          if [ -f ./README.md ] && grep -qF "gist.githubusercontent.com/valeratrades/${gistId}/raw/" ./README.md && ! grep -qF "${expectedLocBadge}" ./README.md; then
+            ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
+          fi
+        '' else "";
       # `origin` is the only place owner/repo actually lives; a repo that has never
       # been pushed has no correct answer, so refuse rather than guess an owner.
-      ciSlugResolve = if hasCiBadge then ''
-        __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
-        case "$__slug" in
-          */*) ;;
-          *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; CI badges need it)" >&2; exit 1 ;;
-        esac
-        sed -i "s#@@REPO_SLUG@@#$__slug#g" ./README.md
-        unset __slug
-      '' else "";
+      ciSlugResolve =
+        if hasCiBadge then ''
+          __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+          case "$__slug" in
+            */*) ;;
+            *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; CI badges need it)" >&2; exit 1 ;;
+          esac
+          sed -i "s#@@REPO_SLUG@@#$__slug#g" ./README.md
+          unset __slug
+        '' else "";
+      # `.sh` assets are shell scripts, not prose; `.typ` needs harper-typst.
+      # ste_checker exits 0 without --deny, so nothing here gates the shell — but a
+      # failed install must not brick every repo's dev shell, hence the command guard.
+      steCheck = ''
+        ${utils.binstallCrate { name = "ste_checker"; }}
+        __ste_targets=""
+        for __f in docs/.readme_assets/usage.md docs/.readme_assets/install*.md; do
+          if [ -f "$__f" ]; then __ste_targets="$__ste_targets $__f"; fi
+        done
+        if [ -n "$__ste_targets" ] && command -v ste_checker >/dev/null; then
+          ste_checker $__ste_targets
+        fi
+        unset __ste_targets __f
+      '';
     in
     utils.mkShellHook ''
       ${locGistCheck}
@@ -532,9 +562,12 @@ README_EOF
       [ -n "$(ls docs/.readme_assets/other.* 2>/dev/null)" ] || : > docs/.readme_assets/other.md
       cp -f ${readme} ./README.md
       ${ciSlugResolve}
+      ${steCheck}
     '';
 in
 {
   inherit readme shellHook init_loc_gist;
-  enabledPackages = [ init_loc_gist pkgs.tokei ];
+  # curl + cargo-binstall are for the ste_checker install in `shellHook`; readme_fw
+  # is used in repos that don't include the `rs` module, which is what ships them otherwise.
+  enabledPackages = [ init_loc_gist pkgs.tokei pkgs.curl pkgs.cargo-binstall ];
 }

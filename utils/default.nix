@@ -16,12 +16,13 @@ let
   # plain strings into `combine` (which would silently bypass the guard).
   unwrapShellHook = h:
     if builtins.isAttrs h && h ? __vFlakesHook then h.__vFlakesHook
-    else throw ''
-      v_flakes: shellHook must be constructed via utils.mkShellHook.
-      Got: ${if builtins.isString h
-             then "a plain string (use `utils.mkShellHook \"...\"` to wrap it)"
-             else builtins.typeOf h}
-    '';
+    else
+      throw ''
+        v_flakes: shellHook must be constructed via utils.mkShellHook.
+        Got: ${if builtins.isString h
+               then "a plain string (use `utils.mkShellHook \"...\"` to wrap it)"
+               else builtins.typeOf h}
+      '';
 
   # Helper to allow both `default` and `defaults` as aliases for the same attribute.
   # When one is provided, both are set to the same value. When neither is provided, neither is set
@@ -42,7 +43,7 @@ let
     if !isSecret then s else
     let len = builtins.stringLength s;
     in if len < 8 then "[REDACTED]"
-       else (builtins.substring 0 2 s) + "..." + (builtins.substring (len - 2) 2 s);
+    else (builtins.substring 0 2 s) + "..." + (builtins.substring (len - 2) 2 s);
 
   maskSh = ''
     _mask() {
@@ -91,6 +92,11 @@ let
     unset -f _v_flakes_cargo
   '';
 
+  # crates.io answers 403 to requests without a User-Agent naming a contact:
+  # https://crates.io/data-access. `curl -sf` reports that as an empty body, which
+  # every caller below reads as "no newer version" — silent, and wrong.
+  cratesIoAgent = "v_flakes (https://github.com/valeratrades/v_flakes)";
+
   # Generate shell command to check if a crate is outdated and auto-bump
   # Uses crates.io API to get latest version, with proper semver comparison
   # If outdated and bumpScript is provided, runs the script to update
@@ -104,7 +110,7 @@ let
   checkCrateVersion = { name, currentVersion, bumpScript ? null, mode ? "binstall", versionVarPostfix ? "Version" }: ''
     _check_crate_${builtins.replaceStrings ["-"] ["_"] name}() {
       local latest
-      latest=$(curl -sf "https://crates.io/api/v1/crates/${name}" 2>/dev/null | \
+      latest=$(curl -sf -A "${cratesIoAgent}" "https://crates.io/api/v1/crates/${name}" 2>/dev/null | \
         grep -o '"newest_version":"[^"]*"' | head -1 | cut -d'"' -f4)
       if [ -n "$latest" ]; then
         # Parse semver components (handles X.Y.Z, ignores pre-release suffixes)
@@ -129,6 +135,27 @@ let
     }
     _check_crate_${builtins.replaceStrings ["-"] ["_"] name}
   '';
+
+  # Install/upgrade a crates.io binary into ~/.cargo/bin, prebuilt when the crate
+  # publishes binstall tarballs and from source when it does not. Queries crates.io
+  # for the newest version and skips the work when that is already what is installed.
+  #
+  # NB: $HOME/.cargo/bin is *appended*, not prepended, on purpose. Prepending would
+  # put the rustup shim ahead of the nix-provided cargo, and rustup would then
+  # dispatch every `cargo` call to a rustup toolchain — which can be broken (e.g.
+  # its ELF interpreter is a nix-store glibc that got GC'd), surfacing as
+  # `error: command failed: 'cargo' / No such file or directory` right here.
+  binstallCrate = { name }:
+    let var = builtins.replaceStrings [ "-" ] [ "_" ] name; in ''
+      case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$PATH:$HOME/.cargo/bin" ;; esac
+      _${var}_installed=$(cargo install --list 2>/dev/null | grep "^${name} v" | grep -oP '\d+\.\d+\.\d+' || echo "")
+      _${var}_latest=$(curl -sf -A "${cratesIoAgent}" "https://crates.io/api/v1/crates/${name}" 2>/dev/null | grep -o '"newest_version":"[^"]*"' | head -1 | cut -d'"' -f4)
+      if [ -n "$_${var}_latest" ] && [ "$_${var}_installed" != "$_${var}_latest" ]; then
+        echo "Installing ${name}@$_${var}_latest..."
+        cargo binstall "${name}@$_${var}_latest" --no-confirm -q 2>/dev/null || cargo install "${name}@$_${var}_latest" -q
+      fi
+      unset _${var}_installed _${var}_latest
+    '';
 in
 {
   setDefaultEnv = { name, default, is_secret ? false }:
@@ -172,21 +199,22 @@ in
   # A private repo on a Free-plan org can't see org secrets, so an empty value there
   # most likely means "set org-wide but unreachable" rather than "never set" — the
   # message branches on github.event.repository.private to say which.
-  requireSecret = { name, hint ? [] }: {
+  requireSecret = { name, hint ? [ ] }: {
     name = "Ensure ${name} secret is configured";
     env = { ${name} = "\${{ secrets.${name} }}"; };
-    run = builtins.concatStringsSep "\n" ([
-      "if [ -z \"\${${name}}\" ]; then"
-      "  echo \"::error::Secret '${name}' is not set (empty in this job).\""
-      "  if [ \"\${{ github.event.repository.private }}\" = \"true\" ]; then"
-      "    echo \"::error::This repo is PRIVATE. On GitHub Free-plan orgs, organization secrets are NOT exposed to private repos — if '${name}' is set org-wide it still won't reach here. Fix: set it repo-level (gh secret set ${name} -R \${{ github.repository }}), or upgrade the org to Team/Enterprise.\""
-      "  else"
-      "    echo \"::error::Add it under Settings → Secrets and variables → Actions (repo-level, or org-level with 'All repositories' visibility — org secrets reach public repos on any plan).\""
-      "  fi"
-    ] ++ (map (l: "  echo \"::error::${l}\"") hint) ++ [
-      "  exit 1"
-      "fi"
-    ]) + "\n";
+    run = builtins.concatStringsSep "\n"
+      ([
+        "if [ -z \"\${${name}}\" ]; then"
+        "  echo \"::error::Secret '${name}' is not set (empty in this job).\""
+        "  if [ \"\${{ github.event.repository.private }}\" = \"true\" ]; then"
+        "    echo \"::error::This repo is PRIVATE. On GitHub Free-plan orgs, organization secrets are NOT exposed to private repos — if '${name}' is set org-wide it still won't reach here. Fix: set it repo-level (gh secret set ${name} -R \${{ github.repository }}), or upgrade the org to Team/Enterprise.\""
+        "  else"
+        "    echo \"::error::Add it under Settings → Secrets and variables → Actions (repo-level, or org-level with 'All repositories' visibility — org secrets reach public repos on any plan).\""
+        "  fi"
+      ] ++ (map (l: "  echo \"::error::${l}\"") hint) ++ [
+        "  exit 1"
+        "fi"
+      ]) + "\n";
   };
 
   # Default GitHub Actions `on` triggers for standard CI workflows.
@@ -197,7 +225,7 @@ in
     pull_request = { };
   };
 
-  inherit checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
+  inherit binstallCrate checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
   inherit (core) mergeConfig;
 
   # Combine multiple v-utils modules into a single shell configuration
@@ -266,7 +294,7 @@ in
         fi
         unset _vf_nix _vf_cand
       '';
-      getPackages = m: m.enabledPackages or [];
+      getPackages = m: m.enabledPackages or [ ];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
       # if a plain string slipped in — that's a programmer error we want loud.
       getHook = m: if m ? shellHook then unwrapShellHook m.shellHook else "";
