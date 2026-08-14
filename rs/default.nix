@@ -5,4 +5,5 @@
   sort_derives = import ./sort_derives.nix;
   machete = import ./machete.nix;
   cpublish = import ./cpublish.nix;
+  diet = import ./diet.nix;
 }

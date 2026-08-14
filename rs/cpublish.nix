@@ -1,26 +1,32 @@
 # `cargo release` behind a gate: the include directives `cargo diet` derives are a function of the
-# tree, so a release cut before they are refreshed publishes a tarball nobody reviewed. Diet writes
-# them, we refuse to release while that write is uncommitted.
-pkgs:
+# tree, so a release cut before they are refreshed publishes a tarball nobody reviewed.
+#
+# `-n -r`: diet's input is `cargo package --list`, which itself honours the include already in the
+# manifest — so without `-r` diet never sees a file added outside it and reports "lean" forever.
+# `-r` restores full visibility, and `-n` makes it a read: diet clears the manifest only long
+# enough to take the listing, then writes the original bytes back. Deciding what to do about a
+# reported change is the human's, so nothing here rewrites a manifest.
+pkgs: diet:
 pkgs.writeShellApplication {
   name = "cpublish";
-  runtimeInputs = with pkgs; [ cargo-diet cargo-release git jq ];
+  runtimeInputs = [ diet pkgs.cargo-release pkgs.git ];
   # No rust here: cargo must be the repo's own toolchain, not one we pin.
   text = ''
     cd "$(git rev-parse --show-toplevel)"
 
-    changed=()
-    while read -r dir; do
-      before="$(sha256sum <"$dir/Cargo.toml")"
-      (cd "$dir" && cargo diet -q -r)
-      [ "$before" = "$(sha256sum <"$dir/Cargo.toml")" ] || changed+=("$dir/Cargo.toml")
-    done < <(cargo metadata --no-deps --format-version 1 \
-      | jq -r '.workspace_default_members[]' | sed 's/#.*//; s|^path+file://||')
-
-    if [ ''${#changed[@]} -gt 0 ]; then
-      echo "cpublish: cargo diet rewrote ''${changed[*]} — review and commit, then re-run" >&2
-      exit 1
-    fi
+    report="$(cargo diet -n -r)"
+    case "$report" in
+      *"WOULD be made"*)
+        printf '%s\n' "$report" >&2
+        echo "cpublish: cargo diet has include directives to rewrite — apply and commit them, then re-run" >&2
+        exit 1 ;;
+      *"There would be no change."*) ;;
+      # Neither phrase means diet's output format moved under us and the gate is no longer reading
+      # anything — a gate that cannot tell must not pass.
+      *) printf '%s\n' "$report" >&2
+         echo "cpublish: could not read cargo diet's verdict from its output" >&2
+         exit 1 ;;
+    esac
 
     exec cargo release --no-confirm --execute "$@"
   '';

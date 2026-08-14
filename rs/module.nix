@@ -135,8 +135,8 @@ if nixpkgs != null && pkgs == null then {
     - `tracey` - spec coverage tool (if tracey = true)
     - `codestyle` - code style linter and formatter (if style.format or style.check is true)
     - `cargo-diet`, `cargo-release`, and `cpublish` — `cargo release --no-confirm --execute`,
-      refusing to run while `cargo diet` still has include directives to rewrite in any
-      workspace default member.
+      refusing to run while `cargo diet` still has include directives to rewrite. The check is a
+      read (`cargo diet -n -r`); applying and committing the rewrite is yours.
   '';
 } else
 
@@ -147,6 +147,7 @@ if nixpkgs != null && pkgs == null then {
     files = import ../files;
     core = import ../utils/core.nix;
     utils = import ../utils;
+    diet = (import ./diet.nix) pkgs.stdenv.hostPlatform.system;
 
     buildEnable = build.enable or true;
     workspace = build.workspace or { "./" = [ "git_version" "log_directives" ]; };
@@ -249,6 +250,6 @@ if nixpkgs != null && pkgs == null then {
     '';
 
     # cargo-binstall for tracey and codestyle
-    enabledPackages = [ pkgs.cargo-binstall pkgs.cargo-diet pkgs.cargo-release ((import ./cpublish.nix) pkgs) ];
+    enabledPackages = [ pkgs.cargo-binstall diet pkgs.cargo-release ((import ./cpublish.nix) pkgs diet) ];
     traceyCheck = tracey;
   }
