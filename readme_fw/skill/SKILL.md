@@ -24,5 +24,6 @@ shell block. Headers in an asset are demoted one level to fit under the section 
 Badges, the licence copies, the architecture section (from `docs/ARCHITECTURE.md`) and the
 licence footer are generated. Nothing about them belongs in an asset.
 
-`usage` and `installation*` are prose, and the dev shell checks them against ASD-STE100 —
-see [ste_checker](https://github.com/valeratrades/ste_checker/blob/main/skill/SKILL.md).
+With `ste = true` in the readme-fw call, the dev shell checks `usage` and `installation*`
+against ASD-STE100 — see [ste_checker](https://github.com/valeratrades/ste_checker/blob/main/skill/SKILL.md).
+Off by default: those sections are prose in some repos and near-pure command listings in others.

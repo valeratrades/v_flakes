@@ -23,6 +23,7 @@ args@{ pkgs
 , licenses ? null
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , branch ? "main"
+, ste ? false
 ,
 }:
 
@@ -534,7 +535,7 @@ ${content}
       # `.sh` assets are shell scripts, not prose; `.typ` needs harper-typst.
       # ste_checker exits 0 without --deny, so nothing here gates the shell — but a
       # failed install must not brick every repo's dev shell, hence the command guard.
-      steCheck = ''
+      steCheck = if !ste then "" else ''
         ${utils.binstallCrate { name = "ste_checker"; }}
         __ste_targets=""
         for __f in docs/.readme_assets/usage.md docs/.readme_assets/install*.md; do
@@ -575,5 +576,5 @@ in
   inherit readme shellHook init_loc_gist;
   # curl + cargo-binstall are for the ste_checker install in `shellHook`; readme_fw
   # is used in repos that don't include the `rs` module, which is what ships them otherwise.
-  enabledPackages = [ init_loc_gist pkgs.tokei pkgs.curl pkgs.cargo-binstall ];
+  enabledPackages = [ init_loc_gist pkgs.tokei ] ++ pkgs.lib.optionals ste [ pkgs.curl pkgs.cargo-binstall ];
 }
