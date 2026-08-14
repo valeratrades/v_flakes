@@ -18,7 +18,9 @@ pkgs.writeShellApplication {
     case "$report" in
       *"WOULD be made"*)
         printf '%s\n' "$report" >&2
-        echo "cpublish: cargo diet has include directives to rewrite — apply and commit them, then re-run" >&2
+        # `cargo diet` without -r cannot apply this: its own input is filtered through the include
+        # it would be rewriting, so it reports lean and the gate blocks forever.
+        echo "cpublish: cargo diet has include directives to rewrite — run 'cargo diet -r', review, commit, then re-run" >&2
         exit 1 ;;
       *"There would be no change."*) ;;
       # Neither phrase means diet's output format moved under us and the gate is no longer reading
