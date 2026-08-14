@@ -6,6 +6,7 @@ authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
 description = "Shared primitives for v_flakes nix module scripts"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
+include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md", ".cargo/*", "build.rs"]
 
 [package.metadata]
 

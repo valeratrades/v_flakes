@@ -4,4 +4,5 @@
   nightly_version = import ./nightly_version.nix;
   sort_derives = import ./sort_derives.nix;
   machete = import ./machete.nix;
+  cpublish = import ./cpublish.nix;
 }

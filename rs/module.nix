@@ -134,6 +134,9 @@ if nixpkgs != null && pkgs == null then {
     enabledPackages includes:
     - `tracey` - spec coverage tool (if tracey = true)
     - `codestyle` - code style linter and formatter (if style.format or style.check is true)
+    - `cargo-diet`, `cargo-release`, and `cpublish` — `cargo release --no-confirm --execute`,
+      refusing to run while `cargo diet` still has include directives to rewrite in any
+      workspace default member.
   '';
 } else
 
@@ -246,6 +249,6 @@ if nixpkgs != null && pkgs == null then {
     '';
 
     # cargo-binstall for tracey and codestyle
-    enabledPackages = [ pkgs.cargo-binstall ];
+    enabledPackages = [ pkgs.cargo-binstall pkgs.cargo-diet pkgs.cargo-release ((import ./cpublish.nix) pkgs) ];
     traceyCheck = tracey;
   }
