@@ -40,7 +40,7 @@
       # Use partial semver (major.minor) - patch versions auto-resolve via cargo-binstall
       traceyVersion = "1.3";
       codestyleVersion = "0.2";
-      steCheckerVersion = "0.1";
+      steCheckerVersion = "0.2";
 
       parts = {
         files = (import ./files).description;

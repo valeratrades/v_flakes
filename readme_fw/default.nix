@@ -541,6 +541,12 @@ ${content}
           if [ -f "$__f" ]; then __ste_targets="$__ste_targets $__f"; fi
         done
         if [ -n "$__ste_targets" ] && command -v ste_checker >/dev/null; then
+          # ASD-STE100 approves ~900 words and rejects the rest, so a repo without a glossary
+          # sees its own vocabulary reported as unknown-word until it declares it.
+          if [ ! -f docs/glossary.nix ]; then
+            echo "readme-fw: no docs/glossary.nix — declare this repo's Technical Names and Verbs with:" >&2
+            echo "  ste_checker --suggest-glossary$__ste_targets > docs/glossary.nix" >&2
+          fi
           ste_checker $__ste_targets
         fi
         unset __ste_targets __f
