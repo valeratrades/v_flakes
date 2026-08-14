@@ -22,6 +22,9 @@ in
 {
   name = "Asset gate";
   runs-on = "ubuntu-latest";
+  # `command` is free to be a cargo invocation, and `.cargo/config.toml` points rustc-wrapper at an
+  # sccache the runner doesn't have. Only Errors/Warnings inherit the rust base env, so unset here.
+  env.RUSTC_WRAPPER = "";
   steps =
     [{
       name = "Checkout repository";
