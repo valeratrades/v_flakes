@@ -1,0 +1,28 @@
+---
+name: readme_fw
+description: "How a repo's README.md is produced from docs/.readme_assets/. Read before editing any README.md or any file under docs/.readme_assets/ in a repo that consumes v_flakes' readme-fw."
+---
+
+# readme_fw
+
+`README.md` is a build artifact. Edit `docs/.readme_assets/`; the dev shell regenerates the
+README on entry and CI regenerates it and diffs, so a hand-edit is reverted, not merged.
+
+| Asset | Becomes |
+|---|---|
+| `description` | the body under the title |
+| `warning` | a banner above everything |
+| `usage` | `## Usage` |
+| `installation[-suffix]` | `## Installation`, one fold per file, suffix as its title |
+| `other` | appended verbatim |
+| `logo` | one image line under the title |
+
+`.md`, `.typ` and (for usage/installation) `.sh` are accepted; a `.sh` asset is fenced as a
+shell block. Headers in an asset are demoted one level to fit under the section they land in —
+`other` is exempt and keeps its own levels.
+
+Badges, the licence copies, the architecture section (from `docs/ARCHITECTURE.md`) and the
+licence footer are generated. Nothing about them belongs in an asset.
+
+`usage` and `installation*` are prose, and the dev shell checks them against ASD-STE100 —
+see [ste_checker](https://github.com/valeratrades/ste_checker/blob/main/skill/SKILL.md).
