@@ -21,7 +21,7 @@ Test links:
 | `arch.mermaid` | No | Architecture diagram (rendered as mermaid code block) |
 | `logo.(md\|html)` | No | Project logo (single-line image tag; defaults to 25% width) |
 
-Any file in `docs/.readme_assets/` that does not match one of the patterns above will trigger a `WARNING` trace during evaluation.
+Any file in `docs/.readme_assets/` that does not match one of the patterns above will trigger a `WARNING` trace during evaluation. Images and other blobs a section links to go in `docs/.readme_assets/assets/` — subdirectories are not scanned, and a `(./assets/x.png)` link is rewritten like any other relative link.
 
 ## Header demotion
 

@@ -460,7 +460,7 @@ ${content}
   _isRecognized = name: builtins.any (pat: builtins.match pat name != null) _recognizedPatterns;
   _unrecognizedAssets = builtins.filter (name: !(_isRecognized name)) _allAssets;
   _warnUnrecognized = builtins.foldl'
-    (acc: name: builtins.trace "WARNING: docs/.readme_assets/${name} is not recognized by readme-fw and will not be included in README" acc)
+    (acc: name: builtins.trace "WARNING: docs/.readme_assets/${name} is not recognized by readme-fw and will not be included in README (images an asset links to belong in docs/.readme_assets/assets/)" acc)
     null
     _unrecognizedAssets;
 

@@ -17,6 +17,9 @@ README on entry and CI regenerates it and diffs, so a hand-edit is reverted, not
 | `other` | appended verbatim |
 | `logo` | one image line under the title |
 
+Anything else directly in `docs/.readme_assets/` warns and is dropped. Images and other blobs a
+section links to go one level down, in `docs/.readme_assets/assets/`, linked as `(./assets/x.png)`.
+
 `.md`, `.typ` and (for usage/installation) `.sh` are accepted; a `.sh` asset is fenced as a
 shell block. Headers in an asset are demoted one level to fit under the section they land in —
 `other` is exempt and keeps its own levels.
