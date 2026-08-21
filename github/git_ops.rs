@@ -383,6 +383,18 @@ const TODO_MARKER: &str = concat!("<!-- ", "todo-id: ");
 // deleting the comment.
 const AUTO_CLOSE_MARKER: &str = "<!-- todo-sync: auto-closed -->";
 
+/// Fixture trees are data, not code: a needle inside one is content to keep verbatim, and
+/// the close pass would otherwise edit it out of the file. Default pathspec magic, so `*`
+/// crosses `/` and every entry matches at any depth (workspace member, nested crate).
+const FIXTURE_PATHSPECS: [&str; 6] = [
+	":(exclude)*tests/corpus*",
+	":(exclude)*tests/data/*",
+	":(exclude)*fixtures/*",
+	":(exclude)*testdata/*",
+	":(exclude)*snapshots/*",
+	":(exclude)*.snap",
+];
+
 /// Walk past bare needle mentions to the `<needle>!*:` occurrence grep matched.
 /// Returns (needle position, bang count, content after the colon).
 fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
@@ -419,9 +431,12 @@ struct Todo {
 	occurrences: Vec<(String, usize)>,
 }
 
+/// A comment is read from the needle to end of line, so it must fit on one line —
+/// a wrapped continuation is invisible here and gets left behind by the close pass.
 fn scan_todos(repo_root: &str) -> Vec<Todo> {
+	let pattern = format!("{TODO_NEEDLE}!*:");
 	let output = Command::new("git")
-		.args(["grep", "-In", "-E", &format!("{TODO_NEEDLE}!*:")])
+		.args(["grep", "-In", "-E", &pattern, "--"].into_iter().chain(FIXTURE_PATHSPECS))
 		.current_dir(repo_root)
 		.output()
 		.unwrap_or_else(|e| {
@@ -456,7 +471,7 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
 		occurrences.sort();
 		let at = format!("{}:{}", occurrences[0].0, occurrences[0].1);
 		if content.is_empty() {
-			eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {at}");
+			eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {at} — the whole comment must fit on that one line");
 			continue;
 		}
 		let (title, description) = match content.split_once(". ") {
