@@ -217,11 +217,13 @@ if nixpkgs != null && pkgs == null then {
             "export LD_LIBRARY_PATH=\\\"\\$(nix-build '<nixpkgs>' -A ${pkg} --no-out-link)/lib\\\${LD_LIBRARY_PATH:+:}\\$LD_LIBRARY_PATH\\\" && "
           )
           allPackages);
-        # Escape for embedding in double-quoted nix-shell --command "...", preserving ${{ }} GHA expressions
+        # Escape for embedding in double-quoted nix-shell --command "...", preserving ${{ }} GHA expressions.
+        # Backticks need it as much as `$` does: one unescaped layer down and the message a step
+        # prints on failure runs as a command substitution instead.
         escapeForNixShell = s:
           let
             protected = builtins.replaceStrings [ "\${{" ] [ "__GHA_EXPR__" ] s;
-            escaped = builtins.replaceStrings [ "\"" "$" ] [ "\\\"" "\\$" ] protected;
+            escaped = builtins.replaceStrings [ "\"" "$" "`" ] [ "\\\"" "\\$" "\\`" ] protected;
           in
           builtins.replaceStrings [ "__GHA_EXPR__" ] [ "\${{" ] escaped;
         wrapStep = step:
