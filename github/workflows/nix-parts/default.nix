@@ -218,12 +218,13 @@ if nixpkgs != null && pkgs == null then {
           )
           allPackages);
         # Escape for embedding in double-quoted nix-shell --command "...", preserving ${{ }} GHA expressions.
-        # Backticks need it as much as `$` does: one unescaped layer down and the message a step
-        # prints on failure runs as a command substitution instead.
+        # All four characters bash treats specially inside double quotes have to survive the trip, and
+        # the backslash is one of them: a script that already writes \` to escape a backtick for its own
+        # shell otherwise arrives with a bare backtick and runs as a command substitution.
         escapeForNixShell = s:
           let
             protected = builtins.replaceStrings [ "\${{" ] [ "__GHA_EXPR__" ] s;
-            escaped = builtins.replaceStrings [ "\"" "$" "`" ] [ "\\\"" "\\$" "\\`" ] protected;
+            escaped = builtins.replaceStrings [ "\\" "\"" "$" "`" ] [ "\\\\" "\\\"" "\\$" "\\`" ] protected;
           in
           builtins.replaceStrings [ "__GHA_EXPR__" ] [ "\${{" ] escaped;
         wrapStep = step:
