@@ -11,16 +11,29 @@ fn lightweight_charts() {
 	if out.exists() && lwc_sha256(&out) == LWC_SHA256 {
 		return;
 	}
-	let url = format!("https://cdn.jsdelivr.net/npm/lightweight-charts@{LWC_VERSION}/dist/lightweight-charts.standalone.production.mjs");
-	let status = std::process::Command::new("curl")
-		.args(["-fsSL", "--output"])
-		.arg(&out)
-		.arg(&url)
-		.status()
-		.expect("`curl` must be on PATH to build the `lightweight_charts` feature");
-	assert!(status.success(), "fetching {url} failed: {status}");
+	// A hermetic builder (nix) forbids network inside the derivation, so it fetches the asset itself
+	// and points `LWC_MJS` at the result. The pin below is asserted either way, so where the bytes
+	// came from carries no trust — only what they hash to.
+	println!("cargo:rerun-if-env-changed=LWC_MJS");
+	let from = match std::env::var_os("LWC_MJS") {
+		Some(path) => {
+			std::fs::copy(&path, &out).unwrap_or_else(|e| panic!("LWC_MJS={path:?} is not readable: {e}"));
+			format!("{path:?}")
+		}
+		None => {
+			let url = format!("https://cdn.jsdelivr.net/npm/lightweight-charts@{LWC_VERSION}/dist/lightweight-charts.standalone.production.mjs");
+			let status = std::process::Command::new("curl")
+				.args(["-fsSL", "--output"])
+				.arg(&out)
+				.arg(&url)
+				.status()
+				.expect("`curl` must be on PATH to build the `lightweight_charts` feature (or set `LWC_MJS` to a pre-fetched copy)");
+			assert!(status.success(), "fetching {url} failed: {status}");
+			url
+		}
+	};
 	let got = lwc_sha256(&out);
-	assert_eq!(got, LWC_SHA256, "{url} no longer hashes to the pinned value");
+	assert_eq!(got, LWC_SHA256, "{from} no longer hashes to the pinned value");
 }
 
 fn lwc_sha256(path: &std::path::Path) -> String {

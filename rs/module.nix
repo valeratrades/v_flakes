@@ -91,6 +91,10 @@ if nixpkgs != null && pkgs == null then {
         196 KB of third-party JS into its published tarball. Needs `curl` and `sha256sum` on PATH.
         A rebuild that already holds the right bytes skips the download, so it stays offline.
 
+        A hermetic build (nix) has no network inside the derivation: set `LWC_MJS` to a copy it
+        fetched itself (`pkgs.fetchurl`) and the download is skipped. The <sha256> pin is asserted
+        against that copy too, so the two sources are interchangeable rather than one being trusted.
+
         Both fields are required — the pin belongs next to the JS written against that API, so there
         is deliberately no default and no bare-string form.
 
