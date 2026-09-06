@@ -76,7 +76,7 @@ let
   #
   # Usage:
   #   ${withCargo { caller = "py"; body = ''
-  #     _v_flakes_cargo -Zscript -q ${./pyproject_merge.rs} ./pyproject.toml ${a} ${b}
+  #     _v_flakes_cargo -Zscript -q ${./pyproject-merge.rs} ./pyproject.toml ${a} ${b}
   #   ''; }}
   withCargo = { caller, body }: ''
     if command -v cargo >/dev/null 2>&1 && cargo --version >/dev/null 2>&1; then
@@ -104,7 +104,7 @@ let
   # Parameters:
   #   name: crate name on crates.io
   #   currentVersion: current version string (X.Y.Z)
-  #   bumpScript: path to bump_crate.rs script (optional)
+  #   bumpScript: path to bump-crate.rs script (optional)
   #   mode: "binstall" or "source" (default: "binstall")
   #   versionVarPostfix: postfix for version variable name (default: "Version")
   checkCrateVersion = { name, currentVersion, bumpScript ? null, mode ? "binstall", versionVarPostfix ? "Version" }: ''
@@ -241,7 +241,7 @@ in
   # `rust` is the nix rust toolchain package (e.g. `rs.rust`) and is REQUIRED:
   # combine prepends `${rust}/bin` to PATH before any module hook runs, so every
   # module is guaranteed a working cargo for the custom rust scripts its hook
-  # invokes (append_custom.rs, pyproject_merge.rs, code-duplication, …). No
+  # invokes (append-custom.rs, pyproject-merge.rs, code-duplication, …). No
   # rustup fallback, no `rust != null` gates downstream — provision it or fail.
   #
   # Each module should have optional `enabledPackages` (list) and `shellHook` (string) attributes.

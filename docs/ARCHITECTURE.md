@@ -48,7 +48,7 @@ GitHub-specific configuration:
 - `workflows/` - CI workflow generation (errors.yml, warnings.yml)
 - `pre_commit.nix` - Pre-commit hook with treefmt
 - `labels.nix` - GitHub label synchronization
-- `git_ops.rs` - Rust script for git operations
+- `git-ops.rs` - Rust script for git operations
 
 ## rs/
 

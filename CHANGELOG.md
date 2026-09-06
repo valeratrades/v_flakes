@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- every `cargo -Zscript` file is renamed to kebab-case (`append_custom.rs` → `append-custom.rs`, and likewise `bump-crate`, `cargo-merge`, `ensure-binstall-metadata`, `git-ops`, `init-loc-gist`, `pre-ci-sed-deps`, `pyproject-merge`). Cargo takes the bin name from the file stem, so every first build of one printed a `cargo::non_kebab_case_bins` warning into the consumer's shell hook. The `git_ops` command itself is unchanged.
+
 - `git_ops`: new `strip-history` subcommand — retroactively applies the `stripClaudeSignature` commit-msg rule to the whole history, dropping `Co-authored-by: …Claude…` / `Generated with [Claude Code` lines from every commit reachable from a local branch or tag (`git filter-branch --msg-filter`, patterns shared with `files/strip_claude_signature.nix`). Lists the offending commits and asks before rewriting (`--yes` to skip, mandatory when stdin is not a tty); leaves the pre-rewrite refs in `refs/original/`. Remote-tracking refs are deliberately out of scope — force-push after verifying.
 
 - `readme_fw`: the `docs/.readme_assets/assets/` convention for images is now documented (skill + description) and named in the unrecognized-file warning, which previously left every repo to guess where a linked blob was supposed to live.

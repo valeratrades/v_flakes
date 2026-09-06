@@ -408,7 +408,7 @@ if nixpkgs != null && pkgs == null then {
             ) else null;
     };
 
-    ensureBinstallScript = ../../ensure_binstall_metadata.rs;
+    ensureBinstallScript = ../../ensure-binstall-metadata.rs;
 
     releaseExpectedFiles = map (name: "release-${name}.yml") (builtins.attrNames releaseWorkflows);
 

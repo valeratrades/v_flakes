@@ -114,7 +114,7 @@ let
       ;
   };
 
-  initLocGistScript = ./init_loc_gist.rs;
+  initLocGistScript = ./init-loc-gist.rs;
   init_loc_gist = pkgs.writeShellScriptBin "init-loc-gist" ''
     exec ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}" "$@"
   '';

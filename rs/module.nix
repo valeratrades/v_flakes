@@ -184,7 +184,7 @@ if nixpkgs != null && pkgs == null then {
     lintsHook =
       if lintsEnabled then ''
         if [ -f ./Cargo.toml ]; then
-          cargo -Zscript -q ${./cargo_merge.rs} ./Cargo.toml ${lintsFile}
+          cargo -Zscript -q ${./cargo-merge.rs} ./Cargo.toml ${lintsFile}
         fi
       '' else "";
 

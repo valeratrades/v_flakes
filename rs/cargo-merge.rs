@@ -48,11 +48,7 @@ fn merge(cargo: &str, lints_src: &str) -> String {
 	let is_workspace = doc.get("workspace").is_some();
 
 	let lints_table: &mut Table = if is_workspace {
-		let workspace = doc
-			.entry("workspace")
-			.or_insert_with(|| Item::Table(Table::new()))
-			.as_table_mut()
-			.expect("inserted above");
+		let workspace = doc.entry("workspace").or_insert_with(|| Item::Table(Table::new())).as_table_mut().expect("inserted above");
 		workspace
 			.entry("lints")
 			.or_insert_with(|| {

@@ -105,7 +105,7 @@ Label sync also runs todo-sync: every `TODO<bangs>:` comment in the repo becomes
 - Keep the whole comment on one line. It is read from `TODO` to end of line, so a wrapped
   continuation never reaches the issue and survives the deletion as orphaned prose.
 - Fixture paths are skipped, so test data containing that literal is left alone — see
-  `FIXTURE_PATHSPECS` in `github/git_ops.rs` for the exact list.
+  `FIXTURE_PATHSPECS` in `github/git-ops.rs` for the exact list.
 
 enabledPackages includes:
 - `git_ops` - GitHub operations (sync-labels, etc.)

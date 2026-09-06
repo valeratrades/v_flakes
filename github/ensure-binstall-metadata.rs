@@ -23,7 +23,7 @@ toml_edit = "0.22"
 ---
 //TODO: join with `toml` command of `v_flakes` crate, - could probably DRY some stuff
 //! Ensures [package.metadata.binstall] section exists in Cargo.toml
-//! Usage: ensure_binstall_metadata.rs [Cargo.toml path]
+//! Usage: ensure-binstall-metadata.rs [Cargo.toml path]
 
 use std::{env, fs, path::Path};
 

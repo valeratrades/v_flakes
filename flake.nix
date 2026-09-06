@@ -117,7 +117,7 @@
             inherit stdenv;
             packages = with pkgs; [ curl mold rust ] ++ preCommitCheck.enabledPackages ++ combined.enabledPackages;
             shellHook = ''
-              # Before combined: append_custom.rs only patches .git/hooks/pre-commit
+              # Before combined: append-custom.rs only patches .git/hooks/pre-commit
               # if it already exists, and this is what writes it.
               ${preCommitCheck.shellHook}
               # Guard first: combined.shellHook aborts (exit 1) the entire hook
@@ -125,7 +125,7 @@
               # — and pollutes a subdirectory — when invoked from elsewhere.
               ${combined.shellHook}
               cp -f ${files.treefmt { inherit pkgs; }} ./.treefmt.toml
-              _bump_script="./__scripts/bump_crate.rs"
+              _bump_script="./__scripts/bump-crate.rs"
               ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "ste_checker"; currentVersion = steCheckerVersion; bumpScript = "$_bump_script"; }}
@@ -184,7 +184,7 @@
       # Backward compatibility aliases
       hooks = {
         description = "DEPRECATED: Use github module instead";
-        appendCustom = ./github/append_custom.rs;
+        appendCustom = ./github/append-custom.rs;
         treefmt = import ./files/treefmt.nix;
         preCommit = import ./github/pre_commit.nix;
       };
