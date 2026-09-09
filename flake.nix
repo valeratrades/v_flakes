@@ -18,6 +18,9 @@
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
   inputs.process-compose-flake.url = "github:Platonic-Systems/process-compose-flake";
+  inputs.lean4-nix.url = "github:lenianiva/lean4-nix/e04ca093bca4c944f587c5e306cb5ff0c2c6ea87"; # manifests up to lean v4.33.1
+  inputs.lean4-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.lean4-nix.inputs.flake-parts.follows = "flake-parts";
   inputs.devenv.url = "github:cachix/devenv/v1.6.1";
   inputs.devenv.inputs.nixpkgs.follows = "nixpkgs";
   # devenv's cachix and vendored-nix each pin their own nixpkgs; unfollowed that is
@@ -30,7 +33,7 @@
   inputs.devenv.inputs.flake-compat.follows = "pre-commit-hooks/flake-compat";
   inputs.devenv.inputs.nix.inputs.flake-parts.follows = "flake-parts";
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv }:
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv, lean4-nix }:
     assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
     assert rust-overlay.rev == (import ./default_rust_overlay.nix).rev;
     let
@@ -168,7 +171,7 @@
       # their own copies — same rev everywhere means nix store dedup, shared caches.
       # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
       # is the same rev as a bare source tree, for `import`.
-      inherit nixpkgs flake-utils rust-overlay pre-commit-hooks flake-parts process-compose-flake devenv;
+      inherit nixpkgs flake-utils rust-overlay pre-commit-hooks flake-parts process-compose-flake devenv lean4-nix;
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;
