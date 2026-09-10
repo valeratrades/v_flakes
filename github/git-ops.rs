@@ -379,8 +379,9 @@ fn lint_issues() {
 	}
 }
 
-/// `severity:*` is what a bug report carries; the `i:*` importance is derived from it.
-const SEVERITY_IMPORTANCE: [(&str, &str); 3] = [("severity:low", "i:3"), ("severity:medium", "i:6"), ("severity:high", "i:9")];
+/// `severity:*` is what a bug report carries; it pins the `i:*` band the bug may sit in.
+/// A bug with no `i:*` gets the band's floor; one that already has an `i:*` keeps it.
+const SEVERITY_BAND: [(&str, u8, u8); 3] = [("severity:low", 3, 5), ("severity:medium", 6, 8), ("severity:high", 9, 9)];
 
 /// Migrate legacy bare `bug` to `t:bug`, and mirror `severity:*` into its `i:*`.
 /// Edits are reflected back into `issue`, so the checks lint the post-edit state.
@@ -399,16 +400,23 @@ fn apply_bug_conventions(issue: &mut GhIssue) {
 		}
 	}
 
-	let derived: Vec<&str> = SEVERITY_IMPORTANCE.iter().filter(|(s, _)| has(s)).map(|(_, i)| *i).collect();
-	match derived[..] {
-		[importance] => {
-			if !has(importance) {
-				add.push(importance.to_string());
+	let bands: Vec<(u8, u8)> = SEVERITY_BAND.iter().filter(|(s, ..)| has(s)).map(|(_, lo, hi)| (*lo, *hi)).collect();
+	match bands[..] {
+		[(lo, hi)] => {
+			let current: Vec<&str> = issue.labels.iter().map(|l| l.name.as_str()).filter(|n| n.starts_with("i:")).collect();
+			if current.is_empty() {
+				add.push(format!("i:{lo}"));
 			}
-			remove.extend(issue.labels.iter().map(|l| l.name.clone()).filter(|n| n.starts_with("i:") && n.as_str() != importance));
+			for name in current {
+				match name.strip_prefix("i:").expect("filtered on that prefix").parse::<u8>() {
+					Ok(n) if (lo..=hi).contains(&n) => {}
+					Ok(_) => eprintln!("issue-lint: #{} '{}' is {name}, outside i:{lo}-i:{hi} for its severity", issue.number, issue.title),
+					Err(e) => eprintln!("issue-lint: #{} '{}' has an unparseable importance label {name}: {e}", issue.number, issue.title),
+				}
+			}
 		}
 		[] => eprintln!("issue-lint: #{} '{}' is a bug with no severity:* label", issue.number, issue.title),
-		_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, derived.len()),
+		_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
 	}
 
 	if add.is_empty() && remove.is_empty() {
