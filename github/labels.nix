@@ -14,6 +14,11 @@
   { name = "c:docs"; color = "#0075ca"; description = "Improvements or additions to documentation"; }
   { name = "c:rewrite"; color = "#008672"; description = "Code quality"; }
 
+  # Severity of a bug; the `i:*` below is derived from it
+  { name = "severity:low"; color = "#c9e6a0"; description = "Bug: cosmetic or easily worked around"; }
+  { name = "severity:medium"; color = "#f8dcb0"; description = "Bug: degrades a feature"; }
+  { name = "severity:high"; color = "#f5b2b3"; description = "Bug: data loss, or a feature is unusable"; }
+
   # Importance (0 = trivial, 9 = critical)
   { name = "i:0"; color = "#0e8a16"; }
   { name = "i:1"; color = "#3d9712"; }

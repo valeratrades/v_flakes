@@ -352,13 +352,17 @@ fn lint_issues() {
 			return;
 		}
 	};
-	let issues: Vec<GhIssue> = match serde_json::from_slice(&output.stdout) {
+	let mut issues: Vec<GhIssue> = match serde_json::from_slice(&output.stdout) {
 		Ok(i) => i,
 		Err(e) => {
 			eprintln!("issue-lint: failed to parse issues: {}", e);
 			std::process::exit(1);
 		}
 	};
+
+	for issue in &mut issues {
+		apply_bug_conventions(issue);
+	}
 
 	// Each check maps an issue to Some(warning); extend as more rules land.
 	let exactly_one = |i: &GhIssue, series: &str| {
@@ -373,6 +377,61 @@ fn lint_issues() {
 			}
 		}
 	}
+}
+
+/// `severity:*` is what a bug report carries; the `i:*` importance is derived from it.
+const SEVERITY_IMPORTANCE: [(&str, &str); 3] = [("severity:low", "i:3"), ("severity:medium", "i:6"), ("severity:high", "i:9")];
+
+/// Migrate legacy bare `bug` to `t:bug`, and mirror `severity:*` into its `i:*`.
+/// Edits are reflected back into `issue`, so the checks lint the post-edit state.
+fn apply_bug_conventions(issue: &mut GhIssue) {
+	let has = |name: &str| issue.labels.iter().any(|l| l.name == name);
+	if !has("bug") && !has("t:bug") {
+		return;
+	}
+
+	let mut add: Vec<String> = Vec::new();
+	let mut remove: Vec<String> = Vec::new();
+	if has("bug") {
+		remove.push("bug".to_string());
+		if !has("t:bug") {
+			add.push("t:bug".to_string());
+		}
+	}
+
+	let derived: Vec<&str> = SEVERITY_IMPORTANCE.iter().filter(|(s, _)| has(s)).map(|(_, i)| *i).collect();
+	match derived[..] {
+		[importance] => {
+			if !has(importance) {
+				add.push(importance.to_string());
+			}
+			remove.extend(issue.labels.iter().map(|l| l.name.clone()).filter(|n| n.starts_with("i:") && n.as_str() != importance));
+		}
+		[] => eprintln!("issue-lint: #{} '{}' is a bug with no severity:* label", issue.number, issue.title),
+		_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, derived.len()),
+	}
+
+	if add.is_empty() && remove.is_empty() {
+		return;
+	}
+	let number = issue.number.to_string();
+	let mut args: Vec<&str> = vec!["issue", "edit", &number];
+	for l in &add {
+		args.extend(["--add-label", l.as_str()]);
+	}
+	for l in &remove {
+		args.extend(["--remove-label", l.as_str()]);
+	}
+	if !run_gh_success(&args) {
+		eprintln!("issue-lint: failed to relabel #{number} (+{add:?} -{remove:?})");
+		return;
+	}
+	issue.labels.retain(|l| !remove.contains(&l.name));
+	issue.labels.extend(add.into_iter().map(|name| GhLabel {
+		name,
+		color: String::new(),
+		description: None,
+	}));
 }
 
 // Built from parts so this file's own literals never match the scan.
