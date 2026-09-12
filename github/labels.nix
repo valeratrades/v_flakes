@@ -2,7 +2,8 @@
 [
   # Type
   { name = "t:chore"; color = "#0052CC"; description = "Small non-imaginative task"; }
-  { name = "t:enhancement"; color = "#a2eeef"; description = "New feature or request"; }
+  { name = "t:enhancement"; color = "#a2eeef"; description = "Improve something that already works"; }
+  { name = "t:feature"; color = "#2bd4a0"; description = "New functionality"; }
   { name = "t:bug"; color = "#d73a4a"; description = "Something isn't working"; }
   { name = "t:question"; color = "#d876e3"; description = "Further information is requested"; }
 
