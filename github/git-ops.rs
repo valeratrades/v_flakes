@@ -17,6 +17,8 @@ use std::{
 	io::{self, BufRead, IsTerminal, Write as _},
 	path::PathBuf,
 	process::{Command, Stdio},
+	sync::Mutex,
+	thread,
 };
 
 use clap::{Parser, Subcommand};
@@ -314,13 +316,6 @@ fn report_mismatches(local_map: &HashMap<String, (String, Option<String>)>, remo
 		}
 	}
 
-	// Labels on remote that we don't manage
-	for name in remote_map.keys() {
-		if !local_map.contains_key(name) {
-			lines.push(format!("  ? {} — on remote but not in config", name));
-		}
-	}
-
 	if !lines.is_empty() {
 		lines.sort();
 		eprintln!("label-sync: config drift detected:");
@@ -337,29 +332,33 @@ struct GhIssue {
 	labels: Vec<GhLabel>,
 }
 
-/// Lint open issues against label conventions. Operates on live remote state,
-/// so unlike label sync it cannot be fingerprint-gated.
-fn lint_issues() {
+/// `None` means the list is unavailable (issues disabled, no network), which is not
+/// the same as "no open issues" — deletions treat it as unknown and hold off.
+fn fetch_open_issues() -> Option<Vec<GhIssue>> {
 	let output = match run_gh(&["issue", "list", "--json", "number,title,labels", "--limit", "1000"]) {
 		Ok(o) if o.status.success() => o,
 		// issues may be disabled on this repo — that shouldn't fail label sync
 		Ok(o) => {
 			eprintln!("issue-lint: skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
-			return;
+			return None;
 		}
 		Err(e) => {
 			eprintln!("issue-lint: skipped: {}", e);
-			return;
+			return None;
 		}
 	};
-	let mut issues: Vec<GhIssue> = match serde_json::from_slice(&output.stdout) {
-		Ok(i) => i,
+	match serde_json::from_slice(&output.stdout) {
+		Ok(i) => Some(i),
 		Err(e) => {
 			eprintln!("issue-lint: failed to parse issues: {}", e);
 			std::process::exit(1);
 		}
-	};
+	}
+}
 
+/// Lint open issues against label conventions. Operates on live remote state,
+/// so unlike label sync it cannot be fingerprint-gated.
+fn lint_issues(mut issues: Vec<GhIssue>) {
 	for issue in &mut issues {
 		apply_bug_conventions(issue);
 	}
@@ -782,19 +781,36 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 		println!("Color check passed.");
 	}
 
+	let open_issues = fetch_open_issues();
+
 	// Fingerprint gates only the label block (not an early return): on a fresh repo
 	// labels must exist before `gh issue create --label ...` below can succeed.
 	let fingerprint = compute_labels_fingerprint(&local_labels);
+	let mut errors = Vec::new();
 	if load_saved_fingerprint("labels", &repo_root).as_ref() != Some(&fingerprint) {
-		sync_labels_remote(local_labels);
-		save_fingerprint("labels", &repo_root, &fingerprint);
+		errors = sync_labels_remote(local_labels, open_issues.as_deref());
+		// unsaved fingerprint re-runs the sync next time, so the errors keep nagging
+		if errors.is_empty() {
+			save_fingerprint("labels", &repo_root, &fingerprint);
+		}
 	}
 
-	lint_issues();
+	if let Some(issues) = open_issues {
+		lint_issues(issues);
+	}
 	sync_todos(&repo_root);
+
+	if !errors.is_empty() {
+		eprintln!("\nERROR: label-sync could not converge:");
+		for e in &errors {
+			eprintln!("  - {e}");
+		}
+		std::process::exit(1);
+	}
 }
 
-fn sync_labels_remote(local_labels: Vec<LabelSpec>) {
+/// Returns what could not be done, so the caller reports it after the rest of the sync.
+fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssue]>) -> Vec<String> {
 	let remote_labels = match get_remote_labels() {
 		Ok(labels) => labels,
 		Err(e) => {
@@ -838,30 +854,58 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>) {
 		}
 	}
 
-	// Find labels to delete (only prompt in interactive mode)
-	let to_delete: Vec<&String> = remote_map.keys().filter(|name| !local_map.contains_key(*name)).collect();
+	// The config is the definition of the label set, so anything else on the remote goes —
+	// unless an open issue still carries it, which is a human's call to make, not ours.
+	// unverifiable usage only warns: an issues-disabled repo would otherwise fail every
+	// shell entry forever, and deleting on a guess is not undoable
+	let Some(open_issues) = open_issues else {
+		eprintln!("label-sync: open issues unavailable — not deleting labels outside the config");
+		return Vec::new();
+	};
+	let mut unmanaged: Vec<&str> = remote_map.keys().map(String::as_str).filter(|name| !local_map.contains_key(*name)).collect();
+	unmanaged.sort();
 
-	if !to_delete.is_empty() && io::stdin().is_terminal() {
-		println!("\nRemote labels not in local config:");
-		for name in &to_delete {
-			println!("  - {}", name);
-		}
-
-		if prompt_yes_no("\nDelete these labels?") {
-			for name in to_delete {
-				if delete_label(name) {
-					deleted += 1;
-				} else {
-					eprintln!("  Failed to delete label '{}'", name);
-				}
-			}
+	let mut errors = Vec::new();
+	let mut queue = Vec::new();
+	for name in unmanaged {
+		let users: Vec<String> = open_issues.iter().filter(|i| i.labels.iter().any(|l| l.name == name)).map(|i| format!("#{}", i.number)).collect();
+		if users.is_empty() {
+			queue.push(name);
+		} else {
+			errors.push(format!("'{}' is not in the config but is used by open {}", name, users.join(", ")));
 		}
 	}
+
+	// `gh label delete` is a round-trip each; a small pool keeps a long drop-list quick
+	let workers = queue.len().min(8);
+	let queue = Mutex::new(queue);
+	let done: Mutex<(usize, Vec<String>)> = Mutex::new((0, Vec::new()));
+	thread::scope(|s| {
+		for _ in 0..workers {
+			s.spawn(|| {
+				while let Some(name) = queue.lock().expect("no panics while holding the queue").pop() {
+					let ok = delete_label(name);
+					let mut done = done.lock().expect("no panics while holding the tally");
+					if ok {
+						done.0 += 1;
+						println!("label-sync: deleted '{}' (not in config, unused by open issues)", name);
+					} else {
+						done.1.push(format!("failed to delete label '{name}'"));
+					}
+				}
+			});
+		}
+	});
+	let (ok, failures) = done.into_inner().expect("workers joined");
+	deleted += ok;
+	errors.extend(failures);
 
 	// Only print summary if there were actual changes
 	if created > 0 || updated > 0 || deleted > 0 {
 		println!("Labels synced: {} created, {} updated, {} deleted", created, updated, deleted);
 	}
+
+	errors
 }
 
 fn compute_conventions_fingerprint(version_key: &str, owner: &str, files: &[String]) -> String {

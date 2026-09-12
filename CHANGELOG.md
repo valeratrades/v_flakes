@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `github`: new `t:feature` label (`#2bd4a0`, "New functionality"); `t:enhancement` is re-described as "Improve something that already works", so the two stop overlapping.
+
+- `github`: **Breaking** — `labels.nix` is now the definition of the remote label set, not a subset of it. Any label on the remote that isn't in the config is deleted (in an 8-way pool of `gh label delete`), *unless* an open issue still carries it — those are left alone and reported at the end as an error listing the label and the issues using it, with a non-zero exit. The previous behavior only listed the extras as drift and prompted to delete them when stdin was a tty (i.e. never, from a shell hook). Deletions also strip the label from **closed** issues, so port anything worth keeping into `labels.nix` before the first sync. The error leaves the labels fingerprint unsaved, so the next shell entry retries and keeps nagging; issue lint and TODO sync still run first. If the open-issue list can't be fetched (issues disabled, no network), nothing is deleted.
+
 - every `cargo -Zscript` file is renamed to kebab-case (`append_custom.rs` → `append-custom.rs`, and likewise `bump-crate`, `cargo-merge`, `ensure-binstall-metadata`, `git-ops`, `init-loc-gist`, `pre-ci-sed-deps`, `pyproject-merge`). Cargo takes the bin name from the file stem, so every first build of one printed a `cargo::non_kebab_case_bins` warning into the consumer's shell hook. The `git_ops` command itself is unchanged.
 
 - `git_ops`: new `strip-history` subcommand — retroactively applies the `stripClaudeSignature` commit-msg rule to the whole history, dropping `Co-authored-by: …Claude…` / `Generated with [Claude Code` lines from every commit reachable from a local branch or tag (`git filter-branch --msg-filter`, patterns shared with `files/strip_claude_signature.nix`). Lists the offending commits and asks before rewriting (`--yes` to skip, mandatory when stdin is not a tty); leaves the pre-rewrite refs in `refs/original/`. Remote-tracking refs are deliberately out of scope — force-push after verifying.
