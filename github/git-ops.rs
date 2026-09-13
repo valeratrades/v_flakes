@@ -360,7 +360,7 @@ fn fetch_open_issues() -> Option<Vec<GhIssue>> {
 /// so unlike label sync it cannot be fingerprint-gated.
 fn lint_issues(mut issues: Vec<GhIssue>) {
 	for issue in &mut issues {
-		apply_bug_conventions(issue);
+		apply_conventions(issue);
 	}
 
 	// Each check maps an issue to Some(warning); extend as more rules land.
@@ -382,40 +382,45 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 /// A bug with no `i:*` gets the band's floor; one that already has an `i:*` keeps it.
 const SEVERITY_BAND: [(&str, u8, u8); 3] = [("severity:low", 3, 5), ("severity:medium", 6, 8), ("severity:high", 9, 9)];
 
-/// Migrate legacy bare `bug` to `t:bug`, and mirror `severity:*` into its `i:*`.
+/// Retagged here so dropping the old name from `labels.nix` doesn't strand open issues
+/// on a label the sync then refuses to delete.
+const LEGACY_RENAMES: [(&str, &str); 2] = [("bug", "t:bug"), ("t:enhancement", "t:feature")];
+
+/// Migrate labels that were renamed out from under an issue, and mirror a bug's `severity:*` into its `i:*`.
 /// Edits are reflected back into `issue`, so the checks lint the post-edit state.
-fn apply_bug_conventions(issue: &mut GhIssue) {
+fn apply_conventions(issue: &mut GhIssue) {
 	let has = |name: &str| issue.labels.iter().any(|l| l.name == name);
-	if !has("bug") && !has("t:bug") {
-		return;
-	}
 
 	let mut add: Vec<String> = Vec::new();
 	let mut remove: Vec<String> = Vec::new();
-	if has("bug") {
-		remove.push("bug".to_string());
-		if !has("t:bug") {
-			add.push("t:bug".to_string());
+	for (from, to) in LEGACY_RENAMES {
+		if has(from) {
+			remove.push(from.to_string());
+			if !has(to) {
+				add.push(to.to_string());
+			}
 		}
 	}
 
-	let bands: Vec<(u8, u8)> = SEVERITY_BAND.iter().filter(|(s, ..)| has(s)).map(|(_, lo, hi)| (*lo, *hi)).collect();
-	match bands[..] {
-		[(lo, hi)] => {
-			let current: Vec<&str> = issue.labels.iter().map(|l| l.name.as_str()).filter(|n| n.starts_with("i:")).collect();
-			if current.is_empty() {
-				add.push(format!("i:{lo}"));
-			}
-			for name in current {
-				match name.strip_prefix("i:").expect("filtered on that prefix").parse::<u8>() {
-					Ok(n) if (lo..=hi).contains(&n) => {}
-					Ok(_) => eprintln!("issue-lint: #{} '{}' is {name}, outside i:{lo}-i:{hi} for its severity", issue.number, issue.title),
-					Err(e) => eprintln!("issue-lint: #{} '{}' has an unparseable importance label {name}: {e}", issue.number, issue.title),
+	if has("bug") || has("t:bug") {
+		let bands: Vec<(u8, u8)> = SEVERITY_BAND.iter().filter(|(s, ..)| has(s)).map(|(_, lo, hi)| (*lo, *hi)).collect();
+		match bands[..] {
+			[(lo, hi)] => {
+				let current: Vec<&str> = issue.labels.iter().map(|l| l.name.as_str()).filter(|n| n.starts_with("i:")).collect();
+				if current.is_empty() {
+					add.push(format!("i:{lo}"));
+				}
+				for name in current {
+					match name.strip_prefix("i:").expect("filtered on that prefix").parse::<u8>() {
+						Ok(n) if (lo..=hi).contains(&n) => {}
+						Ok(_) => eprintln!("issue-lint: #{} '{}' is {name}, outside i:{lo}-i:{hi} for its severity", issue.number, issue.title),
+						Err(e) => eprintln!("issue-lint: #{} '{}' has an unparseable importance label {name}: {e}", issue.number, issue.title),
+					}
 				}
 			}
+			[] => eprintln!("issue-lint: #{} '{}' is a bug with no severity:* label", issue.number, issue.title),
+			_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
 		}
-		[] => eprintln!("issue-lint: #{} '{}' is a bug with no severity:* label", issue.number, issue.title),
-		_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
 	}
 
 	if add.is_empty() && remove.is_empty() {

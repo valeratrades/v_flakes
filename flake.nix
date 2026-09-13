@@ -116,6 +116,27 @@
           packages.cargo-sort-derives = (import ./rs).sort_derives system;
           packages.cargo-machete = (import ./rs).machete system;
 
+          apps.help = {
+            type = "app";
+            program = "${pkgs.writeShellScriptBin "help" ''
+              cat <<'EOF'
+              ${pname} — shared Nix parts. Consumers pin one input:
+                inputs.v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
+
+              Commands:
+                nix develop                    dev shell (rust nightly, pre-commit, generated configs)
+                nix run .#cargo-sort-derives   sort derive lists across ./src
+                nix run .#cargo-machete        find unused cargo dependencies
+                ./__scripts/release.sh         release (see `docs/`)
+
+              Parts (v_flakes.<attr>):     files github rs py tex typ js readme-fw utils qlty container
+              Re-exported inputs:          nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
+                                           flake-parts process-compose-flake devenv lean4-nix
+              Docs: README.md
+              EOF
+            ''}/bin/help";
+          };
+
           devShells.default = pkgs.mkShell {
             inherit stdenv;
             packages = with pkgs; [ curl mold rust ] ++ preCommitCheck.enabledPackages ++ combined.enabledPackages;

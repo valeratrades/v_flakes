@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `github`: new `t:feature` label (`#2bd4a0`, "New functionality"); `t:enhancement` is re-described as "Improve something that already works", so the two stop overlapping.
+- `github`: **Breaking** — `t:enhancement` is replaced by `t:feature` (`#2bd4a0`, "New or improved functionality"). It sat between `t:feature` and `t:chore` and made every issue a coin-flip; the remaining `t:bug` / `t:feature` / `t:chore` / `t:question` split the space, with `c:*` carrying what would otherwise be `t:refactor` / `t:perf` / `t:docs`. Open issues are retagged automatically by the issue lint (same path that migrates legacy bare `bug` → `t:bug`), so the first sync after upgrading reports `t:enhancement` as still-in-use and deletes it on the next run.
 
 - `github`: **Breaking** — `labels.nix` is now the definition of the remote label set, not a subset of it. Any label on the remote that isn't in the config is deleted (in an 8-way pool of `gh label delete`), *unless* an open issue still carries it — those are left alone and reported at the end as an error listing the label and the issues using it, with a non-zero exit. The previous behavior only listed the extras as drift and prompted to delete them when stdin was a tty (i.e. never, from a shell hook). Deletions also strip the label from **closed** issues, so port anything worth keeping into `labels.nix` before the first sync. The error leaves the labels fingerprint unsaved, so the next shell entry retries and keeps nagging; issue lint and TODO sync still run first. If the open-issue list can't be fetched (issues disabled, no network), nothing is deleted.
 

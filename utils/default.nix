@@ -331,6 +331,20 @@ in
           fi
         fi
       '';
+
+      # `nix run .#help` is the one entrypoint a stranger (or an agent) can find
+      # without reading flake.nix, so every repo owes one. `nix eval .#help`
+      # resolves the same attrs `nix run` does (packages.<sys>.help, then
+      # apps.<sys>.help), so this passes for either spelling.
+      helpCheck = ''
+        if command -v nix >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
+          echo "" >&2
+          echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
+          echo "    Add to the per-system outputs of flake.nix:" >&2
+          echo "      apps.help = { type = \"app\"; program = \"''${pkgs.writeShellScriptBin \"help\" '''cat <<EOF ... EOF'''}/bin/help\"; };" >&2
+          echo "" >&2
+        fi
+      '';
     in
     {
       enabledPackages = builtins.concatLists (map getPackages modules);
@@ -350,6 +364,7 @@ in
         export PATH="${rust}/bin:$PATH"
         ${combinedHooks}
         ${dedupeCheck}
+        ${helpCheck}
       '';
     };
 }
