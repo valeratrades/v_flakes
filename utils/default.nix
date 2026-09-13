@@ -333,16 +333,21 @@ in
       '';
 
       # `nix run .#help` is the one entrypoint a stranger (or an agent) can find
-      # without reading flake.nix, so every repo owes one. `nix eval .#help`
-      # resolves the same attrs `nix run` does (packages.<sys>.help, then
-      # apps.<sys>.help), so this passes for either spelling.
+      # without reading flake.nix, so every repo owes one. Both spellings `nix run`
+      # accepts are probed — `apps.<sys>.help` (bare `.#help` does not fall back to
+      # it) and `packages.<sys>.help`, which `.#help` does resolve.
       helpCheck = ''
-        if command -v nix >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
-          echo "" >&2
-          echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
-          echo "    Add to the per-system outputs of flake.nix:" >&2
-          echo "      apps.help = { type = \"app\"; program = \"''${pkgs.writeShellScriptBin \"help\" '''cat <<EOF ... EOF'''}/bin/help\"; };" >&2
-          echo "" >&2
+        if command -v nix >/dev/null 2>&1; then
+          _vf_sys="$(nix eval --impure --raw --expr builtins.currentSystem 2>/dev/null)"
+          if ! nix eval --quiet ".#apps.$_vf_sys.help" >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
+            echo "" >&2
+            echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
+            echo "    Every v_flakes consumer owes one — the entrypoint listing what the repo can do." >&2
+            echo "    Add to the per-system outputs of flake.nix:" >&2
+            echo "      apps.help = { type = \"app\"; program = \"\''${pkgs.writeShellScriptBin \"help\" '''cat <<EOF ... EOF'''}/bin/help\"; };" >&2
+            echo "" >&2
+          fi
+          unset _vf_sys
         fi
       '';
     in
