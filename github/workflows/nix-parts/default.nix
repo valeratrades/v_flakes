@@ -114,6 +114,7 @@ if nixpkgs != null && pkgs == null then {
       cachix = ./shared/cachix.nix;
       code-duplication = ./shared/code-duplication.nix;
       asset-gate = ./shared/asset-gate.nix;
+      flake-app = ./shared/flake-app.nix;
       #,}}}
 
       # rust {{{
@@ -153,6 +154,11 @@ if nixpkgs != null && pkgs == null then {
           then { lastSupportedVersion = lastSupportedVersion; } // jobArgs
           else if jobName == "loc-badge"
           then { inherit gistId; } // jobArgs
+          # These install nix themselves rather than going through load_nix, so they
+          # need the repo's cache mode — without this they silently fall back to the
+          # module default and the repo's `cache` setting does nothing.
+          else if jobName == "asset-gate" || jobName == "flake-app"
+          then { inherit cache; } // jobArgs
           else jobArgs;
 
         # Import the file
