@@ -18,8 +18,31 @@ let
     "ev.invest.contract.criticality" = c.criticality;
   };
 
+  # Every key `mkOne` reads. An unknown one is a typo, and a typo that is merely
+  # ignored ships the default while the author reads their own line and believes
+  # otherwise.
+  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
+  # No default is truthful for these. Reported together, with what each is for:
+  # failing on the first costs one round trip per key.
+  required = {
+    port = "TCP port the process listens on — the Service target and what the probes dial";
+    healthPath = "HTTP path answering 200 once the process is up, e.g. \"/health\"";
+    entrypoint = "the image's ENTRYPOINT as a list, e.g. [ \"\${pkg}/bin/foo\" ]";
+  };
+
   mkOne = pkgs: name: spec:
-    assert pkgs.lib.elem (spec.criticality or "high") [ "high" "normal" ];
+    assert (
+      let unknown = builtins.attrNames (builtins.removeAttrs spec known); in
+      unknown == [ ] || throw "v_flakes container '${name}': unknown keys ${builtins.toJSON unknown} — known keys are ${builtins.toJSON known}"
+    );
+    assert (
+      let missing = builtins.filter (k: !(spec ? ${k})) (builtins.attrNames required); in
+      missing == [ ] || throw "v_flakes container '${name}' is missing:\n${pkgs.lib.concatMapStringsSep "\n" (k: "  ${k} — ${required.${k}}") missing}"
+    );
+    assert (
+      let c = spec.criticality or "high"; in
+      builtins.elem c [ "high" "normal" ] || throw "v_flakes container '${name}': criticality is \"${c}\", must be \"high\" or \"normal\" — it orders the cluster's reconcile chain"
+    );
     let
       lib = pkgs.lib;
       contract = {
@@ -58,13 +81,12 @@ in
 
   # Repos call this with their `pname` and a set of containers keyed by
   # sub-variant ("" = the primary). The image name joins them: `pname` for "",
-  # else `pname-<sub>`. Each spec: { port; healthPath; entrypoint;
-  # criticality ? "high"; env ? {}; mounts ? []; contents ? []; imageEnv ? [];
-  # workingDir ? null; withCacert ? true; tag ? "latest"; }. `env`/`mounts`
-  # describe runtime requirements for `toManifests` (secret env arrives via the
-  # k8s Secret gitops owns, never baked in); `imageEnv` is the non-secret boot
-  # env. Returns a buildable `packages.<name>-container` for each plus
-  # `containers.<name> = { image; contract; }` (plain data gitops reads).
+  # else `pname-<sub>`. A spec's keys are `known` above, `required` of them named
+  # there too; anything else throws. `env`/`mounts` describe runtime requirements
+  # for `toManifests` (secret env arrives via the k8s Secret gitops owns, never
+  # baked in); `imageEnv` is the non-secret boot env. Returns a buildable
+  # `packages.<name>-container` for each plus `containers.<name> =
+  # { image; contract; }` (plain data gitops reads).
   implement = { pkgs, pname, containers }:
     let
       lib = pkgs.lib;
@@ -109,7 +131,8 @@ in
         periodSeconds = 10;
       };
       containerEnv = builtins.attrValues (builtins.mapAttrs
-        (n: value: { name = n; inherit value; }) env);
+        (n: value: { name = n; inherit value; })
+        env);
       volumeMounts = map (m: { name = "data"; mountPath = m; }) mounts;
       volumes = if mounts == [ ] then [ ] else [{
         name = "data";
