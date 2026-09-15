@@ -384,7 +384,7 @@ const SEVERITY_BAND: [(&str, u8, u8); 3] = [("severity:low", 3, 5), ("severity:m
 
 /// Retagged here so dropping the old name from `labels.nix` doesn't strand open issues
 /// on a label the sync then refuses to delete.
-const LEGACY_RENAMES: [(&str, &str); 2] = [("bug", "t:bug"), ("t:enhancement", "t:feature")];
+const LEGACY_RENAMES: [(&str, &str); 1] = [("bug", "t:bug")];
 
 /// Migrate labels that were renamed out from under an issue, and mirror a bug's `severity:*` into its `i:*`.
 /// Edits are reflected back into `issue`, so the checks lint the post-edit state.

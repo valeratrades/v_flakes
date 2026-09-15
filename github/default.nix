@@ -289,9 +289,10 @@ if nixpkgs != null && pkgs == null then {
     # Label sync runs in background to avoid blocking shell startup.
     labelSyncHook =
       if labelsEnabled then ''
-        ${"# </dev/null: backgrounded job must not inherit tty stdin, or the label-delete"}
-        ${"# prompt path sees a terminal and the job can hang on SIGTTIN."}
-        (${git_ops}/bin/git_ops sync-labels </dev/null >/dev/null 2>/dev/null &)
+        ${"# </dev/null: a backgrounded job that inherits tty stdin can hang on SIGTTIN."}
+        ${"# stderr is kept: label drift, lint warnings and the in-use-label error are"}
+        ${"# the only channel this tool has, and it never gets run in the foreground."}
+        (${git_ops}/bin/git_ops sync-labels </dev/null >/dev/null &)
       '' else "";
 
     # Convention files copied from github.com/<owner>/<owner> or github.com/<owner>/.github

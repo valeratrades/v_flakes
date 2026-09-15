@@ -1,8 +1,11 @@
 # Default GitHub repository labels
 [
-  # Type
-  { name = "t:chore"; color = "#0052CC"; description = "Small non-imaginative task"; }
-  { name = "t:feature"; color = "#2bd4a0"; description = "New or improved functionality"; }
+  # Type. `chore -> feature -> enhancement -> research` is one axis: how much of the
+  # end result is known when the issue is filed.
+  { name = "t:chore"; color = "#0052CC"; description = "Small, and fully specified — no decisions left"; }
+  { name = "t:feature"; color = "#2bd4a0"; description = "End result is known, the work to get there isn't small"; }
+  { name = "t:enhancement"; color = "#a2eeef"; description = "A direction — the end shape is decided along the way"; }
+  { name = "t:research"; color = "#5f4b8b"; description = "Deliverable is an answer, not a change"; }
   { name = "t:bug"; color = "#d73a4a"; description = "Something isn't working"; }
   { name = "t:question"; color = "#d876e3"; description = "Further information is requested"; }
 
