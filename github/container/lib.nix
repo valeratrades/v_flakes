@@ -55,15 +55,29 @@ let
       withCacert = spec.withCacert or true;
       cacertEnv = lib.optional withCacert
         "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      # `nobody`, which is the uid `fakeNss` already defines — so nothing needs a
+      # passwd entry invented for it, and anything calling getpwuid (Rust's
+      # `dirs`, Node's `os.homedir()`) resolves instead of failing on an unknown
+      # uid. Declared in the IMAGE rather than left to the deployment: a manifest
+      # asserting `runAsNonRoot` against an image that says nothing is refused by
+      # the kubelet, and the two disagreeing is worse than either alone.
+      #
+      # Every port in this standard's consumers is >1024, so there is nothing a
+      # non-root process cannot bind. A container that writes to a mounted volume
+      # needs that volume writable by 65534 — the mount is the deployment's to
+      # arrange, not the image's.
+      user = "65534:65534";
       image = pkgs.dockerTools.buildLayeredImage {
         inherit name;
         tag = spec.tag or "latest";
-        contents = (spec.contents or [ ]) ++ lib.optional withCacert pkgs.cacert;
+        contents = (spec.contents or [ ]) ++ [ pkgs.fakeNss ]
+          ++ lib.optional withCacert pkgs.cacert;
         config = {
           Entrypoint = spec.entrypoint;
           Env = cacertEnv ++ (spec.imageEnv or [ ]);
           ExposedPorts = { "${toString spec.port}/tcp" = { }; };
           Labels = ociLabels contract;
+          User = user;
         } // lib.optionalAttrs (spec ? workingDir) { WorkingDir = spec.workingDir; };
       };
     in
