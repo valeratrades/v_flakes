@@ -1,18 +1,18 @@
 # Generates load_nix job - installs nix + packages once, cached for other jobs
 # packages: list of nixpkgs attribute name strings, e.g. [ "wayland" "libGL" "openssl" ]
-{ packages ? [], cache ? { nix-action = true; } }:
+{ packages ? [ ], cache ? { } }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
   # Always include openssl.out (runtime libs), openssl.dev (headers), and pkg-config
   # because "openssl" alone resolves to openssl-bin which has no libraries,
   # and pkg-config is needed so openssl-sys finds nix headers, not system ones
   allPackages = packages ++ [ "pkg-config" "openssl.out" "openssl.dev" ];
-  hasPackages = packages != [];
+  hasPackages = packages != [ ];
 in
 if !hasPackages then null else
 {
   name = "load_nix";
-  on.workflow_call = {};
+  on.workflow_call = { };
   permissions.contents = "read";
   jobs.load_nix = {
     runs-on = "ubuntu-latest";

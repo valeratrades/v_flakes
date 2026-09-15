@@ -2,7 +2,7 @@
 # These steps restore the nix cache populated by load_nix
 # Also supports legacy apt (deprecated)
 # packages: list of nixpkgs attribute name strings
-{ packages ? [], apt ? [], linuxOnly ? true, debug ? false, cache ? { nix-action = true; } }:
+{ packages ? [ ], apt ? [ ], linuxOnly ? true, debug ? false, cache ? { } }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
   # Always include openssl.out (runtime libs), openssl.dev (headers), and pkg-config
@@ -90,17 +90,18 @@ let
   '';
 
   # Nix restore steps - restore from cache, then make packages available
-  nixSteps = if packages != [] then nixCi.setupSteps ++ [
-    nixCi.installStep
-    nixCi.cacheStep
-  ] ++ (if debug then [{
-    name = "Debug nix environment";
-    run = debugScript;
-  }] else [])
-  else [];
+  nixSteps =
+    if packages != [ ] then nixCi.setupSteps ++ [
+      nixCi.installStep
+      nixCi.cacheStep
+    ] ++ (if debug then [{
+      name = "Debug nix environment";
+      run = debugScript;
+    }] else [ ])
+    else [ ];
 
   #DEPRECATE: apt-based installation
-  _ = if apt != [] then builtins.trace "WARNING: install.apt is deprecated, use install.packages instead" null else null;
+  _ = if apt != [ ] then builtins.trace "WARNING: install.apt is deprecated, use install.packages instead" null else null;
   baseAptStep = {
     name = "Install dependencies (apt)";
     run = ''
@@ -108,8 +109,9 @@ let
       sudo apt-get install -y ${builtins.concatStringsSep " " apt}
     '';
   };
-  aptSteps = if apt != [] then [
-    (if linuxOnly then baseAptStep // { "if" = "runner.os == 'Linux'"; } else baseAptStep)
-  ] else [];
+  aptSteps =
+    if apt != [ ] then [
+      (if linuxOnly then baseAptStep // { "if" = "runner.os == 'Linux'"; } else baseAptStep)
+    ] else [ ];
 in
 nixSteps ++ aptSteps

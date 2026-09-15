@@ -21,7 +21,7 @@
 # buildTiming: build verbose (-L) and pipe stderr through a gawk filter that, at
 # the end, prints an ASCII bar chart of when each component (rust toolchain/deps,
 # backend, wasm, docs, npm/next, packaging) was active — a per-release profile.
-{ registry, deployKeys ? [], lib, cache ? { nix-action = true; }, impure ? false, refresh ? false, buildTiming ? false }:
+{ registry, deployKeys ? [ ], lib, cache ? { }, impure ? false, refresh ? false, buildTiming ? false }:
 let
   # --impure whenever the flake has unlocked getFlake sources; --refresh (which
   # implies impure) additionally forces those mutable refs to re-resolve each build.
@@ -94,17 +94,17 @@ let
   secretOf = repo: "DEPLOY_KEY_" + builtins.replaceStrings [ "." "-" ] [ "_" "_" ] (lib.toUpper repo);
   mkKeyBlock = ownerRepo:
     let repo = lib.last (lib.splitString "/" ownerRepo); secret = secretOf repo; in ''
-    key="''${{ secrets.${secret} }}"
-    if [ -z "$key" ]; then
-      echo "::error::${secret} unset — build fetches private input '${ownerRepo}'. Provision: git_ops init-deploy-key ${ownerRepo}" >&2
-      exit 1
-    fi
-    printf '%s\n' "$key" > ~/.ssh/${repo}
-    chmod 600 ~/.ssh/${repo}
-    printf 'Host gh-${repo}\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/${repo}\n  IdentitiesOnly yes\n' >> ~/.ssh/config
-    git config --global url."ssh://git@gh-${repo}/${ownerRepo}".insteadOf "ssh://git@github.com/${ownerRepo}"
-    git config --global url."git@gh-${repo}:${ownerRepo}".insteadOf "git@github.com:${ownerRepo}"
-  '';
+      key="''${{ secrets.${secret} }}"
+      if [ -z "$key" ]; then
+        echo "::error::${secret} unset — build fetches private input '${ownerRepo}'. Provision: git_ops init-deploy-key ${ownerRepo}" >&2
+        exit 1
+      fi
+      printf '%s\n' "$key" > ~/.ssh/${repo}
+      chmod 600 ~/.ssh/${repo}
+      printf 'Host gh-${repo}\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/${repo}\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+      git config --global url."ssh://git@gh-${repo}/${ownerRepo}".insteadOf "ssh://git@github.com/${ownerRepo}"
+      git config --global url."git@gh-${repo}:${ownerRepo}".insteadOf "git@github.com:${ownerRepo}"
+    '';
   deployKeyStep = {
     name = "SSH auth for private flake inputs";
     shell = "bash";
@@ -164,7 +164,7 @@ in
         };
       }
     ]
-    ++ (if deployKeys != [] then [ deployKeyStep ] else [])
+    ++ (if deployKeys != [ ] then [ deployKeyStep ] else [ ])
     ++ [
       {
         name = "Build + push containers";

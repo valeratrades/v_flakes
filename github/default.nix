@@ -29,7 +29,7 @@ args@{ pkgs ? null
 , # CI binary-cache mechanism for every nix-using workflow (install steps, load_nix,
   # container release). Exactly one of { nix-action = true; } (default, private GH cache)
   # or { cachix = "<name>"; } (public/org cache; push needs CACHIX_AUTH_TOKEN). See cache.nix.
-  cache ? { nix-action = true; }
+  cache ? { }
 , # Cachix cache name to publish `packages.default` to on every push to main, so
   # downstream flakes substitute instead of rebuilding. Needs CACHIX_AUTH_TOKEN.
   publishCachix ? null

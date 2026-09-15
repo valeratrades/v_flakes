@@ -10,7 +10,7 @@
 # key rather than in the job body, so nothing here does clock arithmetic against a stored stamp; and
 # Actions reads a branch's cache through to the default branch, which makes the interval one per
 # repo rather than one per branch.
-{ asset, command, everySeconds ? null, cache ? { nix-action = true; } }:
+{ asset, command, everySeconds ? null, cache ? { } }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
   guarded = everySeconds != null;

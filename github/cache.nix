@@ -1,16 +1,25 @@
 # Nix install + binary-cache steps for generated workflows that use the nix env.
-# `cache` selects exactly one mechanism:
-#   { nix-action = true; }  → nix-community/cache-nix-action — private GH-Actions cache,
-#                             free, safe for private repos (default). Tarballs the WHOLE
-#                             /nix/store (~5 GB, incl. paths already on cache.nixos.org) →
-#                             thrash-evicts against the 10 GB repo limit on churny keys.
-#   { lean = true; }        → cache ONLY paths built locally (i.e. NOT on cache.nixos.org).
+#
+# THE DEFAULT LIVES HERE AND NOWHERE ELSE. Every other module takes `cache ? { }` and
+# threads it down; an unset `cache` resolves to lean right here. Repeating a literal
+# default in each caller is how `asset-gate` spent its life ignoring the repo's setting.
+#
+# `cache` selects at most one mechanism:
+#   unset / { lean = true; } → cache ONLY paths built locally (i.e. NOT on cache.nixos.org).
 #                             A post-build-hook copies each freshly-built path into a
 #                             file:// binary cache; actions/cache persists just that
 #                             (~1 GB: rust-overlay toolchain + your own outputs). Everything
 #                             substitutable is re-fetched from cache.nixos.org — faster than
 #                             a GH-cache restore — and never counts against the 10 GB limit.
-#                             Private, free, no external service.
+#                             Private, free, no external service. The default because it is
+#                             the only mode that stays inside the budget on a nix-heavy
+#                             closure, and the one nobody has to know to ask for.
+#   { nix-action = true; }  → nix-community/cache-nix-action — private GH-Actions cache,
+#                             free, safe for private repos. Tarballs the WHOLE /nix/store
+#                             (~5 GB, incl. paths already on cache.nixos.org) →
+#                             thrash-evicts against the 10 GB repo limit on churny keys.
+#                             Worth it only when substituter round-trips dominate and the
+#                             closure is small enough to fit with room to spare.
 #   { cachix = "<name>"; }  → cachix/cachix-action — public/org cache; pushing needs the
 #                             CACHIX_AUTH_TOKEN secret. Use only for PUBLIC repos: a public
 #                             cache publishes every pushed path.
@@ -21,12 +30,13 @@
 #
 # Consumers MUST splice `setupSteps` (possibly empty) in BEFORE installStep — lean writes
 # its post-build-hook + cache dir there; the other modes leave it empty (a no-op).
-{ cache ? { nix-action = true; } }:
+{ cache ? { } }:
 let
   hasCachix = cache ? cachix;
-  hasLean = (cache.lean or false) != false;
+  leanRequested = (cache.lean or false) != false;
   hasNixAction = (cache.nix-action or false) != false;
-  modeCount = (if hasCachix then 1 else 0) + (if hasLean then 1 else 0) + (if hasNixAction then 1 else 0);
+  modeCount = (if hasCachix then 1 else 0) + (if leanRequested then 1 else 0) + (if hasNixAction then 1 else 0);
+  hasLean = leanRequested || modeCount == 0;
 
   # Lean file:// binary cache lives in /tmp: the post-build-hook runs as the nix daemon
   # (root) and writes here; actions/cache (runner user) reads it back — a 0777 dir plus
@@ -48,8 +58,8 @@ let
     '';
   };
 in
-assert (modeCount == 1) || throw
-  "v_flakes cache: set exactly one of `cache.nix-action = true`, `cache.lean = true`, or `cache.cachix = \"<name>\"`";
+assert (modeCount <= 1) || throw
+  "v_flakes cache: set at most one of `cache.nix-action = true`, `cache.lean = true`, or `cache.cachix = \"<name>\"` (unset = lean)";
 {
   installStep = {
     name = "Install Nix";
@@ -95,22 +105,24 @@ assert (modeCount == 1) || throw
   # tag run can't read another tag's cache — only its own ref or the default branch. So
   # restore always (this picks up the default-branch cache), but save ONLY on `main`
   # (a tag-scoped save is unshareable and would evict main's). null unless lean.
-  cacheRestoreStep = if hasLean then {
-    name = "Restore lean nix cache";
-    uses = "actions/cache/restore@v4";
-    "with" = {
-      path = leanDir;
-      key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
-      restore-keys = "nix-lean-\${{ runner.os }}-";
-    };
-  } else null;
-  cacheSaveStep = if hasLean then {
-    name = "Save lean nix cache";
-    "if" = "github.ref == 'refs/heads/main'";
-    uses = "actions/cache/save@v4";
-    "with" = {
-      path = leanDir;
-      key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
-    };
-  } else null;
+  cacheRestoreStep =
+    if hasLean then {
+      name = "Restore lean nix cache";
+      uses = "actions/cache/restore@v4";
+      "with" = {
+        path = leanDir;
+        key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
+        restore-keys = "nix-lean-\${{ runner.os }}-";
+      };
+    } else null;
+  cacheSaveStep =
+    if hasLean then {
+      name = "Save lean nix cache";
+      "if" = "github.ref == 'refs/heads/main'";
+      uses = "actions/cache/save@v4";
+      "with" = {
+        path = leanDir;
+        key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
+      };
+    } else null;
 }

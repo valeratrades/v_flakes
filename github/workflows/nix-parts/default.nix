@@ -26,7 +26,7 @@ args@{ pkgs ? null
   # called via the description-only path below; in normal use it's threaded in.
   cargoNightly ? null
 , # CI cache mechanism, threaded to every nix-using workflow. See github/cache.nix.
-  cache ? { nix-action = true; }
+  cache ? { }
 , # Cachix cache name to publish `packages.default` to. See shared/cachix.nix.
   publishCachix ? null
 ,
@@ -54,10 +54,11 @@ if nixpkgs != null && pkgs == null then {
     };
     ```
 
-    Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, py-tests, tokei, loc-badge, code-duplication, asset-gate
+    Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, py-tests, tokei, loc-badge, code-duplication, asset-gate, flake-app
 
-    `asset-gate` takes args and so is passed as an attrset:
+    `asset-gate` and `flake-app` take args and so are passed as attrsets:
       jobsOther = [ { name = "asset-gate"; args = { asset = "docs/x.svg"; command = "nix run .#film"; everySeconds = 86400; }; } ];
+      jobsErrors = [ { name = "flake-app"; args.app = "visual"; } ];
 
     Standalone workflows:
     - release = { }  # enabled by presence, disabled with `enable = false`
