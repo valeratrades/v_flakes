@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `github`: `enable = true` no longer asserts a rust toolchain when the repo passes no language module. The assert covered one thing — the `cargo -Zscript` that installs `custom.sh` into `.git/hooks` — and what that hook runs is guarded by a `Cargo.toml` anyway, so a typst or docs repo was paying a toolchain for a no-op. Pass `rs`/`py`/`tex`/`js` and the assert is unchanged; pass none and `github.shellHook` gives the rest (workflows, `.gitignore`, label sync, conventions) without one. A repo that was reaching for `github.labelSyncHook` alone to dodge the assert can now take `github.shellHook` whole.
+
 - `utils.combine`: the shell hook now warns when the repo defines no `nix run .#help`. Both spellings `nix run` accepts are probed (`apps.<system>.help`, `packages.<system>.help`); the warning prints the `apps.help = { type = "app"; … }` snippet to add. Advisory only — it never aborts the shell, and it is skipped when no `nix` is on PATH. v_flakes itself now answers `nix run .#help`.
 
 - `github`: new `t:feature` label (`#2bd4a0`). `t:chore` → `t:feature` → `t:enhancement` is now one ordered axis — how much of the end result is known when the issue is filed — and the descriptions say so: fully specified / end result known but the work isn't small / a direction whose end shape is decided along the way. `t:question` keeps its name but drops GitHub's stock "Further information is requested" for what it is actually used for: an issue whose deliverable is an answer, not a change — a `t:research` and a `t:decision` in one label. `t:bug` is unchanged. `c:*` still carries what would otherwise be `t:refactor` / `t:perf` / `t:docs`.

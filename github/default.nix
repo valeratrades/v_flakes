@@ -71,10 +71,10 @@ let
       builtins.trace "DEPRECATED [v_flakes.github]: `langs` is deprecated. Pass language modules directly instead (e.g. `inherit rs py tex;`)" langs
     else inferredLangs;
 
-  # Extract rust toolchain from rs module. Required when `enable` — the hook
-  # install runs append-custom.rs via cargo, and `combine` (which provisions
-  # cargo on PATH) likewise demands `rust`. The assert lives in the `enable`
-  # branch of shellHook below (not on this binding — nothing forces `rust`
+  # Extract rust toolchain from rs module. Required by whoever passes a language
+  # module — the hook install runs append-custom.rs via cargo, and `combine`
+  # (which provisions cargo on PATH) likewise demands `rust`. The assert lives in
+  # `preCommitInstallHook` below (not on this binding — nothing forces `rust`
   # there anymore, so a lazy assert would never fire).
   rust = if rs != null then (rs.rust or null) else null;
 
@@ -305,6 +305,20 @@ if nixpkgs != null && pkgs == null then {
       (builtins.readFile ./git-ops.rs) + (builtins.toJSON conventionsFiles)
     );
     conventionsFileArgs = builtins.concatStringsSep " " (map (f: "--file ${f}") conventionsFiles);
+    # The custom pre-commit hook is installed by a `cargo -Zscript`, so it costs a
+    # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
+    # module is what says one is owed; a repo that passes none (typst, docs) takes
+    # the rest of the hook without it. Forced only through the `enable` branch.
+    preCommitInstallHook =
+      if effectiveLangs == [ ] && rust == null then "" else
+        assert (rust != null) || throw
+          "v_flakes.github: `enable = true` with a language module requires the rust toolchain — pass the `rs` module (which provides `rs.rust`).";
+        ''
+          ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
+          cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
+          install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
+        '';
+
     conventionsHook =
       if enable && conventions then ''
         (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} >/dev/null 2>/dev/null &)
@@ -321,17 +335,8 @@ if nixpkgs != null && pkgs == null then {
 
     shellHook = utils.mkShellHook ''
       ${utils.unwrapShellHook workflows.shellHook}
-      ${if enable then
-         # `enable` requires the rust toolchain: the hook install runs
-         # append-custom.rs via cargo, which combine guarantees on PATH only when
-         # `rust` is provisioned. Assert here (forced because this branch is
-         # built) so a missing `rs` fails loud rather than producing a broken hook.
-         assert (rust != null) || throw
-           "v_flakes.github: `enable = true` requires the rust toolchain — pass the `rs` module (which provides `rs.rust`).";
-         ''
-      ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
-      cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
-      install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
+      ${if enable then ''
+      ${preCommitInstallHook}
       cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
       ${if lfs != null then ''
       cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
