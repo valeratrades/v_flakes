@@ -22,6 +22,13 @@ let
       "*.webp"
       #"*.svg" # useful in git-diff
     ];
+    video = [
+      "*.mp4"
+      "*.webm"
+      "*.mov"
+      "*.mkv"
+      "*.m4v"
+    ];
     documents = [
       "*.pdf"
       "*.excalidraw"
@@ -104,6 +111,7 @@ let
     builtins.concatStringsSep "\n" [
       (mkSection enable "Audio formats" lfsPatterns.audio)
       (mkSection enable "Image formats" lfsPatterns.images)
+      (mkSection enable "Video formats" lfsPatterns.video)
       (mkSection enable "Documents" lfsPatterns.documents)
       (mkSection enable "Data" lfsPatterns.data)
       lockSection
