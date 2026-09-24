@@ -312,11 +312,11 @@ if nixpkgs != null && pkgs == null then {
       # Unknown keys must fail loudly: an option this version doesn't know (or a typo)
       # would otherwise silently vanish from the generated workflow.
         assert (
-          let unknown = builtins.removeAttrs containerRelease [ "registry" "deployKeys" "impure" "refresh" "buildTiming" ]; in
+          let unknown = builtins.removeAttrs containerRelease [ "registry" "deployKeys" "impure" "refresh" "buildTiming" "lfs" ]; in
           unknown == { } || throw "v_flakes containerRelease: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
         );
         (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
-          (import files.container-release { inherit (pkgs) lib; inherit cache; registry = pkgs.lib.toLower containerRelease.registry; deployKeys = containerRelease.deployKeys or [ ]; impure = containerRelease.impure or false; refresh = containerRelease.refresh or false; buildTiming = containerRelease.buildTiming or false; })
+          (import files.container-release { inherit (pkgs) lib; inherit cache; registry = pkgs.lib.toLower containerRelease.registry; deployKeys = containerRelease.deployKeys or [ ]; impure = containerRelease.impure or false; refresh = containerRelease.refresh or false; buildTiming = containerRelease.buildTiming or false; lfs = containerRelease.lfs or true; })
           [ "standalone" "filename" ])
       else null;
 

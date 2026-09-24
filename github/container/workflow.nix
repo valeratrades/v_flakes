@@ -18,10 +18,13 @@
 # `main` and bake an old bundle. Locked inputs (nixpkgs/rust) are content-pinned, so
 # `--refresh` only moves the getFlake refs, never toolchain versions.
 #
+# lfs: false when the images take nothing LFS-tracked, and the repo's LFS objects would
+# fill the runner (a media archive whose images carry only its text).
+#
 # buildTiming: build verbose (-L) and pipe stderr through a gawk filter that, at
 # the end, prints an ASCII bar chart of when each component (rust toolchain/deps,
 # backend, wasm, docs, npm/next, packaging) was active — a per-release profile.
-{ registry, deployKeys ? [ ], lib, cache ? { }, impure ? false, refresh ? false, buildTiming ? false }:
+{ registry, deployKeys ? [ ], lib, cache ? { }, impure ? false, refresh ? false, buildTiming ? false, lfs ? true }:
 let
   # --impure whenever the flake has unlocked getFlake sources; --refresh (which
   # implies impure) additionally forces those mutable refs to re-resolve each build.
@@ -134,7 +137,7 @@ in
       # this the working tree has pointer files and the image build fails decoding them.
       {
         uses = "actions/checkout@v4";
-        "with".lfs = true;
+        "with".lfs = lfs;
       }
       {
         name = "Validate tag (strict semver)";
