@@ -13,10 +13,11 @@ let
   # into the image labels.
   ociLabels = c: {
     "org.opencontainers.image.title" = c.name;
+    "ev.invest.contract.criticality" = c.criticality;
+  } // (if c.port == null then { } else {
     "ev.invest.contract.port" = toString c.port;
     "ev.invest.contract.health-path" = c.healthPath;
-    "ev.invest.contract.criticality" = c.criticality;
-  };
+  });
 
   # Every key `mkOne` reads. An unknown one is a typo, and a typo that is merely
   # ignored ships the default while the author reads their own line and believes
@@ -24,9 +25,10 @@ let
   known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
   # No default is truthful for these. Reported together, with what each is for:
   # failing on the first costs one round trip per key.
+  # A worker that listens on nothing states it: `port = null; healthPath = null;`.
   required = {
-    port = "TCP port the process listens on — the Service target and what the probes dial";
-    healthPath = "HTTP path answering 200 once the process is up, e.g. \"/health\"";
+    port = "TCP port the process listens on — the Service target and what the probes dial; null for a worker that listens on nothing";
+    healthPath = "HTTP path answering 200 once the process is up, e.g. \"/health\"; null exactly when port is";
     entrypoint = "the image's ENTRYPOINT as a list, e.g. [ \"\${pkg}/bin/foo\" ]";
   };
 
@@ -38,6 +40,10 @@ let
     assert (
       let missing = builtins.filter (k: !(spec ? ${k})) (builtins.attrNames required); in
       missing == [ ] || throw "v_flakes container '${name}' is missing:\n${pkgs.lib.concatMapStringsSep "\n" (k: "  ${k} — ${required.${k}}") missing}"
+    );
+    assert (
+      (spec.port == null) == (spec.healthPath == null)
+      || throw "v_flakes container '${name}': port and healthPath are null together or not at all — a probe needs a port, and a port with no probe is never proven up"
     );
     assert (
       let c = spec.criticality or "high"; in
@@ -75,7 +81,7 @@ let
         config = {
           Entrypoint = spec.entrypoint;
           Env = cacertEnv ++ (spec.imageEnv or [ ]);
-          ExposedPorts = { "${toString spec.port}/tcp" = { }; };
+          ExposedPorts = if spec.port == null then { } else { "${toString spec.port}/tcp" = { }; };
           Labels = ociLabels contract;
           User = user;
         } // lib.optionalAttrs (spec ? workingDir) { WorkingDir = spec.workingDir; };
@@ -136,6 +142,8 @@ in
   # namespace/PVC/Ingress and serialises). `image` carries no tag — Flux
   # image-automation pins `:vX.Y.Z`.
   toManifests = { contract, image, tag ? "v0.0.0" }:
+    assert contract.port != null
+      || throw "v_flakes toManifests '${contract.name}': a worker (port = null) has no Service and no probe — its Deployment is the consumer's to write";
     let
       inherit (contract) name port healthPath env mounts;
       labels = { app = name; };
