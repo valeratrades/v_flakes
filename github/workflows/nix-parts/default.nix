@@ -234,8 +234,10 @@ if nixpkgs != null && pkgs == null then {
             escaped = builtins.replaceStrings [ "\\" "\"" "$" "`" ] [ "\\\\" "\\\"" "\\$" "\\`" ] protected;
           in
           builtins.replaceStrings [ "__GHA_EXPR__" ] [ "\${{" ] escaped;
+        setupSteps = (import ../../cache.nix { inherit cache; }).setupSteps;
         wrapStep = step:
           if shellPrefix == "" then step
+          else if builtins.elem step setupSteps then step # runs before Nix is installed
           else if step ? run then
           # Wrap the run command in nix-shell, but skip if it's already a nix command or echo
             if builtins.substring 0 4 step.run == "nix " then step
@@ -417,7 +419,8 @@ if nixpkgs != null && pkgs == null then {
 
     ensureBinstallScript = ../../ensure-binstall-metadata.rs;
 
-    releaseExpectedFiles = map (name: "release-${name}.yml") (builtins.attrNames releaseWorkflows);
+    releaseExpectedFiles = map (name: "release-${name}.yml") (builtins.attrNames releaseWorkflows)
+      ++ pkgs.lib.optional (containerReleaseWorkflow != null) "release-container.yml";
 
     releaseHook =
       if releaseWorkflows != { } then
