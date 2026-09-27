@@ -13,6 +13,26 @@
       entry = lib.getExe (import ./strip_claude_signature.nix { inherit pkgs; });
       stages = [ "commit-msg" ];
     };
+    # A package built on default_nightly makes every builder (CI, the hosts, image builds)
+    # fetch the devShell's docs and rust-analyzer.
+    rust-build-toolchain = {
+      enable = true;
+      name = "packages build on rs.build_nightly";
+      files = "^flake\\.nix$";
+      pass_filenames = false;
+      entry = lib.getExe (pkgs.writeShellApplication {
+        name = "rust-build-toolchain";
+        text = ''
+          if grep -q makeRustPlatform flake.nix && ! grep -q build_nightly flake.nix; then
+            echo "flake.nix builds with makeRustPlatform on the dev toolchain. Give it the build one:" >&2
+            echo "  build_rust = v_flakes.rs.build_nightly system;" >&2
+            echo "  rustPlatform = pkgs.makeRustPlatform { rustc = build_rust; cargo = build_rust; ... };" >&2
+            echo "(keep v_flakes.rs.default_nightly for the devShell)" >&2
+            exit 1
+          fi
+        '';
+      });
+    };
     treefmt = {
       enable = true;
       # Override entry to re-stage files after formatting.
