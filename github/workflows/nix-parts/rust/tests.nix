@@ -44,8 +44,13 @@ in
       "if" = "github.ref == 'refs/heads/release'";
     }
     {
+      # workspace crates only: dependencies may statically assert their own layouts (rowan does)
       name = "Enable type layout randomization";
-      run = "echo RUSTFLAGS=\${RUSTFLAGS}\\ -Zrandomize-layout\\ --cfg=exhaustive >> $GITHUB_ENV";
+      run = ''
+        printf '#!/bin/sh\nexec "$@" -Zrandomize-layout --cfg=exhaustive\n' > /tmp/randomize-layout.sh
+        chmod +x /tmp/randomize-layout.sh
+        echo RUSTC_WORKSPACE_WRAPPER=/tmp/randomize-layout.sh >> $GITHUB_ENV
+      '';
       "if" = "matrix.rust == 'nightly'";
     }
     {
