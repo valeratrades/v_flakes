@@ -1,16 +1,18 @@
-{ lastSupportedVersion ? null, skipPatterns ? [] }:
+{ lastSupportedVersion ? null, skipPatterns ? [ ] }:
 let
-	rustcVersions = if lastSupportedVersion == null then
-		builtins.trace "WARNING: lastSupportedVersion not provided for rust-tests. Matrix will only contain 'nightly'."
-			[ "nightly" ]
-	else
-		[
-			"nightly"
-			"${lastSupportedVersion}"
-		];
+  rustcVersions =
+    if lastSupportedVersion == null then
+      builtins.trace "WARNING: lastSupportedVersion not provided for rust-tests. Matrix will only contain 'nightly'."
+        [ "nightly" ]
+    else
+      [
+        "nightly"
+        "${lastSupportedVersion}"
+      ];
 
-	skipArgs = if skipPatterns == [] then ""
-		else " -- " + builtins.concatStringsSep " " (map (p: "--skip ${p}") skipPatterns);
+  skipArgs =
+    if skipPatterns == [ ] then ""
+    else " -- " + builtins.concatStringsSep " " (map (p: "--skip ${p}") skipPatterns);
 in
 {
   name = "Rust \${{matrix.rust}}";
@@ -24,7 +26,7 @@ in
   timeout-minutes = 45;
   steps = [
     {
-      uses = "actions/checkout@v4";
+      uses = "actions/checkout@v5";
     }
     {
       uses = "dtolnay/rust-toolchain@master";
@@ -46,11 +48,11 @@ in
       run = "echo RUSTFLAGS=\${RUSTFLAGS}\\ -Zrandomize-layout\\ --cfg=exhaustive >> $GITHUB_ENV";
       "if" = "matrix.rust == 'nightly'";
     }
-				{
-			name = "Download modified by pre-ci Cargo.toml files";
-			uses = "actions/download-artifact@v4";
-			"with".name = "modified-cargo-files";
-		}
+    {
+      name = "Download modified by pre-ci Cargo.toml files";
+      uses = "actions/download-artifact@v7";
+      "with".name = "modified-cargo-files";
+    }
     # not sure why dtolnay has this
     #{ run = "cargo check --locked"; }
     { run = "cargo update"; }

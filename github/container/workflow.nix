@@ -136,7 +136,7 @@ in
       # lfs: image/font assets (e.g. the frontend's PNGs) are Git-LFS tracked; without
       # this the working tree has pointer files and the image build fails decoding them.
       {
-        uses = "actions/checkout@v4";
+        uses = "actions/checkout@v5";
         "with".lfs = lfs;
       }
       {
@@ -159,7 +159,7 @@ in
         name = "Log in to GHCR";
         # Only the tag build pushes to GHCR; the `main` seed build just warms the cache.
         "if" = "github.ref_type == 'tag'";
-        uses = "docker/login-action@v3";
+        uses = "docker/login-action@v4";
         "with" = {
           registry = "ghcr.io";
           username = "\${{ github.actor }}";

@@ -24,7 +24,7 @@
     };
     runs-on = "\${{ matrix.runner }}";
     steps = [
-      { uses = "actions/checkout@v4"; }
+      { uses = "actions/checkout@v5"; }
       { uses = "cachix/install-nix-action@v31"; }
       {
         uses = "cachix/cachix-action@v17";

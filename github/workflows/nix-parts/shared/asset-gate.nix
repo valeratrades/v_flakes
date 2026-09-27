@@ -28,7 +28,7 @@ in
   steps =
     [{
       name = "Checkout repository";
-      uses = "actions/checkout@v4";
+      uses = "actions/checkout@v5";
     }]
     ++ (if guarded then [
       {
@@ -39,7 +39,7 @@ in
       {
         name = "Has this interval been checked";
         id = "guard";
-        uses = "actions/cache/restore@v4";
+        uses = "actions/cache/restore@v5";
         "with" = {
           path = stamp;
           inherit key;
@@ -65,7 +65,7 @@ in
     ++ (if guarded then [{
       name = "Record this interval as checked";
       "if" = "steps.guard.outputs.cache-hit != 'true'";
-      uses = "actions/cache/save@v4";
+      uses = "actions/cache/save@v5";
       "with" = {
         path = stamp;
         inherit key;

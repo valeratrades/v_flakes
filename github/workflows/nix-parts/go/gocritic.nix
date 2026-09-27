@@ -1,13 +1,13 @@
 {
-     runs-on = "ubuntu-latest";
-     steps = [
-       { uses = "actions/setup-go@v4"; }
-       { uses = "actions/checkout@v3"; }
-       {
-         run = ''
-           go install github.com/go-critic/go-critic/cmd/gocritic@latest
-           gocritic check .
-         '';
-       }
-     ];
-   }
+  runs-on = "ubuntu-latest";
+  steps = [
+    { uses = "actions/setup-go@v6"; }
+    { uses = "actions/checkout@v5"; }
+    {
+      run = ''
+        go install github.com/go-critic/go-critic/cmd/gocritic@latest
+        gocritic check .
+      '';
+    }
+  ];
+}

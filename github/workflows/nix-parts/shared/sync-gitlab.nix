@@ -25,7 +25,7 @@ in {
           hint = [ "Create a GitLab access token with 'write_repository' scope (GitLab → Settings → Access Tokens)." ];
         })
         {
-          uses = "actions/checkout@v4";
+          uses = "actions/checkout@v5";
           "with" = {
             fetch-depth = 0;
             lfs = true;

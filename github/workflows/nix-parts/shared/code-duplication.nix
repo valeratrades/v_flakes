@@ -5,9 +5,9 @@
   "if" = "github.event_name != 'pull_request'";
   timeout-minutes = 15;
   steps = [
-    { uses = "actions/checkout@v4"; }
+    { uses = "actions/checkout@v5"; }
     {
-      uses = "actions/checkout@v4";
+      uses = "actions/checkout@v5";
       "with" = {
         repository = "valeratrades/v_flakes";
         path = "my_gh_stuff";

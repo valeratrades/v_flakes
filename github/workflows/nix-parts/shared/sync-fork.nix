@@ -21,7 +21,7 @@
         {
           name = "Get upstream repo URL";
           id = "upstream";
-          uses = "actions/github-script@v7";
+          uses = "actions/github-script@v8";
           "with" = {
             script = ''
               const repo = await github.rest.repos.get({
@@ -41,7 +41,7 @@
         }
         {
           name = "Checkout";
-          uses = "actions/checkout@v4";
+          uses = "actions/checkout@v5";
           "with" = {
             fetch-depth = 0;
             token = "\${{ secrets.GITHUB_TOKEN }}";

@@ -6,7 +6,7 @@ in {
   steps = [
     {
       name = "Checkout repository";
-      uses = "actions/checkout@v4";
+      uses = "actions/checkout@v5";
     }
     (utils.requireSecret {
       name = "loc_gist_token";
@@ -41,12 +41,11 @@ in {
     }
     {
       name = "Update gist";
-      uses = "exuanbo/actions-deploy-gist@v1";
-      "with" = {
-        token = "\${{ secrets.loc_gist_token }}";
-        gist_id = gistId;
-        file_path = "\${{ steps.count.outputs.pname }}-loc.json";
-      };
+      env.GH_TOKEN = "\${{ secrets.loc_gist_token }}";
+      run = ''
+        F="''${{ steps.count.outputs.pname }}-loc.json"
+        gh api -X PATCH gists/${gistId} -f "files[$F][content]=$(cat "$F")" --silent
+      '';
     }
   ];
 }

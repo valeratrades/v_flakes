@@ -79,14 +79,14 @@ assert (modeCount <= 1) || throw
   cacheStep =
     if hasCachix then {
       name = "Setup Cachix";
-      uses = "cachix/cachix-action@v15";
+      uses = "cachix/cachix-action@v17";
       "with" = {
         name = cache.cachix;
         authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
       };
     } else if hasLean then {
       name = "Lean nix cache (built-only paths)";
-      uses = "actions/cache@v4";
+      uses = "actions/cache@v5";
       "with" = {
         path = leanDir;
         key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
@@ -108,7 +108,7 @@ assert (modeCount <= 1) || throw
   cacheRestoreStep =
     if hasLean then {
       name = "Restore lean nix cache";
-      uses = "actions/cache/restore@v4";
+      uses = "actions/cache/restore@v5";
       "with" = {
         path = leanDir;
         key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
@@ -119,7 +119,7 @@ assert (modeCount <= 1) || throw
     if hasLean then {
       name = "Save lean nix cache";
       "if" = "github.ref == 'refs/heads/main'";
-      uses = "actions/cache/save@v4";
+      uses = "actions/cache/save@v5";
       "with" = {
         path = leanDir;
         key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";

@@ -16,20 +16,21 @@
 {
   # Set to true to use defaults, or customize individual fields
   # Accepts both `default` and `defaults` as aliases
-  defaults ? false,
-  default ? defaults,
-  # Targets as Nix system strings. Each gets a GHA runner + nix build.
+  defaults ? false
+, default ? defaults
+, # Targets as Nix system strings. Each gets a GHA runner + nix build.
   # Linux targets produce musl-static binaries (packages.static) for portability.
   targets ? [
     "x86_64-linux"
     "aarch64-darwin"
-  ],
-  # Install config from parent - no longer used for release (nix build handles deps)
-  installConfig ? {},
-  # Legacy params (deprecated, ignored)
-  install ? {},
-  aptDeps ? [],
-  cargoFlags ? {},
+  ]
+, # Install config from parent - no longer used for release (nix build handles deps)
+  installConfig ? { }
+, # Legacy params (deprecated, ignored)
+  install ? { }
+, aptDeps ? [ ]
+, cargoFlags ? { }
+,
 }:
 let
   nixSystemToGhaOs = system:
@@ -47,13 +48,15 @@ let
 
   isLinux = system: builtins.match ".*-linux" system != null;
 
-  matrixInclude = map (system: {
-    inherit system;
-    os = nixSystemToGhaOs system;
-    cargo_triple = nixSystemToCargoTriple system;
-    # Linux builds use packages.static (musl) for portable binaries
-    nix_pkg = if isLinux system then ".#packages.${system}.static" else ".#packages.${system}.default";
-  }) targets;
+  matrixInclude = map
+    (system: {
+      inherit system;
+      os = nixSystemToGhaOs system;
+      cargo_triple = nixSystemToCargoTriple system;
+      # Linux builds use packages.static (musl) for portable binaries
+      nix_pkg = if isLinux system then ".#packages.${system}.static" else ".#packages.${system}.default";
+    })
+    targets;
 in
 {
   standalone = true;
@@ -82,7 +85,7 @@ in
       };
       runs-on = "\${{ matrix.os }}";
       steps = [
-        { uses = "actions/checkout@v4"; }
+        { uses = "actions/checkout@v5"; }
         {
           name = "Install Nix";
           uses = "DeterminateSystems/nix-installer-action@main";
@@ -110,7 +113,7 @@ in
         }
         {
           name = "Upload artifact";
-          uses = "actions/upload-artifact@v4";
+          uses = "actions/upload-artifact@v6";
           "with" = {
             name = "binary-\${{ matrix.cargo_triple }}";
             path = "*.tar.gz";
@@ -123,7 +126,7 @@ in
       runs-on = "ubuntu-latest";
       steps = [
         {
-          uses = "actions/download-artifact@v4";
+          uses = "actions/download-artifact@v7";
           "with" = {
             path = "artifacts";
             merge-multiple = true;
@@ -131,7 +134,7 @@ in
         }
         {
           name = "Create Release";
-          uses = "softprops/action-gh-release@v2";
+          uses = "softprops/action-gh-release@v3";
           "with" = {
             files = "artifacts/*";
           };

@@ -4,7 +4,7 @@
   steps = [
     {
       name = "Checkout repository";
-      uses = "actions/checkout@v4";
+      uses = "actions/checkout@v5";
     }
     {
       name = "Installation";
@@ -23,17 +23,17 @@
       name = "Check Rust comments";
       # TODO: Generalize to other languages. Dynamically determine the most used language in the repo (excluding markdown, Jupyter, etc.).
       run = ''
-				comments=$(jq '.Rust.comments' tokei_output.json)
-				code=$(jq '.Rust.code' tokei_output.json)
+        				comments=$(jq '.Rust.comments' tokei_output.json)
+        				code=$(jq '.Rust.code' tokei_output.json)
 
-				# compare: comments > code * 0.15
-				if [ $((comments * 100)) -ge $((code * 15)) ]; then
-						echo "Number of comments should be less than 15% of code"
-						exit 1
-				else
-						echo "Check passed: Number of comments is less than 15% of code"
-				fi
-        			'';
+        				# compare: comments > code * 0.15
+        				if [ $((comments * 100)) -ge $((code * 15)) ]; then
+        						echo "Number of comments should be less than 15% of code"
+        						exit 1
+        				else
+        						echo "Check passed: Number of comments is less than 15% of code"
+        				fi
+                			'';
     }
   ];
 }

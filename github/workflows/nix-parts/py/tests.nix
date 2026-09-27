@@ -3,14 +3,14 @@
   runs-on = "ubuntu-latest";
   timeout-minutes = 30;
   steps = [
-    { uses = "actions/checkout@v4"; }
+    { uses = "actions/checkout@v5"; }
     {
-      uses = "actions/setup-python@v5";
+      uses = "actions/setup-python@v6";
       "with".python-version = "3.x";
     }
     {
       name = "Install uv";
-      uses = "astral-sh/setup-uv@v6";
+      uses = "astral-sh/setup-uv@v7";
     }
     {
       name = "Install dependencies";
