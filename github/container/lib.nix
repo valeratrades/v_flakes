@@ -22,7 +22,7 @@ let
   # Every key `mkOne` reads. An unknown one is a typo, and a typo that is merely
   # ignored ships the default while the author reads their own line and believes
   # otherwise.
-  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
+  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "sqlite" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
   # No default is truthful for these. Reported together, with what each is for:
   # failing on the first costs one round trip per key.
   # A worker that listens on nothing states it: `port = null; healthPath = null;`.
@@ -45,6 +45,19 @@ let
       (spec.port == null) == (spec.healthPath == null)
       || throw "v_flakes container '${name}': port and healthPath are null together or not at all — a probe needs a port, and a port with no probe is never proven up"
     );
+    # What a mount holds is the app's to say: every sqlite file on it is replicated
+    # and restored by the cluster, and `[ ]` states that nothing there must survive.
+    assert (
+      (spec.mounts or [ ]) == [ ] || spec ? sqlite
+      || throw "v_flakes container '${name}' mounts ${builtins.toJSON spec.mounts} but has no `sqlite` — list every sqlite file on them that must survive a lost volume, or [ ] if none does"
+    );
+    assert (
+      let
+        mounts = spec.mounts or [ ];
+        stray = builtins.filter (p: !(builtins.any (m: pkgs.lib.hasPrefix "${m}/" p) mounts)) (spec.sqlite or [ ]);
+      in
+      stray == [ ] || throw "v_flakes container '${name}': sqlite ${builtins.toJSON stray} not under any of mounts ${builtins.toJSON mounts}"
+    );
     assert (
       let c = spec.criticality or "high"; in
       builtins.elem c [ "high" "normal" ] || throw "v_flakes container '${name}': criticality is \"${c}\", must be \"high\" or \"normal\" — it orders the cluster's reconcile chain"
@@ -57,6 +70,7 @@ let
         criticality = spec.criticality or "high";
         env = spec.env or { };
         mounts = spec.mounts or [ ];
+        sqlite = spec.sqlite or [ ];
       };
       withCacert = spec.withCacert or true;
       cacertEnv = lib.optional withCacert
