@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `git_ops sync-labels`: no longer prints a "config drift detected" listing before converging — the same run creates/updates those labels, so on a fresh repo every shell entry read as broken. Failures to create/update/delete still go to stderr.
+
 - `github`: `enable = true` no longer asserts a rust toolchain when the repo passes no language module. The assert covered one thing — the `cargo -Zscript` that installs `custom.sh` into `.git/hooks` — and what that hook runs is guarded by a `Cargo.toml` anyway, so a typst or docs repo was paying a toolchain for a no-op. Pass `rs`/`py`/`tex`/`js` and the assert is unchanged; pass none and `github.shellHook` gives the rest (workflows, `.gitignore`, label sync, conventions) without one. A repo that was reaching for `github.labelSyncHook` alone to dodge the assert can now take `github.shellHook` whole.
 
 - `utils.combine`: the shell hook now warns when the repo defines no `nix run .#help`. Both spellings `nix run` accepts are probed (`apps.<system>.help`, `packages.<system>.help`); the warning prints the `apps.help = { type = "app"; … }` snippet to add. Advisory only — it never aborts the shell, and it is skipped when no `nix` is on PATH. v_flakes itself now answers `nix run .#help`.

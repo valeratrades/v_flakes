@@ -290,7 +290,7 @@ if nixpkgs != null && pkgs == null then {
     labelSyncHook =
       if labelsEnabled then ''
         ${"# </dev/null: a backgrounded job that inherits tty stdin can hang on SIGTTIN."}
-        ${"# stderr is kept: label drift, lint warnings and the in-use-label error are"}
+        ${"# stderr is kept: label failures, lint warnings and the in-use-label error are"}
         ${"# the only channel this tool has, and it never gets run in the foreground."}
         (${git_ops}/bin/git_ops sync-labels </dev/null >/dev/null &)
       '' else "";
