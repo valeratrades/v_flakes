@@ -324,17 +324,16 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 		apply_conventions(issue);
 	}
 
-	// Each check maps an issue to Some(warning); extend as more rules land.
-	let exactly_one = |i: &GhIssue, series: &str| {
-		let n = i.labels.iter().filter(|l| l.name.starts_with(series)).count();
-		(n != 1).then(|| format!("#{} '{}' has {} {}* labels, expected exactly one", i.number, i.title, n, series))
-	};
-	let checks: &[&dyn Fn(&GhIssue) -> Option<String>] = &[&|i| exactly_one(i, "t:"), &|i| exactly_one(i, "i:")];
 	for issue in &issues {
-		for check in checks {
-			if let Some(warning) = check(issue) {
-				eprintln!("issue-lint: {}", warning);
-			}
+		let off: Vec<String> = ["t:", "i:"]
+			.into_iter()
+			.filter_map(|series| {
+				let n = issue.labels.iter().filter(|l| l.name.starts_with(series)).count();
+				(n != 1).then(|| format!("{n} {series}*"))
+			})
+			.collect();
+		if !off.is_empty() {
+			eprintln!("issue-lint: #{} '{}' has {} labels, expected exactly one of each", issue.number, issue.title, off.join(", "));
 		}
 	}
 }
