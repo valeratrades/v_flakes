@@ -22,7 +22,7 @@ let
   # Every key `mkOne` reads. An unknown one is a typo, and a typo that is merely
   # ignored ships the default while the author reads their own line and believes
   # otherwise.
-  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "sqlite" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
+  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "sqlite" "settings" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
   # No default is truthful for these. Reported together, with what each is for:
   # failing on the first costs one round trip per key.
   # A worker that listens on nothing states it: `port = null; healthPath = null;`.
@@ -62,6 +62,12 @@ let
       let c = spec.criticality or "high"; in
       builtins.elem c [ "high" "normal" ] || throw "v_flakes container '${name}': criticality is \"${c}\", must be \"high\" or \"normal\" — it orders the cluster's reconcile chain"
     );
+    # `settings`: the v_utils app's production config file. `pkg` is its CARGO_PKG_NAME, the
+    # directory the app looks in under XDG_CONFIG_HOME; `values` is `config.toml`.
+    assert (
+      !(spec ? settings) || (builtins.attrNames spec.settings == [ "pkg" "values" ] && builtins.isString spec.settings.pkg && builtins.isAttrs spec.settings.values)
+      || throw "v_flakes container '${name}': settings is { pkg = <CARGO_PKG_NAME>; values = { <config.toml> }; }"
+    );
     let
       lib = pkgs.lib;
       contract = {
@@ -71,6 +77,7 @@ let
         env = spec.env or { };
         mounts = spec.mounts or [ ];
         sqlite = spec.sqlite or [ ];
+        settings = spec.settings or null;
       };
       withCacert = spec.withCacert or true;
       cacertEnv = lib.optional withCacert
