@@ -99,7 +99,7 @@ The shellHook will:
 - Copy gitignore based on specified langs
 - Copy gitattributes when `lfs` is set (true to track via LFS, false to explicitly opt out)
 
-Label sync also runs todo-sync: every `TODO<bangs>:` comment in the repo becomes a
+Label sync also runs todo-sync: every `<comment-leader>TODO<bangs>:` comment in the repo (e.g. `//TODO:`, `#TODO!!:`; no space after the leader, so `// TODO:` and `OWNER_TODO:` are ignored) becomes a
 `ext:from_todo` issue, and closing that issue deletes the comment from the file.
 
 - Keep the whole comment on one line. It is read from `TODO` to end of line, so a wrapped

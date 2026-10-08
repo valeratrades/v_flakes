@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `git_ops sync-labels` todo-sync: only `<comment-leader>TODO<bangs>:` (`//TODO:`, `#TODO!:`, `<!--TODO:` …) becomes an issue. Mentions inside identifiers or prose (`OWNER_TODO:`) and spaced forms (`// TODO:`) are now ignored, and their open `ext:from_todo` issues get closed by the next sync. The leader can come from any language in any file.
+
 - `git_ops sync-labels`: no longer prints a "config drift detected" listing before converging — the same run creates/updates those labels, so on a fresh repo every shell entry read as broken. Failures to create/update/delete still go to stderr.
 
 - `github`: `enable = true` no longer asserts a rust toolchain when the repo passes no language module. The assert covered one thing — the `cargo -Zscript` that installs `custom.sh` into `.git/hooks` — and what that hook runs is guarded by a `Cargo.toml` anyway, so a typst or docs repo was paying a toolchain for a no-op. Pass `rs`/`py`/`tex`/`js` and the assert is unchanged; pass none and `github.shellHook` gives the rest (workflows, `.gitignore`, label sync, conventions) without one. A repo that was reaching for `github.labelSyncHook` alone to dodge the assert can now take `github.shellHook` whole.

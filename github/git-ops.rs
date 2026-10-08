@@ -426,7 +426,10 @@ const FIXTURE_PATHSPECS: [&str; 6] = [
 	":(exclude)*.snap",
 ];
 
-/// Walk past bare needle mentions to the `<needle>!*:` occurrence grep matched.
+// shortcut: any language's leader is accepted in any file; upgrade to per-extension leaders if one misfires
+const COMMENT_LEADERS: [&str; 8] = ["<!--", "/*", "//", "--", "#", "*", ";", "%"];
+
+/// Find the `<comment-leader><needle>!*:` occurrence, skipping bare mentions like `OWNER_<needle>:`.
 /// Returns (needle position, bang count, content after the colon).
 fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
 	let mut base = 0;
@@ -434,7 +437,9 @@ fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
 		let start = base + pos;
 		let after = &line[start + TODO_NEEDLE.len()..];
 		let bangs = after.bytes().take_while(|&b| b == b'!').count();
-		if let Some(content) = after[bangs..].strip_prefix(':') {
+		if let Some(content) = after[bangs..].strip_prefix(':')
+			&& COMMENT_LEADERS.iter().any(|l| line[..start].ends_with(l))
+		{
 			return Some((start, bangs, content));
 		}
 		base = start + TODO_NEEDLE.len();
@@ -701,9 +706,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 					continue;
 				};
 				let mut prefix = line[..pos].trim_end();
-				// ponytail: one trailing comment-leader heuristic instead of per-language
-				// syntax; upgrade to real comment parsing if a language defeats it
-				for lead in ["<!--", "/*", "//", "--", "#", "*", ";", "%"] {
+				for lead in COMMENT_LEADERS {
 					if let Some(s) = prefix.strip_suffix(lead) {
 						prefix = s.trim_end();
 						break;
