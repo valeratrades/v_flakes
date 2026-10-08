@@ -41,7 +41,7 @@ fi
 
 if [[ "$src_changed" == "true" ]]; then
     cargo t
-    cargo release --no-confirm --execute --no-tag --no-push "$flag"
+    cargo release --no-confirm --execute --no-tag --no-push "${flag#--}"
 
     # cargo release made a version-bump commit; squash it into the commit before it
     git reset --soft HEAD~1
