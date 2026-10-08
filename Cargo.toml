@@ -1,12 +1,20 @@
 [package]
 name = "v_flakes"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
 description = "Shared primitives for v_flakes nix module scripts"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
-include = ["src/**/*", "github/org_properties.json", "LICENSE", "README.md", "CHANGELOG.md", ".cargo/*", "build.rs"]
+include = [
+    "src/**/*",
+    "github/org_properties.json",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    ".cargo/*",
+    "build.rs",
+]
 
 [package.metadata]
 
@@ -27,8 +35,8 @@ toml = ["dep:clap", "dep:toml_edit"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"], optional = true }
-toml_edit = { version = "0.25", optional = true }
 serde_json = { version = "1", optional = true }
+toml_edit = { version = "0.25", optional = true }
 
 [dev-dependencies]
 insta = "1"
