@@ -1,4 +1,4 @@
-# Tag-driven, versioned-only push of every `#containers.<system>.<name>` to GHCR
+# Tag- and `dev`-driven push of every `#containers.<system>.<name>` to GHCR
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
@@ -122,7 +122,7 @@ in
   filename = "release-container.yml";
 
   name = "Release containers";
-  on.push = { tags = [ "v[0-9]+.*" ]; } // (if hasLean then { branches = [ "main" ]; } else { });
+  on.push = { tags = [ "v[0-9]+.*" ]; branches = [ "dev" ] ++ lib.optional hasLean "main"; };
   permissions = {
     contents = "read";
     packages = "write";
@@ -157,8 +157,8 @@ in
       (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
       {
         name = "Log in to GHCR";
-        # Only the tag build pushes to GHCR; the `main` seed build just warms the cache.
-        "if" = "github.ref_type == 'tag'";
+        # Only tag and `dev` builds push to GHCR; the `main` seed build just warms the cache.
+        "if" = "github.ref_type == 'tag' || github.ref == 'refs/heads/dev'";
         uses = "docker/login-action@v4";
         "with" = {
           registry = "ghcr.io";
@@ -190,6 +190,10 @@ in
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:''${{ github.ref_name }}"
+            elif [ "''${{ github.ref }}" = "refs/heads/dev" ]; then
+              nix run nixpkgs#skopeo -- copy \
+                "docker-archive:$RESULT" \
+                "docker://${registry}/''${name,,}:dev-''${GITHUB_SHA::8}"
             else
               echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
             fi
