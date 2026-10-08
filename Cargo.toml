@@ -6,7 +6,7 @@ authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
 description = "Shared primitives for v_flakes nix module scripts"
 license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
-include = ["src/**/*", "LICENSE", "README.md", "CHANGELOG.md", ".cargo/*", "build.rs"]
+include = ["src/**/*", "github/org_properties.json", "LICENSE", "README.md", "CHANGELOG.md", ".cargo/*", "build.rs"]
 
 [package.metadata]
 
@@ -15,12 +15,20 @@ pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
 bin-dir = "{ bin }{ binary-ext }"
 pkg-fmt = "tgz"
 
+[[bin]]
+name = "v_flakes"
+path = "src/main.rs"
+required-features = ["cli"]
+
 [features]
+default = ["cli"]
+cli = ["dep:clap", "dep:serde_json"]
 toml = ["dep:clap", "dep:toml_edit"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"], optional = true }
 toml_edit = { version = "0.25", optional = true }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
 insta = "1"

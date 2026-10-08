@@ -1,0 +1,10 @@
+[
+	{
+		"property_name": "pr_auto_review",
+		"value_type": "true_false",
+		"required": false,
+		"default_value": null,
+		"description": "Claude reviews every PR (v_flakes claude-code-review.yml)",
+		"values_editable_by": "org_and_repo_actors"
+	}
+]

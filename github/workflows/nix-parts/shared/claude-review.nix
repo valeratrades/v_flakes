@@ -1,7 +1,11 @@
 # Automatic Claude code review on every PR open/update. Generic across repos.
 # Requires the CLAUDE_CODE_OAUTH_TOKEN secret (see claude.nix for org-wide sharing).
-let utils = import ../../../../utils;
-in {
+let
+  utils = import ../../../../utils;
+  prop = "pr_auto_review";
+in
+assert builtins.any (p: p.property_name == prop) (builtins.fromJSON (builtins.readFile ../../../org_properties.json));
+{
   standalone = true;
 
   name = "Claude Code Review";
@@ -10,6 +14,8 @@ in {
   };
   jobs = {
     claude-review = {
+      # user-owned repos have no custom properties; the nix `claude` flag is their only switch
+      "if" = "github.event.repository.owner.type == 'User' || github.event.repository.custom_properties.${prop} == 'true'";
       runs-on = "ubuntu-latest";
       permissions = {
         contents = "read";

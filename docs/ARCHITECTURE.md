@@ -49,6 +49,7 @@ GitHub-specific configuration:
 - `pre_commit.nix` - Pre-commit hook with treefmt
 - `labels.nix` - GitHub label synchronization
 - `git-ops.rs` - Rust script for git operations
+- `org_properties.json` - org custom property definitions; `v_flakes org sync` (src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
 
 ## rs/
 

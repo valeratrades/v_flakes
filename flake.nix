@@ -79,10 +79,7 @@
               errors.hooks = { push.paths = [ "src/**" ]; };
               warnings.hooks = { push.paths = [ "src/**" ]; };
             };
-            release = {
-              hooks = { push.branches = [ "main" ]; };
-              gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
-            };
+            release.hooks = { push.tags = [ "v[0-9]+.[0-9]+.0" ]; };
           };
           readme = (import ./readme_fw) {
             inherit pkgs pname;
@@ -115,6 +112,16 @@
           # binary the dev shells get, instead of a divergent upstream build.
           packages.cargo-sort-derives = (import ./rs).sort_derives system;
           packages.cargo-machete = (import ./rs).machete system;
+          packages.v_flakes = (let build_rust = (import ./rs).build_nightly system; in pkgs.makeRustPlatform { cargo = build_rust; rustc = build_rust; }).buildRustPackage {
+            inherit pname;
+            version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+            src = pkgs.lib.fileset.toSource {
+              root = ./.;
+              fileset = pkgs.lib.fileset.unions [ ./Cargo.toml ./Cargo.lock ./build.rs ./src ./github/org_properties.json ];
+            };
+            cargoLock.lockFile = ./Cargo.lock;
+            doCheck = false; # tests/ is outside the fileset
+          };
 
           apps.help = {
             type = "app";
@@ -127,6 +134,7 @@
                 nix develop                    dev shell (rust nightly, pre-commit, generated configs)
                 nix run .#cargo-sort-derives   sort derive lists across ./src
                 nix run .#cargo-machete        find unused cargo dependencies
+                v_flakes org sync <ORG>        converge org custom property definitions (github/org_properties.json)
                 ./__scripts/release.sh         release (see `docs/`)
 
               Parts (v_flakes.<attr>):     files github rs py tex typ js readme-fw utils qlty container

@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-v_flakes = { path = "../..", features = ["toml"] }
+v_flakes = { path = "../..", default-features = false, features = ["toml"] }
 ---
 
 use clap::Parser;

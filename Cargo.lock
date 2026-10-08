@@ -560,6 +560,7 @@ version = "0.1.3"
 dependencies = [
  "clap",
  "insta",
+ "serde_json",
  "toml_edit",
  "v_fixtures",
 ]
