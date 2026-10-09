@@ -1,4 +1,4 @@
-# Tag- and `dev`-driven push of every `#containers.<system>.<name>` to GHCR
+# Tag-, `dev`- and `preview`-label-driven push of every `#containers.<system>.<name>` to GHCR
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
@@ -123,6 +123,8 @@ in
 
   name = "Release containers";
   on.push = { tags = [ "v[0-9]+.*" ]; branches = [ "dev" ] ++ lib.optional hasLean "main"; };
+  # A PR labelled `preview` publishes `pr-<n>-<head sha8>` for devops' `fallback preview`; others build nothing.
+  on.pull_request.types = [ "labeled" "synchronize" ];
   permissions = {
     contents = "read";
     packages = "write";
@@ -132,12 +134,13 @@ in
     # Backstop: a cold build is ~25min; cap the job so a hung step can never burn
     # runner minutes indefinitely (see the magic-nix-cache post-step hang).
     timeout-minutes = 40;
+    "if" = "github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'preview')";
     steps = [
       # lfs: image/font assets (e.g. the frontend's PNGs) are Git-LFS tracked; without
       # this the working tree has pointer files and the image build fails decoding them.
       {
         uses = "actions/checkout@v5";
-        "with".lfs = lfs;
+        "with" = { inherit lfs; ref = "\${{ github.event.pull_request.head.sha || github.sha }}"; }; # a PR's head, not its merge commit
       }
       {
         name = "Validate tag (strict semver)";
@@ -157,8 +160,8 @@ in
       (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
       {
         name = "Log in to GHCR";
-        # Only tag and `dev` builds push to GHCR; the `main` seed build just warms the cache.
-        "if" = "github.ref_type == 'tag' || github.ref == 'refs/heads/dev'";
+        # Only tag, `dev` and PR builds push to GHCR; the `main` seed build just warms the cache.
+        "if" = "github.ref_type == 'tag' || github.ref == 'refs/heads/dev' || github.event_name == 'pull_request'";
         uses = "docker/login-action@v4";
         "with" = {
           registry = "ghcr.io";
@@ -194,6 +197,11 @@ in
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:dev-''${GITHUB_SHA::8}"
+            elif [ "''${{ github.event_name }}" = "pull_request" ]; then
+              head="''${{ github.event.pull_request.head.sha }}"
+              nix run nixpkgs#skopeo -- copy \
+                "docker-archive:$RESULT" \
+                "docker://${registry}/''${name,,}:pr-''${{ github.event.pull_request.number }}-''${head::8}"
             else
               echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
             fi
