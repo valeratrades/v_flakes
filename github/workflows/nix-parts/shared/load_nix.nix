@@ -24,7 +24,7 @@ if !hasPackages then null else
         run = ''
           # Pre-fetch packages into nix store so they're cached for dependent jobs
           # Use nix-shell which properly sets up env vars like PKG_CONFIG_PATH
-          nix-shell -p ${builtins.concatStringsSep " " allPackages} --run "echo packages cached"
+          nix-shell -p ${builtins.concatStringsSep " " (allPackages ++ [ "git" ])} --run "echo packages cached"
         '';
       }
     ];
