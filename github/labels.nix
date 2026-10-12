@@ -2,12 +2,12 @@
 [
   # Type. `chore -> feature -> enhancement -> research` is one axis: how much of the
   # end result is known when the issue is filed.
-  { name = "t:chore"; color = "#0052CC"; description = "Small, and fully specified — no decisions left"; }
   { name = "t:feature"; color = "#2bd4a0"; description = "End result is known, the work to get there isn't small"; }
   { name = "t:enhancement"; color = "#a2eeef"; description = "A direction — the end shape is decided along the way"; }
   { name = "t:bug"; color = "#d73a4a"; description = "Something isn't working"; }
-  { name = "t:refactor"; color = "#5319e7"; description = "Behavior unchanged — the code's shape is the deliverable"; }
+  { name = "t:refactor"; color = "#5319e7"; description = "Refactor of code or functionality. Key distinction is refinement of existing structure."; }
   { name = "t:question"; color = "#d876e3"; description = "Deliverable is an answer, — a sort of `t:research` and `t:decision` combination"; }
+  { name = "t:chore"; color = "#0052CC"; description = "Small, and fully specified — no decisions left. Also works as catch-all for small stuff."; }
 
   # Category
   { name = "c:ci"; color = "#808080"; description = "GHAs, flakes, tooling plugs"; }
