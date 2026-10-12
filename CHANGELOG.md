@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **New `utils.publish`** — the `nix run .#publish -- major|minor|patch [note]` app every container repo was carrying its own copy of. It takes `pkgs` and returns the app record. It tags the next `vX.Y.Z` after the newest *remote* tag (a failed `git fetch --tags` is loud, because a stale tag list reuses a version), makes the tag annotated (with the note when one is given), and pushes that tag by name. `release-container.yml` builds on `v[0-9]+.*`, so the tag is the release. It refuses a dirty tree. No manifest is written: the version lives in the tag alone.
+
+  Migrate: delete the repo's own `publish = pkgs.writeShellApplication { … }` and write
+  ```nix
+  apps.publish = v_flakes.utils.publish pkgs;
+  ```
+  Keep the `nix run .#publish` line in the repo's `help`. Copies existed in panel, aquafix, vifnet, review_archive, site, site_conductor, banking and concierge. concierge's copy is not equal to the others: it makes **lightweight** tags (`push --follow-tags` skips them, and they cannot carry a note) and silences fetch errors. Moving it over changes its tags to annotated. lib and social_networks have a different `publish` (cargo-release, a version in `Cargo.toml`). That is `rs`'s `cpublish`, not this one, so leave those two as they are.
+
 - `github`: new `t:refactor` label (`#5319e7`) — behavior stays the same, the code's shape is the deliverable. Sits beside `t:bug`, off the `t:chore` → `t:feature` → `t:enhancement` axis.
 
 - `git_ops sync-labels` todo-sync: only `<comment-leader>TODO<bangs>:` (`//TODO:`, `#TODO!:`, `<!--TODO:` …) becomes an issue. Mentions inside identifiers or prose (`OWNER_TODO:`) and spaced forms (`// TODO:`) are now ignored, and their open `ext:from_todo` issues get closed by the next sync. The leader can come from any language in any file.

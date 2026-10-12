@@ -226,6 +226,7 @@ in
   };
 
   inherit binstallCrate checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
+  publish = import ./publish.nix;
   inherit (core) mergeConfig;
 
   # Combine multiple v-utils modules into a single shell configuration
