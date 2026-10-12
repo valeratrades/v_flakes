@@ -16,6 +16,7 @@ Rust project configuration combining rustfmt, cargo config, and build.rs generat
 
 ### github
 GitHub integration: workflows, git hooks, gitignore, and label sync.
+- `v_flakes org sync <ORG>` (`nix profile install github:valeratrades/v_flakes#v_flakes`): converges org custom property definitions to `github/org_properties.json`
 - Pre-commit hooks with treefmt
 - CI workflow generation (errors, warnings, other)
 - Automatic gitignore based on project languages

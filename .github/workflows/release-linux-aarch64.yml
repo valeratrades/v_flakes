@@ -4,9 +4,6 @@ env:
   RUSTUP_MAX_RETRIES: '10'
 jobs:
   build:
-    if: needs.gate.outputs.run == 'true'
-    needs:
-    - gate
     runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@v5
@@ -56,24 +53,11 @@ jobs:
       with:
         files: ${{ github.event.repository.name }}-aarch64-unknown-linux-gnu.tar.gz
         tag_name: ${{ steps.version.outputs.tag }}
-  gate:
-    outputs:
-      run: ${{ steps.check.outputs.run }}
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-      with:
-        fetch-depth: 2
-    - id: check
-      run: "if [ \"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" !=\
-        \ \"$(grep '^version' Cargo.toml | head -1)\" ]; then\n  echo \"run=true\"\
-        \ >> \"$GITHUB_OUTPUT\"\nelse\n  echo \"run=false\" >> \"$GITHUB_OUTPUT\"\n\
-        fi\n"
 name: Release linux-aarch64
 'on':
   push:
-    branches:
-    - main
+    tags:
+    - v[0-9]+.[0-9]+.0
   workflow_dispatch: {}
 permissions:
   contents: write
