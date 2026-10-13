@@ -1,11 +1,10 @@
 # Default GitHub repository labels
 [
-  # Type. `chore -> feature -> enhancement -> research` is one axis: how much of the
-  # end result is known when the issue is filed.
+  # Type. `chore -> feature -> enhancement -> research` is one axis: how much of the end result is known when the issue is filed.
   { name = "t:feature"; color = "#2bd4a0"; description = "End result is known, the work to get there isn't small"; }
   { name = "t:enhancement"; color = "#a2eeef"; description = "A direction — the end shape is decided along the way"; }
   { name = "t:bug"; color = "#d73a4a"; description = "Something isn't working"; }
-  { name = "t:refactor"; color = "#5319e7"; description = "Refactor of code or functionality. Key distinction is refinement of existing structure."; }
+  { name = "t:architectural"; color = "#5319e7"; description = "Refactor of code structure or functionality. Key distinction is refinement of existing structure."; }
   { name = "t:question"; color = "#d876e3"; description = "Deliverable is an answer, — a sort of `t:research` and `t:decision` combination"; }
   { name = "t:chore"; color = "#0052CC"; description = "Small, and fully specified — no decisions left. Also works as catch-all for small stuff."; }
 
@@ -13,14 +12,16 @@
   { name = "c:ci"; color = "#808080"; description = "GHAs, flakes, tooling plugs"; }
   { name = "c:test"; color = "#0000ff"; description = "Testing, coverage, and test data"; }
   { name = "c:perf"; color = "#7a3274"; description = "Improve speed (runtime, comp-time, iteration)"; }
-  (import ./workflows/nix-parts/shared/claude.nix).label
   { name = "c:docs"; color = "#0075ca"; description = "Improvements or additions to documentation"; }
-  { name = "c:rewrite"; color = "#008672"; description = "Code quality"; }
+  { name = "c:cq"; color = "#008672"; description = "Code quality"; } # was `c:rewrite` before, but that doesn't compose with all `Type`s
 
-  # Severity of a bug; the `i:*` below is derived from it
-  { name = "severity:low"; color = "#c9e6a0"; description = "Bug: cosmetic or easily worked around"; }
-  { name = "severity:medium"; color = "#f8dcb0"; description = "Bug: degrades a feature"; }
-  { name = "severity:high"; color = "#f5b2b3"; description = "Bug: data loss, or a feature is unusable"; }
+  #Q: there seems to be some overlap between `Category` and `Type` sections
+
+  #DEPRECATE: insofar has been insanely confusing, - full switch towards `i:*`
+  ## Severity of a bug; the `i:*` below is derived from it
+  #{ name = "severity:low"; color = "#c9e6a0"; description = "Bug: cosmetic or easily worked around"; }
+  #{ name = "severity:medium"; color = "#f8dcb0"; description = "Bug: degrades a feature"; }
+  #{ name = "severity:high"; color = "#f5b2b3"; description = "Bug: data loss, or a feature is unusable"; }
 
   # Importance (0 = trivial, 9 = critical)
   { name = "i:0"; color = "#0e8a16"; }
@@ -41,4 +42,5 @@
   { name = "ext:good_first_issue"; color = "#7057ff"; description = "Good for newcomers"; }
   { name = "ext:help_wanted"; color = "#0e8a16"; description = "Extra attention is needed"; }
   { name = "ext:invalid"; color = "#e4e669"; description = "This doesn't seem right"; }
+  { name = "claude"; color = "#D97706"; description = "Hand this issue to Claude to implement"; }
 ]
