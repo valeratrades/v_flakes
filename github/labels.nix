@@ -42,5 +42,5 @@
   { name = "ext:good_first_issue"; color = "#7057ff"; description = "Good for newcomers"; }
   { name = "ext:help_wanted"; color = "#0e8a16"; description = "Extra attention is needed"; }
   { name = "ext:invalid"; color = "#e4e669"; description = "This doesn't seem right"; }
-  { name = "claude"; color = "#D97706"; description = "Hand this issue to Claude to implement"; }
+  (import ./workflows/nix-parts/shared/claude.nix).label
 ]
