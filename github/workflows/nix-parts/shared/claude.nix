@@ -1,13 +1,16 @@
 # Claude Code PR assistant — responds to `@claude` mentions in issues, PR comments and reviews,
-# and to the `claude` label on issues (bots can't be assignees, so labeling stands in for assignment).
-# The label is seeded by github/labels.nix (synced on dev-shell entry).
+# and to `label` on issues (bots can't be assignees, so labeling stands in for assignment).
+# `label` is seeded via github/labels.nix (synced on dev-shell entry).
 # Generic across repos: no repo-specific values. Requires the CLAUDE_CODE_OAUTH_TOKEN secret.
 # Share it across a whole org by setting it as an *organization* secret with "All repositories"
 # visibility. Caveat: on the Free plan org secrets reach public repos only — private repos need
 # a repo-level copy (or a Team/Enterprise org). Personal accounts have no org secrets at all.
-let utils = import ../../../../utils;
+let
+  utils = import ../../../../utils;
+  label = { name = "ext:claude"; color = "#D97706"; description = "Hand this issue to Claude to implement"; };
 in {
   standalone = true;
+  inherit label;
 
   name = "Claude Code";
   on = {
@@ -18,7 +21,7 @@ in {
   };
   jobs = {
     claude = {
-      "if" = "(github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) || (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) || (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) || (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude') || github.event.label.name == 'claude'))";
+      "if" = "(github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) || (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) || (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) || (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude') || github.event.label.name == '${label.name}'))";
       runs-on = "ubuntu-latest";
       permissions = {
         contents = "read";
@@ -40,7 +43,7 @@ in {
           uses = "anthropics/claude-code-action@v1";
           "with" = {
             claude_code_oauth_token = "\${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}";
-            label_trigger = "claude";
+            label_trigger = label.name;
             additional_permissions = "actions: read\n";
             # The action defaults to `--permission-mode acceptEdits` plus a narrow --allowedTools
             # list, and headless has no prompt handler, so everything else (Bash, WebFetch,

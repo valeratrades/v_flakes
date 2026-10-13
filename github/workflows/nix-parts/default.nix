@@ -342,7 +342,7 @@ if nixpkgs != null && pkgs == null then {
     # Claude Code workflows (standalone, generic). Generated as a pair when `claude` is set.
     claudeWorkflow =
       if claude then
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude.nix) [ "standalone" ])
+        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude.nix) [ "standalone" "label" ])
       else null;
     claudeReviewWorkflow =
       if claude then

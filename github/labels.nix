@@ -13,7 +13,7 @@
   { name = "c:ci"; color = "#808080"; description = "GHAs, flakes, tooling plugs"; }
   { name = "c:test"; color = "#0000ff"; description = "Testing, coverage, and test data"; }
   { name = "c:perf"; color = "#7a3274"; description = "Improve speed (runtime, comp-time, iteration)"; }
-  { name = "claude"; color = "#D97706"; description = "Hand this issue to Claude to implement"; }
+  (import ./workflows/nix-parts/shared/claude.nix).label
   { name = "c:docs"; color = "#0075ca"; description = "Improvements or additions to documentation"; }
   { name = "c:rewrite"; color = "#008672"; description = "Code quality"; }
 
