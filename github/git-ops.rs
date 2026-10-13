@@ -338,16 +338,16 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 	}
 }
 
+//DEPRECATE: `severity:*` labels were dropped from `labels.nix`; kept only to sync `i:*` on bugs still carrying one
 /// `severity:*` is what a bug report carries; it pins the `i:*` band the bug may sit in.
 /// A bug with no `i:*` gets the band's floor; one that already has an `i:*` keeps it.
-/// A bug with an `i:*` but no `severity:*` gets the lowest band whose ceiling covers it.
 const SEVERITY_BAND: [(&str, u8, u8); 3] = [("severity:low", 3, 5), ("severity:medium", 6, 8), ("severity:high", 9, 9)];
 
 /// Retagged here so dropping the old name from `labels.nix` doesn't strand open issues
 /// on a label the sync then refuses to delete.
 const LEGACY_RENAMES: [(&str, &str); 1] = [("bug", "t:bug")];
 
-/// Migrate labels that were renamed out from under an issue, and mirror a bug's `severity:*` and `i:*` into each other.
+/// Migrate labels that were renamed out from under an issue, and pin a bug's `i:*` to its `severity:*` band.
 /// Edits are reflected back into `issue`, so the checks lint the post-edit state.
 fn apply_conventions(issue: &mut GhIssue) {
 	let has = |name: &str| issue.labels.iter().any(|l| l.name == name);
@@ -363,6 +363,7 @@ fn apply_conventions(issue: &mut GhIssue) {
 		}
 	}
 
+	//DEPRECATE: `severity:*` labels were dropped from `labels.nix`; kept only to sync `i:*` on bugs still carrying one
 	if has("bug") || has("t:bug") {
 		let bands: Vec<(u8, u8)> = SEVERITY_BAND.iter().filter(|(s, ..)| has(s)).map(|(_, lo, hi)| (*lo, *hi)).collect();
 		match bands[..] {
@@ -379,19 +380,7 @@ fn apply_conventions(issue: &mut GhIssue) {
 					}
 				}
 			}
-			[] => {
-				let importance: Vec<Result<u8, _>> = issue.labels.iter().filter_map(|l| l.name.strip_prefix("i:")).map(str::parse::<u8>).collect();
-				match importance[..] {
-					[Ok(n)] => match SEVERITY_BAND.iter().find(|(_, _, hi)| n <= *hi) {
-						Some((severity, ..)) => add.push(severity.to_string()),
-						None => eprintln!("issue-lint: #{} '{}' has i:{n}, above every severity band", issue.number, issue.title),
-					},
-					_ => eprintln!(
-						"issue-lint: #{} '{}' is a bug with no severity:* label, and no single valid i:* to derive it from",
-						issue.number, issue.title
-					),
-				}
-			}
+			[] => {}
 			_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
 		}
 	}
