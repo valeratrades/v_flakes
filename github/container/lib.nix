@@ -176,11 +176,12 @@ in
       containerEnv = builtins.attrValues (builtins.mapAttrs
         (n: value: { name = n; inherit value; })
         env);
-      volumeMounts = map (m: { name = "data"; mountPath = m; }) mounts;
-      volumes = if mounts == [ ] then [ ] else [{
+      # images ship no /tmp, and anything writing scratch (a cache, a browser profile) needs one that dies with the pod
+      volumeMounts = [{ name = "tmp"; mountPath = "/tmp"; }] ++ map (m: { name = "data"; mountPath = m; }) mounts;
+      volumes = [{ name = "tmp"; emptyDir = { }; }] ++ (if mounts == [ ] then [ ] else [{
         name = "data";
         persistentVolumeClaim.claimName = "${name}-data";
-      }];
+      }]);
     in
     {
       deployment = {
