@@ -344,6 +344,8 @@ if nixpkgs != null && pkgs == null then {
       ${"# local .git/config, so it must be (re)applied per clone — `true` always"}
       ${"# succeeds without touching the file, keeping our version on conflict)."}
       git config merge.ours.driver true
+      ${"# `git wt <path> [worktree-add args]`: a worktree without the LFS-tracked files, which a checkout would copy out of .git/lfs one by one"}
+      git config alias.wt '!f() { set -f; top="$(git rev-parse --show-toplevel)"; cd "''${GIT_PREFIX:-.}" && git worktree add --no-checkout "$@" && git -C "$1" sparse-checkout set --no-cone "/*" $(sed -n "s/^\([^ #]*\) .*filter=lfs.*/!\1/p" "$top/.gitattributes") && git -C "$1" checkout -q; }; f'
       '' else ""}
       ${labelSyncHook}
       ${conventionsHook}
