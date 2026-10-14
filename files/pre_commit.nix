@@ -3,8 +3,15 @@
 , # Drop the `Co-Authored-By: Claude` / `Generated with Claude Code` trailer from
   # every commit message. Off by default — opt in per repo.
   stripClaudeSignature ? false
+, # `{ root; allow ? [ ]; }`: raster images under `root` must be webp (svg passes too). `allow`
+  # holds repo-relative paths whose consumers need another format (a `/`-suffixed entry
+  # covers a directory). Off when null.
+  webAssets ? null
 ,
-}: {
+}:
+assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames webAssets) == [ "root" ]
+  || throw "v_flakes files.preCommit: webAssets is { root; allow ? [ ]; }, got ${builtins.toJSON webAssets}";
+{
   src = ./.;
   hooks = {
     strip-claude-signature = {
@@ -30,6 +37,22 @@
             echo "(keep v_flakes.rs.default_nightly for the devShell)" >&2
             exit 1
           fi
+        '';
+      });
+    };
+    # next/image and friends decode the source on every cache miss, so a 2MB png costs on each one.
+    web-assets-webp = {
+      enable = webAssets != null;
+      name = "raster images are webp";
+      files = lib.optionalString (webAssets != null)
+        "(?i)^${lib.escapeRegex (lib.removeSuffix "/" webAssets.root)}/.*\\.(png|jpe?g|gif|bmp|tiff?|avif|ico|heic)$";
+      excludes = map (p: "^${lib.escapeRegex p}${lib.optionalString (!lib.hasSuffix "/" p) "$"}") (webAssets.allow or [ ]);
+      entry = lib.getExe (pkgs.writeShellApplication {
+        name = "web-assets-webp";
+        text = ''
+          printf 'not webp: %s\n' "$@" >&2
+          echo "convert (cwebp -q 90 photo, cwebp -lossless screenshot), or list it in webAssets.allow" >&2
+          exit 1
         '';
       });
     };
