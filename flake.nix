@@ -137,7 +137,7 @@
                 v_flakes org sync <ORG>        converge org custom property definitions (github/org_properties.json)
                 ./__scripts/release.sh         release (see `docs/`)
 
-              Parts (v_flakes.<attr>):     files github rs py tex typ js readme-fw utils qlty container
+              Parts (v_flakes.<attr>):     files github rs py tex typ js readme-fw utils qlty container lean
               Re-exported inputs:          nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
                                            flake-parts process-compose-flake devenv lean4-nix
               Docs: README.md
@@ -212,6 +212,7 @@
       readme-fw = import ./readme_fw;
       utils = import ./utils;
       qlty = import ./qlty.nix;
+      lean = import ./lean { inherit lean4-nix; };
 
       # Backward compatibility aliases
       hooks = {
