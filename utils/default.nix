@@ -225,6 +225,26 @@ in
     pull_request = { };
   };
 
+  # `nix run .#help`, listed off the flake's own outputs so it can't drift from them:
+  #   apps.help = v_flakes.utils.help { inherit pkgs self system; about = "what isn't a flake output"; };
+  # Every app owes a `meta.description`.
+  help = { pkgs, self, system, about ? "" }:
+    let
+      lib = pkgs.lib;
+      row = cmd: desc: "  ${cmd}" + lib.optionalString (desc != "") "${lib.strings.replicate (lib.max 1 (32 - builtins.stringLength cmd)) " "}${desc}";
+      apps = lib.mapAttrsToList
+        (name: app: row "nix run .#${name}" (app.meta.description or (throw "v_flakes.utils.help: apps.${system}.${name} has no meta.description")))
+        (removeAttrs (self.apps.${system} or { }) [ "help" ]);
+      packages = lib.mapAttrsToList (name: p: row "nix build .#${name}" (p.meta.description or "")) (self.packages.${system} or { });
+      shells = map (name: row "nix develop${lib.optionalString (name != "default") " .#${name}"}" "") (builtins.attrNames (self.devShells.${system} or { }));
+      text = lib.concatStringsSep "\n" (lib.filter (s: s != "") [ about (lib.concatStringsSep "\n" (apps ++ packages ++ shells)) ]);
+    in
+    {
+      type = "app";
+      meta.description = "this listing";
+      program = "${pkgs.writeShellScriptBin "help" "cat <<'EOF'\n${text}\nEOF\n"}/bin/help";
+    };
+
   inherit binstallCrate checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
   publish = import ./publish.nix;
   inherit (core) mergeConfig;
@@ -345,7 +365,7 @@ in
             echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
             echo "    Every v_flakes consumer owes one — the entrypoint listing what the repo can do." >&2
             echo "    Add to the per-system outputs of flake.nix:" >&2
-            echo "      apps.help = { type = \"app\"; program = \"\''${pkgs.writeShellScriptBin \"help\" '''cat <<EOF ... EOF'''}/bin/help\"; };" >&2
+            echo "      apps.help = v_flakes.utils.help { inherit pkgs self system; };" >&2
             echo "" >&2
           fi
           unset _vf_sys

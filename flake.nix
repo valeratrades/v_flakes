@@ -123,26 +123,17 @@
             doCheck = false; # tests/ is outside the fileset
           };
 
-          apps.help = {
-            type = "app";
-            program = "${pkgs.writeShellScriptBin "help" ''
-              cat <<'EOF'
+          apps.help = utils.help {
+            inherit pkgs self system;
+            about = ''
               ${pname} — shared Nix parts. Consumers pin one input:
                 inputs.v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
-
-              Commands:
-                nix develop                    dev shell (rust nightly, pre-commit, generated configs)
-                nix run .#cargo-sort-derives   sort derive lists across ./src
-                nix run .#cargo-machete        find unused cargo dependencies
-                v_flakes org sync <ORG>        converge org custom property definitions (github/org_properties.json)
-                ./__scripts/release.sh         release (see `docs/`)
-
-              Parts (v_flakes.<attr>):     files github rs py tex typ js readme-fw utils qlty container lean
-              Re-exported inputs:          nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
-                                           flake-parts process-compose-flake devenv lean4-nix
-              Docs: README.md
-              EOF
-            ''}/bin/help";
+              Parts (v_flakes.<attr>):  files github rs py tex typ js readme-fw utils qlty container lean
+              Re-exported inputs:       nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
+                                        flake-parts process-compose-flake devenv lean4-nix
+              v_flakes org sync <ORG>   converge org custom property definitions (github/org_properties.json)
+              ./__scripts/release.sh    release (see `docs/`)
+            '';
           };
 
           devShells.default = pkgs.mkShell {
