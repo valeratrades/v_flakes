@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **`files.preCommit { webAssets = { root; allow ? [ ]; }; }`** — opt-in hook `web-assets-webp`: a raster image (png, jpg, gif, bmp, tiff, avif, ico, heic) committed under `root` fails the commit unless its repo-relative path is in `allow` (a `/`-suffixed entry covers a directory). For files whose consumers need their format: an apple-touch icon, a favicon, an OG image, visual-regression baselines.
+- **`files.preCommit { webAssets = { allow ? [ ]; }; }`** — opt-in hook `web-assets-webp`: a raster image (png, jpg, gif, bmp, tiff, avif, ico, heic) committed anywhere in the repo fails the commit unless its repo-relative path is in `allow` (a `/`-suffixed entry covers a directory). For files whose consumers need their format: an apple-touch icon, a favicon, an OG image, visual-regression baselines.
 - **`container.toManifests`** mounts an emptyDir at `/tmp` in every container.
 
 - **New `utils.publish`** — the `nix run .#publish -- major|minor|patch [note]` app every container repo was carrying its own copy of. It takes `pkgs` and returns the app record. It tags the next `vX.Y.Z` after the newest *remote* tag (a failed `git fetch --tags` is loud, because a stale tag list reuses a version), makes the tag annotated (with the note when one is given), and pushes that tag by name. `release-container.yml` builds on `v[0-9]+.*`, so the tag is the release. It refuses a dirty tree. No manifest is written: the version lives in the tag alone.
