@@ -3,6 +3,7 @@
 # ships the image on `v[0-9]+.*`, and a second copy of the number would be a second source for it.
 pkgs: {
   type = "app";
+  meta.description = "tag the next vX.Y.Z after the newest remote tag and push it: major|minor|patch [note]";
   program = pkgs.lib.getExe (pkgs.writeShellApplication {
     name = "publish";
     runtimeInputs = [ pkgs.git ];
