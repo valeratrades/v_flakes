@@ -22,7 +22,7 @@ let
   # Every key `mkOne` reads. An unknown one is a typo, and a typo that is merely
   # ignored ships the default while the author reads their own line and believes
   # otherwise.
-  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "sqlite" "settings" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
+  known = [ "port" "healthPath" "entrypoint" "criticality" "env" "mounts" "sqlite" "unreplicated" "settings" "contents" "imageEnv" "workingDir" "withCacert" "tag" ];
   # No default is truthful for these. Reported together, with what each is for:
   # failing on the first costs one round trip per key.
   # A worker that listens on nothing states it: `port = null; healthPath = null;`.
@@ -58,6 +58,18 @@ let
       in
       stray == [ ] || throw "v_flakes container '${name}': sqlite ${builtins.toJSON stray} not under any of mounts ${builtins.toJSON mounts}"
     );
+    # `unreplicated`: paths (a file, or a directory and all under it) whose sqlite files are
+    # lost with the volume — another program's, not in the WAL mode litestream needs.
+    assert (
+      let
+        mounts = spec.mounts or [ ];
+        paths = spec.unreplicated or [ ];
+        stray = builtins.filter (p: !(builtins.any (m: pkgs.lib.hasPrefix "${m}/" p) mounts)) paths;
+        replicated = builtins.filter (s: builtins.any (p: s == p || pkgs.lib.hasPrefix "${p}/" s) paths) (spec.sqlite or [ ]);
+      in
+      (stray == [ ] || throw "v_flakes container '${name}': unreplicated ${builtins.toJSON stray} not under any of mounts ${builtins.toJSON mounts}")
+      && (replicated == [ ] || throw "v_flakes container '${name}': sqlite ${builtins.toJSON replicated} is also under `unreplicated`")
+    );
     assert (
       let c = spec.criticality or "high"; in
       builtins.elem c [ "high" "normal" ] || throw "v_flakes container '${name}': criticality is \"${c}\", must be \"high\" or \"normal\" — it orders the cluster's reconcile chain"
@@ -77,6 +89,7 @@ let
         env = spec.env or { };
         mounts = spec.mounts or [ ];
         sqlite = spec.sqlite or [ ];
+        unreplicated = spec.unreplicated or [ ];
         settings = spec.settings or null;
       };
       withCacert = spec.withCacert or true;
