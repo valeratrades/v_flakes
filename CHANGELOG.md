@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`github { enable = true; envrc.extra ? ""; }`** writes `.envrc`: `NIX_CONFIG` (flakes + `accept-flake-config`), a `.direnv/bin/nix` wrapper first on `PATH` that adds `--impure` to every evaluating command (nix drops pure eval for flakes only on the flag, never from config), then `use flake`, then `envrc.extra`. Lines the rewrite drops are printed on shell entry. Migrate: move anything beyond `use flake` into `envrc.extra`; `use flake . --no-pure-eval` is covered by the wrapper.
 - **`files.preCommit { webAssets = { allow ? [ ]; }; }`** — opt-in hook `web-assets-webp`: a raster image (png, jpg, gif, bmp, tiff, avif, ico, heic) committed anywhere in the repo fails the commit unless its repo-relative path is in `allow` (a `/`-suffixed entry covers a directory). For files whose consumers need their format: an apple-touch icon, a favicon, an OG image, visual-regression baselines.
 - **`container.toManifests`** mounts an emptyDir at `/tmp` in every container.
 

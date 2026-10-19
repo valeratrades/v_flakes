@@ -26,4 +26,5 @@
   };
   gitignore = import ./gitignore.nix;
   gitattributes = import ./gitattributes.nix;
+  envrc = import ./envrc.nix;
 }

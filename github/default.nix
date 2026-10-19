@@ -7,6 +7,7 @@ args@{ pkgs ? null
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , langs ? null
 , gitignore ? { }
+, envrc ? { }
 , lfs ? null
 , labels ? { }
 , preCommit ? { }
@@ -49,7 +50,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -319,6 +320,8 @@ if nixpkgs != null && pkgs == null then {
           install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
         '';
 
+    envrcFile = files.envrc { inherit pkgs; extra = envrc.extra or ""; };
+
     conventionsHook =
       if enable && conventions then ''
         (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} >/dev/null 2>/dev/null &)
@@ -338,6 +341,8 @@ if nixpkgs != null && pkgs == null then {
       ${if enable then ''
       ${preCommitInstallHook}
       cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
+      ${"# a consumer's own lines belong in `envrc.extra`; the diff names whatever the rewrite drops"}
+      cmp -s ${envrcFile} ./.envrc || { [ -e ./.envrc ] && diff ${envrcFile} ./.envrc | sed -n 's/^> /v_flakes: .envrc rewritten, move into github.envrc.extra: /p' >&2; cp -f ${envrcFile} ./.envrc; }
       ${if lfs != null then ''
       cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
       ${"# Register the `ours` merge driver referenced by .gitattributes (kept in"}
