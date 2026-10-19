@@ -320,7 +320,7 @@ if nixpkgs != null && pkgs == null then {
           install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
         '';
 
-    envrcFile = files.envrc { inherit pkgs; extra = envrc.extra or ""; };
+    envrcFile = files.envrc { inherit pkgs; impure = envrc.impure or false; extra = envrc.extra or ""; };
 
     conventionsHook =
       if enable && conventions then ''

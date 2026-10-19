@@ -37,7 +37,7 @@ flake.nix (entry point)
 Templates for project files. Each submodule generates a derivation containing the file.
 
 - `gitignore/` - Language-specific gitignore rules
-- `envrc/` - `.envrc` with the `--impure` nix wrapper
+- `envrc/` - `.envrc`, the `--impure` nix wrapper behind `impure`
 - `rust/` - rustfmt.toml, cargo config, deny.toml
 - `treefmt.nix` - treefmt configuration
 - `licenses/` - License file templates

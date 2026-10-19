@@ -15,7 +15,7 @@ GitHub integration: workflows, git hooks, gitignore, and label sync.
 - Pre-commit hooks with treefmt
 - CI workflow generation (errors, warnings, other)
 - Automatic gitignore based on project languages
-- `.envrc` with an `--impure` nix wrapper (`envrc.extra` for repo lines)
+- `.envrc` (`envrc.impure` for an `--impure` nix wrapper, `envrc.extra` for repo lines)
 
 ## files
 File templates: rustfmt.toml, cargo config, deny.toml, treefmt, gitignore, envrc.
