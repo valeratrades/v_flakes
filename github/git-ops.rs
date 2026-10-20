@@ -325,15 +325,19 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 	}
 
 	for issue in &issues {
-		let off: Vec<String> = ["t:", "i:"]
-			.into_iter()
-			.filter_map(|series| {
-				let n = issue.labels.iter().filter(|l| l.name.starts_with(series)).count();
-				(n != 1).then(|| format!("{n} {series}*"))
-			})
+		let n = issue.labels.iter().filter(|l| l.name.starts_with("i:")).count();
+		if n != 1 {
+			eprintln!("issue-lint: #{} '{}' has {n} i:* labels, expected exactly one", issue.number, issue.title);
+		}
+	}
+	for series in ["t:", "h:"] {
+		let off: Vec<String> = issues
+			.iter()
+			.filter(|issue| issue.labels.iter().filter(|l| l.name.starts_with(series)).count() != 1)
+			.map(|issue| format!("#{}", issue.number))
 			.collect();
 		if !off.is_empty() {
-			eprintln!("issue-lint: #{} '{}' has {} labels, expected exactly one of each", issue.number, issue.title, off.join(", "));
+			eprintln!("issue-lint: expected one {series}* on {}", off.join(", "));
 		}
 	}
 }
