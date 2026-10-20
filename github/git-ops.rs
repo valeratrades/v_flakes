@@ -363,6 +363,8 @@ fn lint_issues(issues: &[GhIssue]) {
 	for series in ["t:", "h:"] {
 		let off: Vec<String> = issues
 			.iter()
+			// a question's scope is what it sets out to find, so it can't be estimated
+			.filter(|issue| !(series == "h:" && issue.labels.iter().any(|l| l.name == "t:question")))
 			.filter(|issue| issue.labels.iter().filter(|l| l.name.starts_with(series)).count() != 1)
 			.map(|issue| format!("#{}", issue.number))
 			.collect();

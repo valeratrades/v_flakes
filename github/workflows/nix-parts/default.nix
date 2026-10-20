@@ -492,26 +492,22 @@ if nixpkgs != null && pkgs == null then {
         cp -f ${claudeReviewWorkflow} ./.github/workflows/claude-code-review.yml
       '' else "";
 
-    errorsHook =
-      if workflows.errors != null then ''
-        cp -f ${workflows.errors} ./.github/workflows/errors.yml
-      '' else "";
-    warningsHook =
-      if workflows.warnings != null then ''
-        cp -f ${workflows.warnings} ./.github/workflows/warnings.yml
-      '' else "";
-    otherHook =
-      if workflows.other != null then ''
-        cp -f ${workflows.other} ./.github/workflows/other.yml
-      '' else "";
+    # these names are ours: one no longer configured is a stale leftover of an earlier generation
+    jobsHook = name:
+      let path = "./.github/workflows/${name}.yml"; in
+      if workflows.${name} != null then ''
+        cp -f ${workflows.${name}} ${path}
+      '' else ''
+        [ -e ${path} ] && rm -f ${path} && echo "v_flakes: removed ${path}, no ${name} jobs are configured" >&2
+      '';
   in
   workflows // {
     inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       mkdir -p ./.github/workflows
-      ${errorsHook}
-      ${warningsHook}
-      ${otherHook}
+      ${jobsHook "errors"}
+      ${jobsHook "warnings"}
+      ${jobsHook "other"}
       ${releaseHook}
       ${releaseStaleWarningHook}
       ${containerReleaseHook}
