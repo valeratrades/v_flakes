@@ -353,12 +353,8 @@ fn fetch_open_issues() -> Option<Vec<GhIssue>> {
 
 /// Lint open issues against label conventions. Operates on live remote state,
 /// so unlike label sync it cannot be fingerprint-gated.
-fn lint_issues(mut issues: Vec<GhIssue>) {
-	for issue in &mut issues {
-		apply_conventions(issue);
-	}
-
-	for issue in &issues {
+fn lint_issues(issues: &[GhIssue]) {
+	for issue in issues {
 		let n = issue.labels.iter().filter(|l| l.name.starts_with("i:")).count();
 		if n != 1 {
 			report!("issue-lint", "#{} '{}' has {n} i:* labels, expected exactly one", issue.number, issue.title);
@@ -789,21 +785,29 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 		println!("Color check passed.");
 	}
 
-	let open_issues = fetch_open_issues();
+	let mut open_issues = fetch_open_issues();
 
 	// Fingerprint gates only the label block (not an early return): on a fresh repo
 	// labels must exist before `gh issue create --label ...` below can succeed.
 	let fingerprint = compute_labels_fingerprint(&local_labels);
+	let stale = load_saved_fingerprint("labels", &repo_root).as_ref() != Some(&fingerprint);
+	if stale {
+		upsert_labels(&local_labels);
+	}
+	// after upsert so renamed-to labels exist, before prune so it sees no renamed-from users
+	if let Some(issues) = &mut open_issues {
+		issues.iter_mut().for_each(apply_conventions);
+	}
 	let mut errors = Vec::new();
-	if load_saved_fingerprint("labels", &repo_root).as_ref() != Some(&fingerprint) {
-		errors = sync_labels_remote(local_labels, open_issues.as_deref());
+	if stale {
+		errors = prune_labels(&local_labels, open_issues.as_deref());
 		// unsaved fingerprint re-runs the sync next time, so the errors keep nagging
 		if errors.is_empty() {
 			save_fingerprint("labels", &repo_root, &fingerprint);
 		}
 	}
 
-	if let Some(issues) = open_issues {
+	if let Some(issues) = &open_issues {
 		lint_issues(issues);
 	}
 	sync_todos(&repo_root);
@@ -817,25 +821,21 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	flush_report();
 }
 
-/// Returns what could not be done, so the caller reports it after the rest of the sync.
-fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssue]>) -> Vec<String> {
-	let remote_labels = match get_remote_labels() {
-		Ok(labels) => labels,
+fn fetch_remote_labels() -> HashMap<String, (String, Option<String>)> {
+	match get_remote_labels() {
+		Ok(labels) => labels.into_iter().map(|l| (l.name, (l.color, l.description))).collect(),
 		Err(e) => {
 			report!("label-sync", "{e}");
 			exit_reporting();
 		}
-	};
+	}
+}
 
-	let local_map: HashMap<String, (String, Option<String>)> = local_labels.into_iter().map(|l| (l.name, (l.color, l.description))).collect();
-	let remote_map: HashMap<String, (String, Option<String>)> = remote_labels.into_iter().map(|l| (l.name, (l.color, l.description))).collect();
-
+fn upsert_labels(local_labels: &[LabelSpec]) {
+	let remote_map = fetch_remote_labels();
 	let mut created = 0;
 	let mut updated = 0;
-	let mut deleted = 0;
-
-	// Create or update labels
-	for (name, (color, description)) in &local_map {
+	for LabelSpec { name, color, description } in local_labels {
 		match remote_map.get(name) {
 			None =>
 				if create_label(name, color, description.as_deref()) {
@@ -860,6 +860,13 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 		}
 	}
 
+	if created > 0 || updated > 0 {
+		println!("Labels synced: {created} created, {updated} updated");
+	}
+}
+
+/// Returns what could not be done, so the caller reports it after the rest of the sync.
+fn prune_labels(local_labels: &[LabelSpec], open_issues: Option<&[GhIssue]>) -> Vec<String> {
 	// The config is the definition of the label set, so anything else on the remote goes —
 	// unless an open issue still carries it, which is a human's call to make, not ours.
 	// unverifiable usage only warns: an issues-disabled repo would otherwise fail every
@@ -868,7 +875,8 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 		report!("label-sync", "open issues unavailable — not deleting labels outside the config");
 		return Vec::new();
 	};
-	let mut unmanaged: Vec<&str> = remote_map.keys().map(String::as_str).filter(|name| !local_map.contains_key(*name)).collect();
+	let remote_map = fetch_remote_labels();
+	let mut unmanaged: Vec<&str> = remote_map.keys().map(String::as_str).filter(|name| !local_labels.iter().any(|l| l.name == *name)).collect();
 	unmanaged.sort();
 
 	let mut errors = Vec::new();
@@ -885,33 +893,21 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 	// `gh label delete` is a round-trip each; a small pool keeps a long drop-list quick
 	let workers = queue.len().min(8);
 	let queue = Mutex::new(queue);
-	let done: Mutex<(usize, Vec<String>)> = Mutex::new((0, Vec::new()));
+	let errors = Mutex::new(errors);
 	thread::scope(|s| {
 		for _ in 0..workers {
 			s.spawn(|| {
 				while let Some(name) = queue.lock().expect("no panics while holding the queue").pop() {
-					let ok = delete_label(name);
-					let mut done = done.lock().expect("no panics while holding the tally");
-					if ok {
-						done.0 += 1;
-						println!("label-sync: deleted '{}' (not in config, unused by open issues)", name);
+					if delete_label(name) {
+						println!("label-sync: deleted '{name}' (not in config, unused by open issues)");
 					} else {
-						done.1.push(format!("failed to delete label '{name}'"));
+						errors.lock().expect("no panics while holding the errors").push(format!("failed to delete label '{name}'"));
 					}
 				}
 			});
 		}
 	});
-	let (ok, failures) = done.into_inner().expect("workers joined");
-	deleted += ok;
-	errors.extend(failures);
-
-	// Only print summary if there were actual changes
-	if created > 0 || updated > 0 || deleted > 0 {
-		println!("Labels synced: {} created, {} updated, {} deleted", created, updated, deleted);
-	}
-
-	errors
+	errors.into_inner().expect("workers joined")
 }
 
 fn compute_conventions_fingerprint(version_key: &str, owner: &str, files: &[String]) -> String {
