@@ -52,3 +52,6 @@ len_zero = "allow"
 comparison_to_empty = "allow"
 undocumented_unsafe_blocks = "warn"
 tabs_in_doc_comments = "allow"
+
+[lints.cargo]
+non_kebab_case_bins = "allow"
