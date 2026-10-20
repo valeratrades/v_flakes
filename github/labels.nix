@@ -35,6 +35,20 @@
   { name = "i:8"; color = "#c73405"; }
   { name = "i:9"; color = "#b60205"; }
 
+  # Hours: done within N with 68% certainty (1σ). Fibonacci, like zenhub estimates.
+  { name = "h:1"; color = "#c3dfed"; }
+  { name = "h:2"; color = "#accee8"; }
+  { name = "h:3"; color = "#94b8e3"; }
+  { name = "h:5"; color = "#7b9edf"; }
+  { name = "h:8"; color = "#617fdc"; }
+  { name = "h:13"; color = "#475bd9"; }
+  { name = "h:21"; color = "#2d32d7"; }
+  { name = "h:34"; color = "#2e21c6"; }
+  { name = "h:55"; color = "#361bb0"; }
+  { name = "h:89"; color = "#3b1599"; }
+  { name = "h:144"; color = "#3c1081"; }
+  { name = "h:233"; color = "#3a0b69"; }
+
   # Extensions
   { name = "ext:breaking"; color = "#000000"; description = "Implementing should be postponed until next major version"; }
   { name = "ext:from_todo"; color = "#bfd4f2"; description = "Auto-generated from a TODO comment"; }
