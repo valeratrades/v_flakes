@@ -293,6 +293,40 @@ struct GhIssue {
 	labels: Vec<GhLabel>,
 }
 
+/// stderr of `sync-labels`, grouped by section and written in one go: it runs backgrounded
+/// from a shellHook, so anything else printing meanwhile would split a group apart.
+static REPORT: Mutex<Vec<(&str, String)>> = Mutex::new(Vec::new());
+
+macro_rules! report {
+	($section:expr, $($arg:tt)*) => {
+		REPORT.lock().expect("no panics while holding the report").push(($section, format!($($arg)*)))
+	};
+}
+
+fn flush_report() {
+	let report = std::mem::take(&mut *REPORT.lock().expect("no panics while holding the report"));
+	let mut sections: Vec<(&str, Vec<String>)> = Vec::new();
+	for (section, line) in report {
+		match sections.iter_mut().find(|(s, _)| *s == section) {
+			Some((_, lines)) => lines.push(line),
+			None => sections.push((section, vec![line])),
+		}
+	}
+	let mut out = String::new();
+	for (section, lines) in sections {
+		out += &format!("- {section}\n");
+		for line in lines {
+			out += &format!("  {line}\n");
+		}
+	}
+	io::stderr().lock().write_all(out.as_bytes()).expect("stderr is open");
+}
+
+fn exit_reporting() -> ! {
+	flush_report();
+	std::process::exit(1)
+}
+
 /// `None` means the list is unavailable (issues disabled, no network), which is not
 /// the same as "no open issues" — deletions treat it as unknown and hold off.
 fn fetch_open_issues() -> Option<Vec<GhIssue>> {
@@ -300,19 +334,19 @@ fn fetch_open_issues() -> Option<Vec<GhIssue>> {
 		Ok(o) if o.status.success() => o,
 		// issues may be disabled on this repo — that shouldn't fail label sync
 		Ok(o) => {
-			eprintln!("issue-lint: skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
+			report!("issue-lint", "skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
 			return None;
 		}
 		Err(e) => {
-			eprintln!("issue-lint: skipped: {}", e);
+			report!("issue-lint", "skipped: {}", e);
 			return None;
 		}
 	};
 	match serde_json::from_slice(&output.stdout) {
 		Ok(i) => Some(i),
 		Err(e) => {
-			eprintln!("issue-lint: failed to parse issues: {}", e);
-			std::process::exit(1);
+			report!("issue-lint", "failed to parse issues: {}", e);
+			exit_reporting();
 		}
 	}
 }
@@ -327,7 +361,7 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 	for issue in &issues {
 		let n = issue.labels.iter().filter(|l| l.name.starts_with("i:")).count();
 		if n != 1 {
-			eprintln!("issue-lint: #{} '{}' has {n} i:* labels, expected exactly one", issue.number, issue.title);
+			report!("issue-lint", "#{} '{}' has {n} i:* labels, expected exactly one", issue.number, issue.title);
 		}
 	}
 	for series in ["t:", "h:"] {
@@ -337,7 +371,7 @@ fn lint_issues(mut issues: Vec<GhIssue>) {
 			.map(|issue| format!("#{}", issue.number))
 			.collect();
 		if !off.is_empty() {
-			eprintln!("issue-lint: expected one {series}* on {}", off.join(", "));
+			report!("issue-lint", "expected one {series}* on {}", off.join(", "));
 		}
 	}
 }
@@ -379,13 +413,13 @@ fn apply_conventions(issue: &mut GhIssue) {
 				for name in current {
 					match name.strip_prefix("i:").expect("filtered on that prefix").parse::<u8>() {
 						Ok(n) if (lo..=hi).contains(&n) => {}
-						Ok(_) => eprintln!("issue-lint: #{} '{}' is {name}, outside i:{lo}-i:{hi} for its severity", issue.number, issue.title),
-						Err(e) => eprintln!("issue-lint: #{} '{}' has an unparseable importance label {name}: {e}", issue.number, issue.title),
+						Ok(_) => report!("issue-lint", "#{} '{}' is {name}, outside i:{lo}-i:{hi} for its severity", issue.number, issue.title),
+						Err(e) => report!("issue-lint", "#{} '{}' has an unparseable importance label {name}: {e}", issue.number, issue.title),
 					}
 				}
 			}
 			[] => {}
-			_ => eprintln!("issue-lint: #{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
+			_ => report!("issue-lint", "#{} '{}' has {} severity:* labels, expected exactly one", issue.number, issue.title, bands.len()),
 		}
 	}
 
@@ -401,7 +435,7 @@ fn apply_conventions(issue: &mut GhIssue) {
 		args.extend(["--remove-label", l.as_str()]);
 	}
 	if !run_gh_success(&args) {
-		eprintln!("issue-lint: failed to relabel #{number} (+{add:?} -{remove:?})");
+		report!("issue-lint", "failed to relabel #{number} (+{add:?} -{remove:?})");
 		return;
 	}
 	issue.labels.retain(|l| !remove.contains(&l.name));
@@ -482,8 +516,8 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
 		.current_dir(repo_root)
 		.output()
 		.unwrap_or_else(|e| {
-			eprintln!("todo-sync: failed to run git grep: {e}");
-			std::process::exit(1);
+			report!("todo-sync", "failed to run git grep: {e}");
+			exit_reporting();
 		});
 	match output.status.code() {
 		Some(0) => {}
@@ -491,8 +525,8 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
 		// misreading a grep failure as "no TODOs" would mass-close every generated issue
 		Some(1) if output.stderr.is_empty() => return Vec::new(),
 		_ => {
-			eprintln!("todo-sync: git grep failed: {}", String::from_utf8_lossy(&output.stderr));
-			std::process::exit(1);
+			report!("todo-sync", "git grep failed: {}", String::from_utf8_lossy(&output.stderr));
+			exit_reporting();
 		}
 	}
 
@@ -513,7 +547,7 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
 		occurrences.sort();
 		let at = format!("{}:{}", occurrences[0].0, occurrences[0].1);
 		if content.is_empty() {
-			eprintln!("todo-sync: skipping contentless {TODO_NEEDLE} at {at} — the whole comment must fit on that one line");
+			report!("todo-sync", "skipping contentless {TODO_NEEDLE} at {at} — the whole comment must fit on that one line");
 			continue;
 		}
 		let (title, description) = match content.split_once(". ") {
@@ -521,7 +555,7 @@ fn scan_todos(repo_root: &str) -> Vec<Todo> {
 			None => (content.strip_suffix('.').unwrap_or(&content).to_string(), String::new()),
 		};
 		if title.len() > 256 {
-			eprintln!("todo-sync: skipping (title > 256 chars, gh would reject) at {at}");
+			report!("todo-sync", "skipping (title > 256 chars, gh would reject) at {at}");
 			continue;
 		}
 		todos.push(Todo {
@@ -571,24 +605,24 @@ fn sync_todos(repo_root: &str) {
 		Ok(o) if o.status.success() => o,
 		// issues may be disabled on this repo — same policy as lint_issues
 		Ok(o) => {
-			eprintln!("todo-sync: skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
+			report!("todo-sync", "skipped: {}", String::from_utf8_lossy(&o.stderr).trim());
 			return;
 		}
 		Err(e) => {
-			eprintln!("todo-sync: skipped: {}", e);
+			report!("todo-sync", "skipped: {}", e);
 			return;
 		}
 	};
 	let issues: Vec<GhTodoIssue> = match serde_json::from_slice(&output.stdout) {
 		Ok(i) => i,
 		Err(e) => {
-			eprintln!("todo-sync: failed to parse issues: {}", e);
-			std::process::exit(1);
+			report!("todo-sync", "failed to parse issues: {}", e);
+			exit_reporting();
 		}
 	};
 	if issues.len() == 1000 {
-		eprintln!("todo-sync: fetch cap hit — reconciling against a truncated view could duplicate issues");
-		std::process::exit(1);
+		report!("todo-sync", "fetch cap hit — reconciling against a truncated view could duplicate issues");
+		exit_reporting();
 	}
 
 	let mut by_id: HashMap<&str, &GhTodoIssue> = HashMap::new();
@@ -603,7 +637,7 @@ fn sync_todos(repo_root: &str) {
 				}
 			}
 			None if issue.state == "OPEN" => {
-				eprintln!("todo-sync: #{} has ext:from_todo but no id marker — leaving it alone", issue.number)
+				report!("todo-sync", "#{} has ext:from_todo but no id marker — leaving it alone", issue.number)
 			}
 			None => {}
 		}
@@ -623,7 +657,7 @@ fn sync_todos(repo_root: &str) {
 				// t:chore keeps the exactly-one-t:* lint green; user retags freely — identity is the marker
 				let labels = format!("ext:from_todo,i:{},t:chore", todo.importance);
 				if !run_gh_success(&["issue", "create", "--title", &todo.title, "--body", &body, "--label", &labels]) {
-					eprintln!("todo-sync: failed to create issue for '{}'", todo.title);
+					report!("todo-sync", "failed to create issue for '{}'", todo.title);
 				}
 			}
 			// auto-close marker + not-planned = we closed it when the comment was hidden
@@ -636,10 +670,10 @@ fn sync_todos(repo_root: &str) {
 				if run_gh_success(&["issue", "reopen", &n]) {
 					let stripped = i.body.replace(&format!("\n\n{AUTO_CLOSE_MARKER}"), "").replace(AUTO_CLOSE_MARKER, "");
 					if !run_gh_success(&["issue", "edit", &n, "--body", &stripped]) {
-						eprintln!("todo-sync: failed to strip auto-close marker from #{n}");
+						report!("todo-sync", "failed to strip auto-close marker from #{n}");
 					}
 				} else {
-					eprintln!("todo-sync: failed to reopen #{n}");
+					report!("todo-sync", "failed to reopen #{n}");
 				}
 			}
 			// any other close (completed, or not-planned without our marker) is a human
@@ -665,13 +699,13 @@ fn sync_todos(repo_root: &str) {
 		if !issue.body.contains(AUTO_CLOSE_MARKER) {
 			let marked = format!("{}\n\n{AUTO_CLOSE_MARKER}", issue.body);
 			if !run_gh_success(&["issue", "edit", &n, "--body", &marked]) {
-				eprintln!("todo-sync: failed to stamp #{n} before close — skipping close");
+				report!("todo-sync", "failed to stamp #{n} before close — skipping close");
 				continue;
 			}
 		}
 		let comment = format!("{TODO_NEEDLE} comment no longer in code — closed by sync.");
 		if !run_gh_success(&["issue", "close", &n, "--reason", "not planned", "--comment", &comment]) {
-			eprintln!("todo-sync: failed to close #{n}");
+			report!("todo-sync", "failed to close #{n}");
 		}
 	}
 }
@@ -690,7 +724,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 		let text = match fs::read_to_string(&path) {
 			Ok(t) => t,
 			Err(e) => {
-				eprintln!("todo-sync: can't read {file}: {e}");
+				report!("todo-sync", "can't read {file}: {e}");
 				continue;
 			}
 		};
@@ -699,7 +733,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 		let mut lines: Vec<Option<String>> = text.split('\n').map(|l| Some(l.to_string())).collect();
 		for (lineno, todo, number) in edits {
 			let Some(slot) = lines.get_mut(lineno - 1) else {
-				eprintln!("todo-sync: {file}:{lineno} vanished since scan — not removing");
+				report!("todo-sync", "{file}:{lineno} vanished since scan — not removing");
 				continue;
 			};
 			let replacement = {
@@ -708,7 +742,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 				// are milliseconds apart, but deleting the wrong code is unrecoverable
 				let verified = split_todo(line).filter(|(_, bangs, content)| todo_id(*bangs, content.trim()) == todo.id);
 				let Some((pos, ..)) = verified else {
-					eprintln!("todo-sync: {file}:{lineno} changed since scan — not removing");
+					report!("todo-sync", "{file}:{lineno} changed since scan — not removing");
 					continue;
 				};
 				let mut prefix = line[..pos].trim_end();
@@ -718,14 +752,14 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 						break;
 					}
 				}
-				eprintln!("todo-sync: #{number} closed by human — removing comment at {file}:{lineno}");
+				report!("todo-sync", "#{number} closed by human — removing comment at {file}:{lineno}");
 				(!prefix.is_empty()).then(|| prefix.to_string())
 			};
 			*slot = replacement;
 		}
 		let kept: Vec<&str> = lines.iter().flatten().map(String::as_str).collect();
 		if let Err(e) = fs::write(&path, kept.join("\n")) {
-			eprintln!("todo-sync: can't write {file}: {e}");
+			report!("todo-sync", "can't write {file}: {e}");
 		}
 	}
 }
@@ -743,14 +777,14 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 		Err(e) if matches!(e, fs::TryLockError::WouldBlock) => return,
 		Err(e) => {
 			eprintln!("ERROR: lock {}: {}", lock_path.display(), e);
-			std::process::exit(1);
+			exit_reporting();
 		}
 	}
 
 	if check_colors {
 		if let Err(e) = check_duplicate_colors(&local_labels) {
 			eprintln!("ERROR: {}", e);
-			std::process::exit(1);
+			exit_reporting();
 		}
 		println!("Color check passed.");
 	}
@@ -774,13 +808,13 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	}
 	sync_todos(&repo_root);
 
-	if !errors.is_empty() {
-		eprintln!("\nERROR: label-sync could not converge:");
-		for e in &errors {
-			eprintln!("  - {e}");
-		}
-		std::process::exit(1);
+	for e in &errors {
+		report!("label-sync could not converge", "{e}");
 	}
+	if !errors.is_empty() {
+		exit_reporting();
+	}
+	flush_report();
 }
 
 /// Returns what could not be done, so the caller reports it after the rest of the sync.
@@ -788,8 +822,8 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 	let remote_labels = match get_remote_labels() {
 		Ok(labels) => labels,
 		Err(e) => {
-			eprintln!("ERROR: {}", e);
-			std::process::exit(1);
+			report!("label-sync", "{e}");
+			exit_reporting();
 		}
 	};
 
@@ -807,7 +841,7 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 				if create_label(name, color, description.as_deref()) {
 					created += 1;
 				} else {
-					eprintln!("  Failed to create label '{}'", name);
+					report!("label-sync", "failed to create label '{name}'");
 				},
 			Some((remote_color, remote_desc)) => {
 				let color_differs = remote_color.to_lowercase() != color.to_lowercase();
@@ -819,7 +853,7 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 					if update_label(name, color, description.as_deref()) {
 						updated += 1;
 					} else {
-						eprintln!("  Failed to update label '{}'", name);
+						report!("label-sync", "failed to update label '{name}'");
 					}
 				}
 			}
@@ -831,7 +865,7 @@ fn sync_labels_remote(local_labels: Vec<LabelSpec>, open_issues: Option<&[GhIssu
 	// unverifiable usage only warns: an issues-disabled repo would otherwise fail every
 	// shell entry forever, and deleting on a guess is not undoable
 	let Some(open_issues) = open_issues else {
-		eprintln!("label-sync: open issues unavailable — not deleting labels outside the config");
+		report!("label-sync", "open issues unavailable — not deleting labels outside the config");
 		return Vec::new();
 	};
 	let mut unmanaged: Vec<&str> = remote_map.keys().map(String::as_str).filter(|name| !local_map.contains_key(*name)).collect();
