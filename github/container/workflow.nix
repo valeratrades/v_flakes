@@ -1,4 +1,4 @@
-# Tag-, `main`- and `preview`-label-driven push of every `#containers.<system>.<name>` to GHCR
+# Tag-, dispatch- and `preview`-label-driven push of every `#containers.<system>.<name>` to GHCR
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
@@ -30,8 +30,9 @@ let
   # implies impure) additionally forces those mutable refs to re-resolve each build.
   flakeFlags = lib.optionalString (impure || refresh) "--impure " + lib.optionalString refresh "--refresh ";
   nixCi = import ../cache.nix { inherit cache; };
-  # Lean cache can't be shared between tag runs (GitHub scopes caches per ref): the `main`
-  # build seeds a default-branch-scoped cache that tag runs can read.
+  # Lean cache can't be shared between tag runs (GitHub scopes caches per ref). So under
+  # lean we ALSO build on `main` (seeding a default-branch-scoped cache that tag runs can
+  # read) — that build skips the GHCR push; the tag run restores it and pushes.
   hasLean = (cache.lean or false) != false;
 
   # buildTiming: -L for streamed, drv-prefixed build logs; --quiet otherwise.
@@ -121,8 +122,9 @@ in
   filename = "release-container.yml";
 
   name = "Release containers";
-  # `main` publishes `main-<head sha8>` for devops' deployment-control, which a Deployment switched to main runs.
-  on.push = { tags = [ "v[0-9]+.*" ]; branches = [ "main" ]; };
+  on.push = { tags = [ "v[0-9]+.*" ]; } // lib.optionalAttrs hasLean { branches = [ "main" ]; };
+  # Dispatched on `main` by devops' deployment-control for a Deployment switched to main: publishes `main-<head sha8>`.
+  on.workflow_dispatch = { };
   # A PR labelled `preview` publishes `pr-<n>-<head sha8>` for devops' `fallback preview`; others build nothing.
   on.pull_request.types = [ "labeled" "synchronize" ];
   permissions = {
@@ -159,6 +161,8 @@ in
       (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
       {
         name = "Log in to GHCR";
+        # The lean `main` seed build just warms the cache.
+        "if" = "github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'";
         uses = "docker/login-action@v4";
         "with" = {
           registry = "ghcr.io";
@@ -190,15 +194,18 @@ in
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:''${{ github.ref_name }}"
-            elif [ "''${{ github.ref }}" = "refs/heads/main" ]; then
+            elif [ "''${{ github.event_name }}" = "workflow_dispatch" ]; then
+              [ "''${{ github.ref }}" = "refs/heads/main" ] || { echo "::error::dispatch publishes main's head only, not ''${{ github.ref }}" >&2; exit 1; }
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:main-''${GITHUB_SHA::8}"
-            else
+            elif [ "''${{ github.event_name }}" = "pull_request" ]; then
               head="''${{ github.event.pull_request.head.sha }}"
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:pr-''${{ github.event.pull_request.number }}-''${head::8}"
+            else
+              echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
             fi
             echo "::endgroup::"
           done
