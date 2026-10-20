@@ -37,14 +37,6 @@ fn merge(cargo: &str, lints_src: &str) -> String {
 	let mut doc = cargo.parse::<DocumentMut>().expect("valid Cargo.toml");
 	let lints_doc = lints_src.parse::<DocumentMut>().expect("valid lints TOML");
 
-	let mut rust_lints = Table::new();
-	if let Some(rust) = lints_doc.get("rust").and_then(|i| i.as_table()) {
-		for (k, v) in rust.iter() {
-			rust_lints.insert(k, v.clone());
-		}
-	}
-	rust_lints.sort_values();
-
 	let is_workspace = doc.get("workspace").is_some();
 
 	let lints_table: &mut Table = if is_workspace {
@@ -69,7 +61,14 @@ fn merge(cargo: &str, lints_src: &str) -> String {
 			.expect("inserted above")
 	};
 
-	lints_table.insert("rust", Item::Table(rust_lints));
+	for (tool, src) in lints_doc.iter() {
+		let mut lints = Table::new(); // fresh, so it doesn't inherit the input doc's position
+		for (k, v) in src.as_table().expect("lints input is tool -> table").iter() {
+			lints.insert(k, v.clone());
+		}
+		lints.sort_values();
+		lints_table.insert(tool, Item::Table(lints));
+	}
 
 	doc.to_string()
 }

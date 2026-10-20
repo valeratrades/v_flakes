@@ -56,7 +56,7 @@ if nixpkgs != null && pkgs == null then {
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
       clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see files/rust/clippy.nix)
       sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see files/rust/sort_derives.nix)
-      lints = true;     # `false` disables Cargo.toml [lints.rust] (or [workspace.lints.rust]) management. Pass an attrset to extend defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
+      lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
       tracey = true;     # Enable tracey spec coverage (default: true)
       style = {
         format = true;   # Auto-fix style issues in pre-commit (default: true)
@@ -131,7 +131,7 @@ if nixpkgs != null && pkgs == null then {
     - Copy rustfmt.toml to ./rustfmt.toml
     - Copy cargo config to ./.cargo/config.toml
     - Copy clippy config to ./.cargo/clippy.toml
-    - Merge controlled `[lints.rust]` (or `[workspace.lints.rust]` if `[workspace]` exists) into ./Cargo.toml
+    - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into ./Cargo.toml
     - Copy build.rs to each directory in build.workspace (with write permissions for treefmt)
     - Copy deny.toml to ./deny.toml (if deny = true)
 

@@ -1,15 +1,18 @@
-{ pkgs, extend ? {} }:
+{ pkgs, extend ? { } }:
 let
   core = import ../../utils/core.nix;
 
-  # Keys here become entries under [lints.rust] (or [workspace.lints.rust]) in Cargo.toml.
+  # `extend` applies to `rust` only.
   base = {
     "unused_features" = "allow";
   };
 
-  merged = core.mergeConfig base extend;
-
-  # Wrapped under `rust` so the consumer can place it under either [lints] or [workspace.lints].
-  wrapped = { rust = merged; };
+  # Top-level keys are tool names, placed under either [lints] or [workspace.lints].
+  tools = {
+    rust = core.mergeConfig base extend;
+    cargo = {
+      "non_kebab_case_bins" = "allow";
+    };
+  };
 in
-(pkgs.formats.toml { }).generate "cargo-lints.toml" wrapped
+(pkgs.formats.toml { }).generate "cargo-lints.toml" tools
