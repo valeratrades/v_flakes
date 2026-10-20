@@ -183,6 +183,7 @@ if nixpkgs != null && pkgs == null then {
     lintsFile = files.rust.lints { inherit pkgs; extend = lintsExtend; };
     lintsHook =
       if lintsEnabled then ''
+        export CARGO_UNSTABLE_CARGO_LINTS=true # pinned nightly ignores [lints.cargo] without it
         if [ -f ./Cargo.toml ]; then
           cargo -Zscript -q ${./cargo-merge.rs} ./Cargo.toml ${lintsFile}
         fi
