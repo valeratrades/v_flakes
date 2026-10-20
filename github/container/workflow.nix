@@ -1,4 +1,4 @@
-# Tag-, `dev`- and `preview`-label-driven push of every `#containers.<system>.<name>` to GHCR
+# Tag-, `main`- and `preview`-label-driven push of every `#containers.<system>.<name>` to GHCR
 # (aarch64). The repo's container set is enumerated at build time, so adding a
 # container needs no workflow change.
 #
@@ -30,9 +30,8 @@ let
   # implies impure) additionally forces those mutable refs to re-resolve each build.
   flakeFlags = lib.optionalString (impure || refresh) "--impure " + lib.optionalString refresh "--refresh ";
   nixCi = import ../cache.nix { inherit cache; };
-  # Lean cache can't be shared between tag runs (GitHub scopes caches per ref). So under
-  # lean we ALSO build on `main` (seeding a default-branch-scoped cache that tag runs can
-  # read) — that build skips the GHCR push; the tag run restores it and pushes.
+  # Lean cache can't be shared between tag runs (GitHub scopes caches per ref): the `main`
+  # build seeds a default-branch-scoped cache that tag runs can read.
   hasLean = (cache.lean or false) != false;
 
   # buildTiming: -L for streamed, drv-prefixed build logs; --quiet otherwise.
@@ -122,7 +121,8 @@ in
   filename = "release-container.yml";
 
   name = "Release containers";
-  on.push = { tags = [ "v[0-9]+.*" ]; branches = [ "dev" ] ++ lib.optional hasLean "main"; };
+  # `main` publishes `main-<head sha8>` for devops' deployment-control, which a Deployment switched to main runs.
+  on.push = { tags = [ "v[0-9]+.*" ]; branches = [ "main" ]; };
   # A PR labelled `preview` publishes `pr-<n>-<head sha8>` for devops' `fallback preview`; others build nothing.
   on.pull_request.types = [ "labeled" "synchronize" ];
   permissions = {
@@ -144,7 +144,6 @@ in
       }
       {
         name = "Validate tag (strict semver)";
-        # Skipped on the `main` cache-seed build (no tag to validate).
         "if" = "github.ref_type == 'tag'";
         shell = "bash";
         run = semverGate;
@@ -160,8 +159,6 @@ in
       (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
       {
         name = "Log in to GHCR";
-        # Only tag, `dev` and PR builds push to GHCR; the `main` seed build just warms the cache.
-        "if" = "github.ref_type == 'tag' || github.ref == 'refs/heads/dev' || github.event_name == 'pull_request'";
         uses = "docker/login-action@v4";
         "with" = {
           registry = "ghcr.io";
@@ -193,17 +190,15 @@ in
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:''${{ github.ref_name }}"
-            elif [ "''${{ github.ref }}" = "refs/heads/dev" ]; then
+            elif [ "''${{ github.ref }}" = "refs/heads/main" ]; then
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
-                "docker://${registry}/''${name,,}:dev-''${GITHUB_SHA::8}"
-            elif [ "''${{ github.event_name }}" = "pull_request" ]; then
+                "docker://${registry}/''${name,,}:main-''${GITHUB_SHA::8}"
+            else
               head="''${{ github.event.pull_request.head.sha }}"
               nix run nixpkgs#skopeo -- copy \
                 "docker-archive:$RESULT" \
                 "docker://${registry}/''${name,,}:pr-''${{ github.event.pull_request.number }}-''${head::8}"
-            else
-              echo "cache-seed build ($name) on ''${{ github.ref_name }} — skipping GHCR push"
             fi
             echo "::endgroup::"
           done
