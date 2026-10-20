@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `github`: label sync (with issue lint and todo-sync) moved off shell entry into the pre-commit hook, still detached. `labelSyncHook` is gone; a repo with its own hook runs `${github.git_ops}/bin/git_ops sync-labels` from it. Label sync now rides on `custom.sh`, so it only runs where that is installed: repos passing a language module, with a git-hooks.nix pre-commit hook.
+- `github`: the pre-commit hook is now `github/pre-commit.rs` (`custom.sh` just runs it), in phases of concurrent steps: `[config copy | cargo sort + autoinherit | sort-derives | codestyle install]`, re-stage, codestyle, `[semver-checks | tracey | js visual]`. Each step's output is printed whole when its phase ends. `cargo semver-checks`, `tracey --check`, `codestyle assert` and failing sort/autoinherit runs now fail the commit; before, only an explicit `exit 1` did.
+
 - **`github { enable = true; envrc = { impure ? false; extra ? ""; }; }`** writes `.envrc`: `NIX_CONFIG` (flakes + `accept-flake-config`), then with `envrc.impure = true` a `.direnv/bin/nix` wrapper first on `PATH` that adds `--impure` to every evaluating command (nix drops pure eval for flakes only on the flag, never from config), then `use flake`, then `envrc.extra`. Lines the rewrite drops are printed on shell entry. Migrate: move anything beyond `use flake` into `envrc.extra`; `use flake . --no-pure-eval` becomes `envrc.impure = true`.
 - **`files.preCommit { webAssets = { allow ? [ ]; }; }`** — opt-in hook `web-assets-webp`: a raster image (png, jpg, gif, bmp, tiff, avif, ico, heic) committed anywhere in the repo fails the commit unless its repo-relative path is in `allow` (a `/`-suffixed entry covers a directory). For files whose consumers need their format: an apple-touch icon, a favicon, an OG image, visual-regression baselines.
 - **`container.toManifests`** mounts an emptyDir at `/tmp` in every container.

@@ -39,7 +39,7 @@ github = v-utils.github {
   };
 
   labels = {
-    enable = true;    # Auto-sync labels on shell entry (default: true)
+    enable = true;    # Auto-sync labels on every commit, from the pre-commit hook (default: true)
     defaults = true;  # Include default labels (default: true)
     extra = [         # Additional labels
       { name = "priority:high"; color = "ff0000"; description = "High priority"; }

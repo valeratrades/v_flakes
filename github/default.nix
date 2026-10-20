@@ -287,14 +287,6 @@ if nixpkgs != null && pkgs == null then {
     # can be very slow
     semverChecks = preCommit.semverChecks or false;
 
-    # Label sync runs in background to avoid blocking shell startup.
-    labelSyncHook =
-      if labelsEnabled then ''
-        ${"# </dev/null: a backgrounded job that inherits tty stdin can hang on SIGTTIN."}
-        ${"# stderr is kept: label failures, lint warnings and the in-use-label error are"}
-        ${"# the only channel this tool has, and it never gets run in the foreground."}
-        (${git_ops}/bin/git_ops sync-labels </dev/null >/dev/null &)
-      '' else "";
 
     # Convention files copied from github.com/<owner>/<owner> or github.com/<owner>/.github
     # on first rebuild for each v_flakes version. Expand this list to add more.
@@ -317,7 +309,7 @@ if nixpkgs != null && pkgs == null then {
         ''
           ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
           cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
-          install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname semverChecks excludeDirs; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
+          install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
         '';
 
     envrcFile = files.envrc { inherit pkgs; impure = envrc.impure or false; extra = envrc.extra or ""; };
@@ -333,8 +325,6 @@ if nixpkgs != null && pkgs == null then {
 
     appendCustom = ./append-custom.rs;
     preCommit = import ./pre_commit.nix;
-
-    inherit labelSyncHook;
 
     shellHook = utils.mkShellHook ''
       ${utils.unwrapShellHook workflows.shellHook}
@@ -352,7 +342,6 @@ if nixpkgs != null && pkgs == null then {
       ${"# `git wt <path> [worktree-add args]`: a worktree without the LFS-tracked files, which a checkout would copy out of .git/lfs one by one"}
       git config alias.wt '!f() { set -f; top="$(git rev-parse --show-toplevel)"; cd "''${GIT_PREFIX:-.}" && git worktree add --no-checkout "$@" && git -C "$1" sparse-checkout set --no-cone "/*" $(sed -n "s/^\([^ #]*\) .*filter=lfs.*/!\1/p" "$top/.gitattributes") && git -C "$1" checkout -q; }; f'
       '' else ""}
-      ${labelSyncHook}
       ${conventionsHook}
       ''
       else ""}
