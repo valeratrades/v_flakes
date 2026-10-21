@@ -504,7 +504,6 @@ ${content}
   # Expected loc badge URL for this pname/gistId
   expectedLocBadge = "https://gist.githubusercontent.com/valeratrades/${gistId}/raw/${pname}-loc.json";
   hasLocBadge = builtins.elem "loc" badges;
-  hasCiBadge = builtins.elem "ci" badges;
 
   shellHook =
     let
@@ -524,19 +523,21 @@ ${content}
             unset __readme
           fi
         '' else "";
-      readmeInputs = "${readme} ./README.md" + pkgs.lib.optionalString hasCiBadge " \"$_vf_gitconfig\""; # `origin` lives in the git config
+      readmeInputs = "${readme} ./README.md \"$_vf_gitconfig\""; # `origin` lives in the git config
       # `origin` is the only place owner/repo actually lives; a repo that has never
       # been pushed has no correct answer, so refuse rather than guess an owner.
-      ciSlugResolve =
-        if hasCiBadge then ''
-          __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+      # `@@OWNER@@` is for hand-written links (`https://@@OWNER@@.github.io/<repo>/`), so an org rename can't strand them.
+      slugResolve = ''
+        if grep -q '@@REPO_SLUG@@\|@@OWNER@@' ./README.md; then
+          __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$##')"
           case "$__slug" in
             */*) ;;
-            *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; CI badges need it)" >&2; exit 1 ;;
+            *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; README links need it)" >&2; exit 1 ;;
           esac
-          sed -i "s#@@REPO_SLUG@@#$__slug#g" ./README.md
+          sed -i "s#@@REPO_SLUG@@#$__slug#g; s#@@OWNER@@#''${__slug%%/*}#g" ./README.md
           unset __slug
-        '' else "";
+        fi
+      '';
       # `.sh` assets are shell scripts, not prose; `.typ` needs harper-typst.
       # ste_checker exits 0 without --deny, so nothing here gates the shell — but a
       # failed install must not brick every repo's dev shell, hence the command guard.
@@ -574,7 +575,7 @@ ${content}
       _vf_any docs/.readme_assets/other.* || : > docs/.readme_assets/other.md
       if ! _vf_fresh readme ${readmeInputs}; then
         cp -f ${readme} ./README.md
-        ${ciSlugResolve}
+        ${slugResolve}
         _vf_stamp readme ${readmeInputs}
       fi
       ${steCheck}

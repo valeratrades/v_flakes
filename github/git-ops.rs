@@ -789,6 +789,7 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 		println!("Color check passed.");
 	}
 
+	follow_rename();
 	let mut open_issues = fetch_open_issues();
 
 	// Fingerprint gates only the label block (not an early return): on a fresh repo
@@ -929,6 +930,37 @@ fn compute_conventions_fingerprint(version_key: &str, owner: &str, files: &[Stri
 		out.push('\n');
 	}
 	out
+}
+
+/// A renamed repo or org keeps redirecting git and the API, but not `<owner>.github.io` —
+/// so `origin` is moved to where GitHub says the repo lives now.
+fn follow_rename() {
+	let output = Command::new("git").args(["config", "--get", "remote.origin.url"]).output().expect("git is on PATH in a git hook");
+	if !output.status.success() {
+		return; // never pushed: nothing to have been renamed
+	}
+	let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+	let Some((_, after_host)) = url.split_once("github.com") else { return }; // not ours to follow
+	let slug = after_host.trim_start_matches([':', '/']).trim_end_matches('/').trim_end_matches(".git");
+	let canonical = match run_gh(&["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]) {
+		Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+		Ok(o) => return report!("follow-rename", "skipped: {}", String::from_utf8_lossy(&o.stderr).trim()),
+		Err(e) => return report!("follow-rename", "skipped: {}", e),
+	};
+	assert!(canonical.contains('/'), "gh returned no owner/repo: {canonical:?}");
+	if canonical.eq_ignore_ascii_case(slug) {
+		return;
+	}
+	let new_url = url.replacen(slug, &canonical, 1);
+	assert!(
+		Command::new("git")
+			.args(["remote", "set-url", "origin", &new_url])
+			.status()
+			.expect("git is on PATH in a git hook")
+			.success(),
+		"git remote set-url origin {new_url}"
+	);
+	report!("follow-rename", "{slug} moved to {canonical}; origin is now {new_url}");
 }
 
 /// Parse the GitHub owner from `remote.origin.url` — purely local, no network.
