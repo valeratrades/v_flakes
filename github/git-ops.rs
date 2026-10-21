@@ -476,7 +476,8 @@ fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
 		let after = &line[start + TODO_NEEDLE.len()..];
 		let bangs = after.bytes().take_while(|&b| b == b'!').count();
 		if let Some(content) = after[bangs..].strip_prefix(':')
-			&& COMMENT_LEADERS.iter().any(|l| line[..start].ends_with(l))
+			&& COMMENT_LEADERS.iter().any(|l| line[..start].strip_suffix(l).is_some_and(|before| !before.ends_with('`')))
+		// `` `//TODO:` `` is prose quoting the syntax
 		{
 			return Some((start, bangs, content));
 		}
