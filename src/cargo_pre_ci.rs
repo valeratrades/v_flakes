@@ -4,7 +4,7 @@ use std::{
 	process::Command,
 };
 
-use toml_edit::{DocumentMut, Item, Value};
+use toml_edit::{DocumentMut, Item, Table, Value};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -81,33 +81,32 @@ fn process(content: &str, manifest_dir: &Path) -> String {
 		doc.remove("patch");
 	}
 
-	let dep_section_names: Vec<String> = doc.iter().filter(|(k, _)| k.ends_with("dependencies")).map(|(k, _)| k.to_owned()).collect();
-
-	for section in dep_section_names {
-		let table = match doc.get_mut(&section).and_then(|i| i.as_table_mut()) {
-			Some(t) => t,
-			None => continue,
-		};
-
-		let keys_to_remove: Vec<String> = table.iter().filter(|(_, v)| matches!(ga_action(v), Some(GaAction::Comment))).map(|(k, _)| k.to_owned()).collect();
-
-		for key in &keys_to_remove {
-			table.remove(key);
+	for (name, section) in doc.iter_mut() {
+		if name.ends_with("dependencies")
+			&& let Some(table) = section.as_table_mut()
+		{
+			apply_ga(table);
 		}
-
-		for (_, item) in table.iter_mut() {
-			match ga_action(item) {
-				Some(GaAction::SubPath) => *item = Item::Value(Value::from("*")),
-				Some(GaAction::RmPath) =>
-					if let Some(inline) = item.as_inline_table_mut() {
-						inline.remove("path");
-					},
-				Some(GaAction::Comment) | None => {}
-			}
-		}
+	}
+	if let Some(table) = doc.get_mut("workspace").and_then(|w| w.get_mut("dependencies")).and_then(|d| d.as_table_mut()) {
+		apply_ga(table);
 	}
 
 	doc.to_string()
+}
+
+fn apply_ga(table: &mut Table) {
+	table.retain(|_, v| !matches!(ga_action(v), Some(GaAction::Comment)));
+	for (_, item) in table.iter_mut() {
+		match ga_action(item) {
+			Some(GaAction::SubPath) => *item = Item::Value(Value::from("*")),
+			Some(GaAction::RmPath) =>
+				if let Some(inline) = item.as_inline_table_mut() {
+					inline.remove("path");
+				},
+			Some(GaAction::Comment) | None => {}
+		}
+	}
 }
 
 fn git_tracked_cargo_tomls(root: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -232,6 +231,22 @@ neighbour = { path = "../../neighbour" }
 		), @r#"
 		[patch.crates-io]
 		sibling = { path = "../sibling" }
+		"#);
+	}
+
+	#[test]
+	fn workspace_dependencies_annotations_apply() {
+		insta::assert_snapshot!(process(
+			r#"[workspace.dependencies]
+sibling = { version = "0.20", path = "../sibling/sibling" } #ga: rm path
+gone = { path = "../gone" } #ga: comment
+serde = "1"
+"#,
+			Path::new("")
+		), @r#"
+		[workspace.dependencies]
+		sibling = { version = "0.20"} #ga: rm path
+		serde = "1"
 		"#);
 	}
 
