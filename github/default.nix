@@ -314,6 +314,12 @@ if nixpkgs != null && pkgs == null then {
           [[ -x .git/hooks/custom.sh && $(<.git/hooks/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} ./.git/hooks/custom.sh
         '';
 
+    lfsGitConfig = ''
+      git config merge.ours.driver true
+      ${"# `git wt <path> [worktree-add args]`: a worktree without the LFS-tracked files, which a checkout would copy out of .git/lfs one by one"}
+      git config alias.wt '!f() { set -f; top="$(git rev-parse --show-toplevel)"; cd "''${GIT_PREFIX:-.}" && git worktree add --no-checkout "$@" && git -C "$1" sparse-checkout set --no-cone "/*" $(sed -n "s/^\([^ #]*\) .*filter=lfs.*/!\1/p" "$top/.gitattributes") && git -C "$1" checkout -q; }; f'
+    '';
+
     envrcFile = files.envrc { inherit pkgs; impure = envrc.impure or false; extra = envrc.extra or ""; };
 
     conventionsHook =
@@ -332,17 +338,18 @@ if nixpkgs != null && pkgs == null then {
       ${utils.unwrapShellHook workflows.shellHook}
       ${if enable then ''
       ${preCommitInstallHook}
-      cp -f ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
+      _vf_cp ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
       ${"# a consumer's own lines belong in `envrc.extra`; the diff names whatever the rewrite drops"}
-      cmp -s ${envrcFile} ./.envrc || { [ -e ./.envrc ] && diff ${envrcFile} ./.envrc | sed -n 's/^> /v_flakes: .envrc rewritten, move into github.envrc.extra: /p' >&2; cp -f ${envrcFile} ./.envrc; }
+      _vf_same ${envrcFile} ./.envrc || { [ -e ./.envrc ] && diff ${envrcFile} ./.envrc | sed -n 's/^> /v_flakes: .envrc rewritten, move into github.envrc.extra: /p' >&2; cp -f ${envrcFile} ./.envrc; }
       ${if lfs != null then ''
-      cp -f ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
+      _vf_cp ${(files.gitattributes { inherit pkgs; inherit lfs; })} ./.gitattributes
       ${"# Register the `ours` merge driver referenced by .gitattributes (kept in"}
       ${"# local .git/config, so it must be (re)applied per clone — `true` always"}
       ${"# succeeds without touching the file, keeping our version on conflict)."}
-      git config merge.ours.driver true
-      ${"# `git wt <path> [worktree-add args]`: a worktree without the LFS-tracked files, which a checkout would copy out of .git/lfs one by one"}
-      git config alias.wt '!f() { set -f; top="$(git rev-parse --show-toplevel)"; cd "''${GIT_PREFIX:-.}" && git worktree add --no-checkout "$@" && git -C "$1" sparse-checkout set --no-cone "/*" $(sed -n "s/^\([^ #]*\) .*filter=lfs.*/!\1/p" "$top/.gitattributes") && git -C "$1" checkout -q; }; f'
+      if ! _vf_fresh lfs-git-config "${builtins.hashString "sha256" lfsGitConfig}" "$_vf_gitconfig"; then
+        ${lfsGitConfig}
+        _vf_stamp lfs-git-config "${builtins.hashString "sha256" lfsGitConfig}" "$_vf_gitconfig"
+      fi
       '' else ""}
       ${conventionsHook}
       ''

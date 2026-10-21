@@ -429,14 +429,14 @@ if nixpkgs != null && pkgs == null then {
           copyCommands = builtins.concatStringsSep "\n" (
             pkgs.lib.mapAttrsToList
               (name: wf: ''
-                cp -f ${wf} ./.github/workflows/release-${name}.yml
+                _vf_cp ${wf} ./.github/workflows/release-${name}.yml
               '')
               releaseWorkflows
           );
         in
         ''
           ${copyCommands}
-          ${cargoNightly} -Zscript -q ${ensureBinstallScript} ${releaseCargoTomlPath}
+          _vf_fresh binstall-metadata "${ensureBinstallScript}" ${releaseCargoTomlPath} || { ${cargoNightly} -Zscript -q ${ensureBinstallScript} ${releaseCargoTomlPath} && _vf_stamp binstall-metadata "${ensureBinstallScript}" ${releaseCargoTomlPath}; }
         ''
       else "";
 
@@ -450,7 +450,7 @@ if nixpkgs != null && pkgs == null then {
           _release_stale=()
           for f in ./.github/workflows/*release*; do
             [ -e "$f" ] || continue
-            _base="$(basename "$f")"
+            _base="''${f##*/}"
             _match=0
             for _exp in ${expectedBash}; do
               [ "$_base" = "$_exp" ] && _match=1 && break
@@ -468,35 +468,35 @@ if nixpkgs != null && pkgs == null then {
 
     containerReleaseHook =
       if containerReleaseWorkflow != null then ''
-        cp -f ${containerReleaseWorkflow} ./.github/workflows/release-container.yml
+        _vf_cp ${containerReleaseWorkflow} ./.github/workflows/release-container.yml
       '' else "";
 
     cachixHook =
       if cachixWorkflow != null then ''
-        cp -f ${cachixWorkflow} ./.github/workflows/cachix.yml
+        _vf_cp ${cachixWorkflow} ./.github/workflows/cachix.yml
       '' else "";
 
     syncForkHook =
       if syncForkWorkflow != null then ''
-        cp -f ${syncForkWorkflow} ./.github/workflows/sync_fork.yml
+        _vf_cp ${syncForkWorkflow} ./.github/workflows/sync_fork.yml
       '' else "";
 
     gitlabSyncHook =
       if gitlabSyncWorkflow != null then ''
-        cp -f ${gitlabSyncWorkflow} ./.github/workflows/sync_gitlab.yml
+        _vf_cp ${gitlabSyncWorkflow} ./.github/workflows/sync_gitlab.yml
       '' else "";
 
     claudeHook =
       if claudeWorkflow != null then ''
-        cp -f ${claudeWorkflow} ./.github/workflows/claude.yml
-        cp -f ${claudeReviewWorkflow} ./.github/workflows/claude-code-review.yml
+        _vf_cp ${claudeWorkflow} ./.github/workflows/claude.yml
+        _vf_cp ${claudeReviewWorkflow} ./.github/workflows/claude-code-review.yml
       '' else "";
 
     # these names are ours: one no longer configured is a stale leftover of an earlier generation
     jobsHook = name:
       let path = "./.github/workflows/${name}.yml"; in
       if workflows.${name} != null then ''
-        cp -f ${workflows.${name}} ${path}
+        _vf_cp ${workflows.${name}} ${path}
       '' else ''
         [ -e ${path} ] && rm -f ${path} && echo "v_flakes: removed ${path}, no ${name} jobs are configured" >&2
       '';
@@ -504,7 +504,7 @@ if nixpkgs != null && pkgs == null then {
   workflows // {
     inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
-      mkdir -p ./.github/workflows
+      [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
       ${jobsHook "warnings"}
       ${jobsHook "other"}

@@ -509,17 +509,22 @@ ${content}
   shellHook =
     let
       licenseCopies = builtins.concatStringsSep "\n" (
-        builtins.map (l: "cp -f ${l.license.path} ./${l.outPath}") licenses
+        builtins.map (l: "_vf_cp ${l.license.path} ./${l.outPath}") licenses
       );
       # Run init-loc-gist only if loc badge is used AND README exists with a DIFFERENT loc badge URL
       # (indicates project was renamed). Don't run if README doesn't exist or has no loc badge -
       # the CI workflow will create the gist file on first push.
       locGistCheck =
         if hasLocBadge then ''
-          if [ -f ./README.md ] && grep -qF "gist.githubusercontent.com/valeratrades/${gistId}/raw/" ./README.md && ! grep -qF "${expectedLocBadge}" ./README.md; then
-            ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
+          if [ -f ./README.md ]; then
+            IFS= read -rd "" __readme < ./README.md
+            if [[ $__readme == *"gist.githubusercontent.com/valeratrades/${gistId}/raw/"* && $__readme != *"${expectedLocBadge}"* ]]; then
+              ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}"
+            fi
+            unset __readme
           fi
         '' else "";
+      readmeInputs = "${readme} ./README.md" + pkgs.lib.optionalString hasCiBadge " \"$_vf_gitconfig\""; # `origin` lives in the git config
       # `origin` is the only place owner/repo actually lives; a repo that has never
       # been pushed has no correct answer, so refuse rather than guess an owner.
       ciSlugResolve =
@@ -536,7 +541,7 @@ ${content}
       # ste_checker exits 0 without --deny, so nothing here gates the shell — but a
       # failed install must not brick every repo's dev shell, hence the command guard.
       steCheck = if !ste then "" else ''
-        ${utils.binstallCrate { name = "ste_checker"; }}
+        ${utils.binstallOnEntry { name = "ste_checker"; }}
         __ste_targets=""
         for __f in docs/.readme_assets/usage.md docs/.readme_assets/install*.md; do
           if [ -f "$__f" ]; then __ste_targets="$__ste_targets $__f"; fi
@@ -556,19 +561,22 @@ ${content}
     utils.mkShellHook ''
       ${locGistCheck}
       ${licenseCopies}
-      mkdir -p docs
       #DEPRECATE: in v2.0 version
       if [ -d ./.readme_assets ] && [ ! -d ./docs/.readme_assets ]; then
+        mkdir -p docs
         mv ./.readme_assets ./docs/.readme_assets
         echo "Moved .readme_assets/ to docs/.readme_assets/"
       fi
-      mkdir -p docs/.readme_assets
-      [ -n "$(ls docs/.readme_assets/description.* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/description.md
-      [ -n "$(ls docs/.readme_assets/usage.* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/usage.md
-      [ -n "$(ls docs/.readme_assets/install* 2>/dev/null)" ] || echo TODO > docs/.readme_assets/installation.md
-      [ -n "$(ls docs/.readme_assets/other.* 2>/dev/null)" ] || : > docs/.readme_assets/other.md
-      cp -f ${readme} ./README.md
-      ${ciSlugResolve}
+      [ -d docs/.readme_assets ] || mkdir -p docs/.readme_assets
+      _vf_any docs/.readme_assets/description.* || echo TODO > docs/.readme_assets/description.md
+      _vf_any docs/.readme_assets/usage.* || echo TODO > docs/.readme_assets/usage.md
+      _vf_any docs/.readme_assets/install* || echo TODO > docs/.readme_assets/installation.md
+      _vf_any docs/.readme_assets/other.* || : > docs/.readme_assets/other.md
+      if ! _vf_fresh readme ${readmeInputs}; then
+        cp -f ${readme} ./README.md
+        ${ciSlugResolve}
+        _vf_stamp readme ${readmeInputs}
+      fi
       ${steCheck}
     '';
 in

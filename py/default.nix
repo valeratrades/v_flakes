@@ -60,10 +60,11 @@ if nixpkgs != null && pkgs == null then {
     # combine, fall back loudly to global rustup otherwise, and hard-error if
     # neither is reachable (instead of silently dispatching through a broken
     # rustup shim).
+    pyprojectKey = "${./pyproject-merge.rs} ${venv_path} ${src_path}";
     pyprojectHook = utils.withCargo {
       caller = "py";
       body = ''
-        _v_flakes_cargo -Zscript -q ${./pyproject-merge.rs} ./pyproject.toml ${venv_path} ${src_path}
+        _v_flakes_cargo -Zscript -q ${./pyproject-merge.rs} ./pyproject.toml ${venv_path} ${src_path} && _vf_stamp pyproject "${pyprojectKey}" ./pyproject.toml
       '';
     };
   in
@@ -71,20 +72,28 @@ if nixpkgs != null && pkgs == null then {
     inherit ruffFile python;
 
     shellHook = utils.mkShellHook ''
-      cp -f ${ruffFile} ./ruff.toml
-      ${pyprojectHook}
+      _vf_cp ${ruffFile} ./ruff.toml
+      if ! _vf_fresh pyproject "${pyprojectKey}" ./pyproject.toml; then
+        ${pyprojectHook}
+      fi
       if [ ! -d "${venv_path}" ]; then
         uv venv ${venv_path}
       fi
       source ${venv_path}/bin/activate
-      _venv_recorded="$(grep '^VIRTUAL_ENV=' ${venv_path}/bin/activate 2>/dev/null | head -1 | sed "s/VIRTUAL_ENV='//;s/'$//")"
-      _venv_actual="$(readlink -f ${venv_path})"
+      _venv_recorded=
+      while IFS= read -r _venv_l; do
+        [[ $_venv_l == VIRTUAL_ENV=* ]] || continue
+        _venv_recorded=''${_venv_l#VIRTUAL_ENV=\'}
+        _venv_recorded=''${_venv_recorded%\'}
+        break
+      done < ${venv_path}/bin/activate
+      _venv_actual="$(cd -P ${venv_path} && pwd)"
       if [ "$_venv_recorded" != "$_venv_actual" ]; then
         echo "warning: venv is stale (repo was moved?) — recreate with: rm -rf ${venv_path} && uv venv ${venv_path} && uv_sync"
       elif [ -f "uv.lock" ] && [ "${venv_path}" -ot "uv.lock" ]; then
         echo "warning: venv is older than uv.lock — run uv_sync"
       fi
-      unset _venv_recorded _venv_actual
+      unset _venv_recorded _venv_actual _venv_l
     '';
 
     # The shellHook runs `uv venv` and activates a python venv, so `uv` and a

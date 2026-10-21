@@ -156,6 +156,27 @@ let
       fi
       unset _${var}_installed _${var}_latest
     '';
+
+  # `binstallCrate` for a shell hook: only a missing binary installs in the foreground. An
+  # installed one has its crates.io lookup detached, at most daily, its output shown on the next entry.
+  binstallOnEntry = { name }:
+    let log = "\"$_vf_stamps/${name}.update\""; in ''
+      case ":$PATH:" in *":$HOME/.cargo/bin:"*) ;; *) export PATH="$PATH:$HOME/.cargo/bin" ;; esac
+      if ! command -v ${name} >/dev/null 2>&1; then
+        ${binstallCrate { inherit name; }}
+      else
+        [ -s ${log}.warn ] && { _vf_replay ${name}.update; : > ${log}.warn; }
+        printf -v _vf_now '%(%s)T' -1
+        _vf_last=0
+        [ -f ${log} ] && read -r _vf_last < ${log}
+        if (( _vf_now - _vf_last >= 86400 )); then
+          [ -d "$_vf_stamps" ] || mkdir -p "$_vf_stamps"
+          printf '%s\n' "$_vf_now" > ${log}
+          ( ( { ${binstallCrate { inherit name; }} } > ${log}.log 2>&1; mv -f ${log}.log ${log}.warn ) </dev/null >/dev/null 2>&1 & )
+        fi
+        unset _vf_now _vf_last
+      fi
+    '';
 in
 {
   setDefaultEnv = { name, default, is_secret ? false }:
@@ -245,7 +266,7 @@ in
       program = "${pkgs.writeShellScriptBin "help" "cat <<'EOF'\n${text}\nEOF\n"}/bin/help";
     };
 
-  inherit binstallCrate checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
+  inherit binstallCrate binstallOnEntry checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
   publish = import ./publish.nix;
   inherit (core) mergeConfig;
 
@@ -306,14 +327,70 @@ in
         done
         if [ -z "$_vf_nix" ]; then
           echo "warning: v_flakes: found no 'nix' to verify lazy-trees with — skipping the Determinate Nix check." >&2
-        elif [ "$("$_vf_nix" config show lazy-trees 2>/dev/null)" != true ]; then
-          printf '%s\n' \
-            "✘ This repo requires Determinate Nix (lazy-trees=true)." \
-            "  Stock nix produces flake.lock NAR hashes that diverge from CI — private inputs fail to verify." \
-            "  Install: https://determinate.systems/nix   NixOS: nix.settings.lazy-trees = true" >&2
-          exit 1
+        else
+          _vf_nixconf=("$_vf_nix|$NIX_CONFIG|$NIX_CONF_DIR|$NIX_USER_CONF_FILES" "''${NIX_CONF_DIR:-/etc/nix}/nix.conf" "''${NIX_CONF_DIR:-/etc/nix}/nix.custom.conf" "''${XDG_CONFIG_HOME:-$HOME/.config}/nix/nix.conf")
+          if ! _vf_fresh lazy-trees "''${_vf_nixconf[@]}"; then # only a pass is stamped; a nix swapped under unchanged config files goes unnoticed
+            if [ "$("$_vf_nix" config show lazy-trees 2>/dev/null)" != true ]; then
+              printf '%s\n' \
+                "✘ This repo requires Determinate Nix (lazy-trees=true)." \
+                "  Stock nix produces flake.lock NAR hashes that diverge from CI — private inputs fail to verify." \
+                "  Install: https://determinate.systems/nix   NixOS: nix.settings.lazy-trees = true" >&2
+              exit 1
+            fi
+            _vf_stamp lazy-trees "''${_vf_nixconf[@]}"
+          fi
         fi
-        unset _vf_nix _vf_cand
+        unset _vf_nix _vf_cand _vf_nixconf
+      '';
+      # Every shell entry (each direnv load) re-runs the hook, so its steady state execs nothing:
+      # outputs are compared with bash builtins, and work is redone only when its inputs changed.
+      # Stamps hold full input contents rather than mtimes, so a stale one only costs a rerun.
+      shellPrelude = ''
+        _vf_stamps="''${XDG_CACHE_HOME:-$HOME/.cache}/v_flakes/stamps/''${PWD//\//%}"
+        _vf_gitconfig=.git/config
+        if [ -f .git ]; then # worktree: `.git` names its gitdir, whose `commondir` holds the shared config
+          read -r _vf_gd < .git
+          _vf_gd=''${_vf_gd#gitdir: }
+          if [ -f "$_vf_gd/commondir" ]; then
+            read -r _vf_cd < "$_vf_gd/commondir"
+            [[ $_vf_cd == /* ]] && _vf_gd=$_vf_cd || _vf_gd=$_vf_gd/$_vf_cd
+          fi
+          _vf_gitconfig=$_vf_gd/config
+          unset _vf_gd _vf_cd
+        fi
+        _vf_same() {
+          [ -f "$1" ] && [ -f "$2" ] || return 1
+          local a b
+          IFS= read -rd "" a < "$1"
+          IFS= read -rd "" b < "$2"
+          [[ $a == "$b" ]]
+        }
+        _vf_cp() { _vf_same "$1" "$2" || cp -f "$1" "$2"; }
+        _vf_any() { [ -e "$1" ]; } # pass it a glob
+        _vf_inputs() {
+          local f c
+          _vf_in=$1
+          shift
+          for f; do
+            if [ -f "$f" ]; then IFS= read -rd "" c < "$f"; _vf_in+=$'\x1f+'"$c"; else _vf_in+=$'\x1f-'; fi
+          done
+        }
+        # <name> <key> <file>...: true while the files hold what they held at `_vf_stamp <name>` under the same key
+        _vf_fresh() {
+          local s=
+          _vf_inputs "''${@:2}"
+          [ -f "$_vf_stamps/$1" ] && IFS= read -rd "" s < "$_vf_stamps/$1"
+          [[ $s == "$_vf_in" ]] && return
+          [ -d "$_vf_stamps" ] || mkdir -p "$_vf_stamps"
+          return 1
+        }
+        _vf_stamp() { _vf_inputs "''${@:2}"; printf '%s' "$_vf_in" > "$_vf_stamps/$1"; }
+        _vf_replay() {
+          local w
+          [ -s "$_vf_stamps/$1.warn" ] || return 0
+          IFS= read -rd "" w < "$_vf_stamps/$1.warn"
+          printf '%s' "$w" >&2
+        }
       '';
       getPackages = m: m.enabledPackages or [ ];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
@@ -326,8 +403,8 @@ in
       # re-fetches hundreds of MB. `--offline` guarantees the check itself never fetches
       max_duplication_mb = 20;
       dedupeCheck = ''
-        if command -v jq >/dev/null 2>&1; then
-          _vf_dups="$(nix flake archive --json --offline 2>/dev/null | jq -r '
+        if command -v jq >/dev/null 2>&1 && ! _vf_fresh dedupe "" flake.lock; then
+          { _vf_dups="$(nix flake archive --json --offline 2>/dev/null | jq -r '
             def walk: .inputs // {} | to_entries[] | [.key, (.value.path // null)], (.value | walk);
             [walk] | map(select(.[1] != null)) | group_by(.[0])
             | map(select((map(.[1]) | unique | length) > 1))
@@ -349,8 +426,10 @@ in
               echo "      <input>.inputs.nixpkgs.follows = \"nixpkgs\";" >&2
               echo "" >&2
             fi
-          fi
+          fi; } 2> "$_vf_stamps/dedupe.warn"
+          _vf_stamp dedupe "" flake.lock
         fi
+        _vf_replay dedupe
       '';
 
       # `nix run .#help` is the one entrypoint a stranger (or an agent) can find
@@ -358,33 +437,32 @@ in
       # accepts are probed — `apps.<sys>.help` (bare `.#help` does not fall back to
       # it) and `packages.<sys>.help`, which `.#help` does resolve.
       helpCheck = ''
-        if command -v nix >/dev/null 2>&1; then
-          _vf_sys="$(nix eval --impure --raw --expr builtins.currentSystem 2>/dev/null)"
-          if ! nix eval --quiet ".#apps.$_vf_sys.help" >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
+        if command -v nix >/dev/null 2>&1 && ! _vf_fresh help "" flake.nix flake.lock; then # an apps.help defined outside flake.nix is only seen once flake.nix or flake.lock changes
+          if ! nix eval --quiet ".#apps.${rust.system}.help" >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
             echo "" >&2
             echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
             echo "    Every v_flakes consumer owes one — the entrypoint listing what the repo can do." >&2
             echo "    Add to the per-system outputs of flake.nix:" >&2
             echo "      apps.help = v_flakes.utils.help { inherit pkgs self system; };" >&2
             echo "" >&2
-          fi
-          unset _vf_sys
+          fi 2> "$_vf_stamps/help.warn"
+          _vf_stamp help "" flake.nix flake.lock
         fi
+        _vf_replay help
       '';
     in
     {
       enabledPackages = builtins.concatLists (map getPackages modules);
       shellHook = ''
-        _v_flakes_repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-          echo "error: v_flakes shellHook requires a git repository" >&2
-          exit 1
-        }
-        if [ "$PWD" != "$_v_flakes_repo_root" ]; then
+        if [ ! -e .git ]; then
+          _v_flakes_repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+            echo "error: v_flakes shellHook requires a git repository" >&2
+            exit 1
+          }
           echo "warning: v_flakes shellHook aborting entire flake.nix hook — CWD is not repo root ($PWD != $_v_flakes_repo_root)" >&2
-          unset _v_flakes_repo_root
           exit 1
         fi
-        unset _v_flakes_repo_root
+        ${shellPrelude}
         ${determinateGuard}
         # Guarantee cargo for the rust scripts module hooks invoke.
         export PATH="${rust}/bin:$PATH"

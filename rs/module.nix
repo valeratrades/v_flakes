@@ -185,8 +185,8 @@ if nixpkgs != null && pkgs == null then {
     lintsHook =
       if lintsEnabled then ''
         export CARGO_UNSTABLE_CARGO_LINTS=true # pinned nightly ignores [lints.cargo] without it
-        if [ -f ./Cargo.toml ]; then
-          cargo -Zscript -q ${./cargo-merge.rs} ./Cargo.toml ${lintsFile}
+        if [ -f ./Cargo.toml ] && ! _vf_fresh cargo-lints "${./cargo-merge.rs} ${lintsFile}" ./Cargo.toml; then
+          cargo -Zscript -q ${./cargo-merge.rs} ./Cargo.toml ${lintsFile} && _vf_stamp cargo-lints "${./cargo-merge.rs} ${lintsFile}" ./Cargo.toml
         fi
       '' else "";
 
@@ -204,11 +204,14 @@ if nixpkgs != null && pkgs == null then {
               let
                 buildFile = makeBuildFile workspace.${dir};
                 targetPath = normalizePath dir;
+                stamp = builtins.replaceStrings [ "/" ] [ "%" ] targetPath;
               in
               ''
-                cp -f ${buildFile} ${targetPath}
-                chmod 644 ${targetPath}
-                rustfmt --config-path ${buildRustfmtFile} ${targetPath}
+                if ! _vf_fresh ${stamp} "${buildFile} ${buildRustfmtFile}" ${targetPath}; then
+                  cp -f ${buildFile} ${targetPath}
+                  chmod 644 ${targetPath}
+                  rustfmt --config-path ${buildRustfmtFile} ${targetPath} && _vf_stamp ${stamp} "${buildFile} ${buildRustfmtFile}" ${targetPath}
+                fi
               '')
             workspaceDirs)
       else "";
@@ -216,7 +219,7 @@ if nixpkgs != null && pkgs == null then {
     denyEnabled = if builtins.isBool deny then deny else deny != { };
     denyHook =
       if denyEnabled then ''
-        cp -f ${denyFile} ./deny.toml
+        _vf_cp ${denyFile} ./deny.toml
       '' else "";
 
     # Normalize style config
@@ -226,7 +229,7 @@ if nixpkgs != null && pkgs == null then {
 
     binstallHook = ''
       export PATH="$PATH:$HOME/.cargo/bin"
-    '' + (if tracey then utils.binstallCrate { name = "tracey"; } else "");
+    '' + (if tracey then utils.binstallOnEntry { name = "tracey"; } else "");
 
     # codestyle is installed lazily at pre-commit time, not at shell entry.
     codestyleLazyInstall = if styleEnabled then utils.binstallCrate { name = "codestyle"; } else "";
@@ -244,11 +247,11 @@ if nixpkgs != null && pkgs == null then {
       # rustup shim in ~/.cargo/bin. Also critical for trybuild tests which
       # spawn cargo subprocesses.
       export PATH="${rust}/bin:$PATH"
-      mkdir -p ./.cargo
-      cp -f ${rustfmtFile} ./rustfmt.toml
-      cp -f ${configFile} ./.cargo/config.toml
-      cp -f ${clippyFile} ./.cargo/clippy.toml
-      cp -f ${sortDerivesFile} ./.sort-derives.toml
+      [ -d ./.cargo ] || mkdir -p ./.cargo
+      _vf_cp ${rustfmtFile} ./rustfmt.toml
+      _vf_cp ${configFile} ./.cargo/config.toml
+      _vf_cp ${clippyFile} ./.cargo/clippy.toml
+      _vf_cp ${sortDerivesFile} ./.sort-derives.toml
       ${lintsHook}
       ${buildHook}
       ${denyHook}
