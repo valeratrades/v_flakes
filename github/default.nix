@@ -237,6 +237,7 @@ if nixpkgs != null && pkgs == null then {
       syncFork = effectiveSyncFork;
     } // (if enable then {
       inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync;
+      rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
       inherit claude;

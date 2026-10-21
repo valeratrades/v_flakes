@@ -27,6 +27,8 @@ args@{ pkgs ? null
   cargoNightly ? null
 , # CI cache mechanism, threaded to every nix-using workflow. See github/cache.nix.
   cache ? { }
+, # Cargo manifests may name sibling checkouts by path; jobs that run cargo outside Errors/Warnings then need pre_ci's rewritten copies.
+  rustRepo ? false
 , # Cachix cache name to publish `packages.default` to. See shared/cachix.nix.
   publishCachix ? null
 ,
@@ -158,7 +160,9 @@ if nixpkgs != null && pkgs == null then {
           # These install nix themselves rather than going through load_nix, so they
           # need the repo's cache mode — without this they silently fall back to the
           # module default and the repo's `cache` setting does nothing.
-          else if jobName == "asset-gate" || jobName == "flake-app"
+          else if jobName == "asset-gate"
+          then { inherit cache; preCi = rustRepo; } // jobArgs
+          else if jobName == "flake-app"
           then { inherit cache; } // jobArgs
           else jobArgs;
 
@@ -411,9 +415,12 @@ if nixpkgs != null && pkgs == null then {
                 name = "Other";
                 "on" = makeOn hooksOther;
                 permissions = (import files.base).permissions;
-                jobs = pkgs.lib.recursiveUpdate
-                  (loadNixJob installOther)
-                  (constructJobs installOther jobsOther);
+                jobs =
+                  let
+                    own = pkgs.lib.recursiveUpdate (loadNixJob installOther) (constructJobs installOther jobsOther);
+                    needsPreCi = builtins.any (j: (j.needs or null) == "pre_ci") (builtins.attrValues own);
+                  in
+                  (if needsPreCi then { inherit ((import files.rust-base).jobs) pre_ci; } else { }) // own;
               }
             ) else null;
     };

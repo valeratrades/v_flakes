@@ -10,7 +10,7 @@
 # key rather than in the job body, so nothing here does clock arithmetic against a stored stamp; and
 # Actions reads a branch's cache through to the default branch, which makes the interval one per
 # repo rather than one per branch.
-{ asset, command, everySeconds ? null, cache ? { } }:
+{ asset, command, everySeconds ? null, cache ? { }, preCi ? false }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
   guarded = everySeconds != null;
@@ -22,6 +22,7 @@ in
 {
   name = "Asset gate";
   runs-on = "ubuntu-latest";
+} // (if preCi then { needs = "pre_ci"; } else { }) // {
   # `command` is free to be a cargo invocation, and `.cargo/config.toml` points rustc-wrapper at an
   # sccache the runner doesn't have. Only Errors/Warnings inherit the rust base env, so unset here.
   env.RUSTC_WRAPPER = "";
@@ -30,6 +31,11 @@ in
       name = "Checkout repository";
       uses = "actions/checkout@v5";
     }]
+    ++ (if preCi then [{
+      name = "Download modified by pre-ci Cargo.toml files";
+      uses = "actions/download-artifact@v7";
+      "with".name = "modified-cargo-files";
+    }] else [ ])
     ++ (if guarded then [
       {
         name = "Interval bucket";
