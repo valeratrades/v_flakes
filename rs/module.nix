@@ -140,7 +140,8 @@ if nixpkgs != null && pkgs == null then {
     - `codestyle` - code style linter and formatter (if style.format or style.check is true)
     - `cargo-diet`, `cargo-release`, and `cpublish` — `cargo release --no-confirm --execute`,
       refusing to run while `cargo diet` still has include directives to rewrite. The check is a
-      read (`cargo diet -n -r`); applying and committing the rewrite is yours.
+      read (`cargo diet -n -r`); applying and committing the rewrite is yours. On success it
+      force-moves the `release` branch to the release commit.
   '';
 } else
 

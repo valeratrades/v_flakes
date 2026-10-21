@@ -30,6 +30,8 @@ pkgs.writeShellApplication {
          exit 1 ;;
     esac
 
-    exec cargo release --no-confirm --execute "$@"
+    cargo release --no-confirm --execute "$@"
+    # nix consumers pin `?ref=release`, the same ref `cnix_release` maintains
+    git push --force origin HEAD:refs/heads/release
   '';
 }
