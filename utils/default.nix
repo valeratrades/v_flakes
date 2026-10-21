@@ -172,7 +172,7 @@ let
         if (( _vf_now - _vf_last >= 86400 )); then
           [ -d "$_vf_stamps" ] || mkdir -p "$_vf_stamps"
           printf '%s\n' "$_vf_now" > ${log}
-          ( ( { ${binstallCrate { inherit name; }} } > ${log}.log 2>&1; mv -f ${log}.log ${log}.warn ) </dev/null >/dev/null 2>&1 & )
+          ( ( { ${binstallCrate { inherit name; }} } > ${log}.log 2>&1; mv -f ${log}.log ${log}.warn ) </dev/null >/dev/null 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- & ) # direnv reads the env dump off fd 3 until every holder closes it
         fi
         unset _vf_now _vf_last
       fi

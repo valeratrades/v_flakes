@@ -324,7 +324,7 @@ if nixpkgs != null && pkgs == null then {
 
     conventionsHook =
       if enable && conventions then ''
-        (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} >/dev/null 2>/dev/null &)
+        (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} </dev/null >/dev/null 2>/dev/null 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &) # fd 3+: direnv waits on its env-dump pipe
       '' else "";
   in
   warnIfNeeded ({
