@@ -475,9 +475,10 @@ fn split_todo(line: &str) -> Option<(usize, usize, &str)> {
 		let start = base + pos;
 		let after = &line[start + TODO_NEEDLE.len()..];
 		let bangs = after.bytes().take_while(|&b| b == b'!').count();
+		let quoted = line[..start].trim_end_matches(|c: char| !c.is_whitespace() && c != '`').ends_with('`'); // `` `<!--TODO:` `` is prose quoting the syntax
 		if let Some(content) = after[bangs..].strip_prefix(':')
-			&& COMMENT_LEADERS.iter().any(|l| line[..start].strip_suffix(l).is_some_and(|before| !before.ends_with('`')))
-		// `` `//TODO:` `` is prose quoting the syntax
+			&& !quoted
+			&& COMMENT_LEADERS.iter().any(|l| line[..start].ends_with(l))
 		{
 			return Some((start, bangs, content));
 		}
