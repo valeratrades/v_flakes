@@ -160,16 +160,24 @@ fn copy_config(cfg: &Config, log: &mut Log) -> bool {
 	let nix = config.join(format!("{}.nix", cfg.pname));
 	let toml = config.join(format!("{}.toml", cfg.pname));
 	let dir = config.join(&cfg.pname);
+	let replace = |src: &Path, dest: &str| {
+		match fs::remove_file(dest) {
+			// fs::copy carries the store's read-only mode of a home-manager config over, which the next run can't overwrite
+			Err(e) if e.kind() != std::io::ErrorKind::NotFound => panic!("remove {dest}: {e}"),
+			_ => {}
+		}
+		fs::copy(src, dest).unwrap_or_else(|e| panic!("copy {} to {dest}: {e}", src.display()));
+	};
 	// .nix takes priority over .toml
 	if nix.is_file() {
 		log.line("Copying project's nix config to examples/");
 		fs::create_dir_all("examples").expect("create examples/");
-		fs::copy(&nix, "examples/config.nix").expect("copy nix config");
+		replace(&nix, "examples/config.nix");
 	} else if toml.is_file() || dir.is_dir() {
 		log.line("Copying project's toml config to examples/");
 		fs::create_dir_all("examples").expect("create examples/");
 		if toml.is_file() {
-			fs::copy(&toml, "examples/config.toml").expect("copy toml config");
+			replace(&toml, "examples/config.toml");
 		} else if !Path::new("examples/config").is_dir() && !log.run(Command::new("cp").arg("-r").arg(&dir).arg("examples/config")) {
 			return false;
 		}
