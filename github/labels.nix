@@ -3,6 +3,7 @@
   # Type. `chore -> feature -> enhancement -> research` is one axis: how much of the end result is known when the issue is filed.
   { name = "t:feature"; color = "#2bd4a0"; description = "End result is known, the work to get there isn't small"; }
   { name = "t:enhancement"; color = "#a2eeef"; description = "A direction — the end shape is decided along the way"; }
+  { name = "t:epic"; color = "#0b3d91"; description = "Large scope, delivered through sub-issues — too big for one `t:feature` / `t:enhancement`"; }
   { name = "t:bug"; color = "#d73a4a"; description = "Something isn't working"; }
   { name = "t:architectural"; color = "#5319e7"; description = "Refactor of code structure or functionality. Key distinction is refinement of existing structure."; }
   { name = "t:question"; color = "#d876e3"; description = "Deliverable is an answer, — a sort of `t:research` and `t:decision` combination"; }
