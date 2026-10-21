@@ -302,14 +302,16 @@ if nixpkgs != null && pkgs == null then {
     # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
     # module is what says one is owed; a repo that passes none (typst, docs) takes
     # the rest of the hook without it. Forced only through the `enable` branch.
+    customSh = (import ./pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
         assert (rust != null) || throw
           "v_flakes.github: `enable = true` with a language module requires the rust toolchain — pass the `rs` module (which provides `rs.rust`).";
         ''
           ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
-          cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
-          install -m 0755 ${(import ./pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; }} ./.git/hooks/custom.sh
+          ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
+          [[ ! -f .git/hooks/pre-commit || $(<.git/hooks/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
+          [[ -x .git/hooks/custom.sh && $(<.git/hooks/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} ./.git/hooks/custom.sh
         '';
 
     envrcFile = files.envrc { inherit pkgs; impure = envrc.impure or false; extra = envrc.extra or ""; };
