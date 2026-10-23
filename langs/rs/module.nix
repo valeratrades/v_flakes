@@ -132,7 +132,7 @@ if nixpkgs != null && pkgs == null then {
     The shellHook will:
     - Prepend nix rust to PATH so it takes precedence over rustup shims
     - Copy rustfmt.toml to ./rustfmt.toml
-    - Copy cargo config to ./.cargo/config.toml
+    - Write cargo config to ./.cargo/config.toml, keeping its local `[patch.*]` tables (a git clean filter keeps them out of the index)
     - Copy clippy config to ./.cargo/clippy.toml
     - Copy sort-derives config to <cargoRoot>/.sort-derives.toml
     - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into <cargoRoot>/Cargo.toml
@@ -186,7 +186,7 @@ if nixpkgs != null && pkgs == null then {
 
     rustfmtFile = import ./files/rustfmt.nix { inherit pkgs; };
     targetsExtend = if targets != { } then { target.augment = targets; } else { };
-    configExtend = core.mergeConfig targetsExtend config;
+    configExtend = assert !(config ? patch) || throw "v_flakes.rs: `config.patch` would be stripped from git by the `.cargo/config.toml` clean filter; put it in Cargo.toml"; core.mergeConfig targetsExtend config;
     configFile = import ./files/config.nix {
       inherit pkgs cranelift;
       extend = configExtend;
@@ -233,6 +233,26 @@ if nixpkgs != null && pkgs == null then {
             workspaceDirs)
       else "";
 
+    patchAwk = builtins.readFile ./cargo-patch.awk;
+    patchAwkKey = builtins.hashString "sha256" patchAwk;
+    cargoConfigHook = ''
+      if [ -e .git ]; then
+        _vf_attrs=''${_vf_gitconfig%config}info/attributes
+        if ! _vf_fresh cargo-patch-filter "${patchAwkKey}" "$_vf_gitconfig" "$_vf_attrs"; then
+          git config filter.vf-cargo-patch.clean ${pkgs.lib.escapeShellArg "awk ${pkgs.lib.escapeShellArg patchAwk}"} # inlined: a store path gets GCd, and a missing filter commits the patch
+          [[ -f $_vf_attrs && $(<"$_vf_attrs") == *'/.cargo/config.toml filter=vf-cargo-patch'* ]] || { mkdir -p "''${_vf_attrs%/attributes}" && echo '/.cargo/config.toml filter=vf-cargo-patch' >> "$_vf_attrs"; }
+          _vf_stamp cargo-patch-filter "${patchAwkKey}" "$_vf_gitconfig" "$_vf_attrs"
+        fi
+        unset _vf_attrs
+      fi
+      if ! _vf_fresh cargo-config "${configFile} ${patchAwkKey}" ./.cargo/config.toml; then
+        { cat ${configFile}; [ ! -f ./.cargo/config.toml ] || awk -v keep=1 ${pkgs.lib.escapeShellArg patchAwk} ./.cargo/config.toml; } > ./.cargo/config.toml.vf &&
+          _vf_cp ./.cargo/config.toml.vf ./.cargo/config.toml && rm ./.cargo/config.toml.vf &&
+          { [ ! -e .git ] || ! git ls-files --error-unmatch -- .cargo/config.toml >/dev/null 2>&1 || ! git diff --quiet -- .cargo/config.toml || git add -- .cargo/config.toml; } && # re-records the stat: git calls a file whose size differs from the index modified without running the filter
+          _vf_stamp cargo-config "${configFile} ${patchAwkKey}" ./.cargo/config.toml
+      fi
+    '';
+
     denyEnabled = if builtins.isBool deny then deny else deny != { };
     denyHook =
       if denyEnabled then ''
@@ -267,7 +287,7 @@ if nixpkgs != null && pkgs == null then {
       export PATH="${rust}/bin:$PATH"
       [ -d ./.cargo ] || mkdir -p ./.cargo
       _vf_cp ${rustfmtFile} ./rustfmt.toml
-      _vf_cp ${configFile} ./.cargo/config.toml
+      ${cargoConfigHook}
       _vf_cp ${clippyFile} ./.cargo/clippy.toml
       _vf_cp ${sortDerivesFile} ${inRoot ".sort-derives.toml"}
       ${lintsHook}

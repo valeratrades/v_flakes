@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs`: `.cargo/config.toml` keeps its local `[patch.*]` tables across shell entries, and a git clean filter (`filter.vf-cargo-patch`, attribute in `<commondir>/info/attributes`) strips them from the index, so a sibling path override never reaches a commit. Everything else in the file is still v_flakes-owned and rewritten; `rs { config.patch = …; }` is now an eval error. A local `nix build` from a dirty tree still reads the unfiltered file. A checkout that changes the file drops the local patch, because smudge is identity.
+
 - `github`: new `t:epic` label (`#0b3d91`) — a large implementation scope tracked through sub-issues, too big to call one `t:feature` / `t:enhancement`.
 - `github`: label sync (with issue lint and todo-sync) moved off shell entry into the pre-commit hook, still detached. `labelSyncHook` is gone; a repo with its own hook runs `${github.git_ops}/bin/git_ops sync-labels` from it. Label sync now rides on `custom.sh`, so it only runs where that is installed: repos passing a language module, with a git-hooks.nix pre-commit hook.
 - `github`: the pre-commit hook is now `github/pre-commit.rs` (`custom.sh` just runs it), in phases of concurrent steps: `[config copy | cargo sort + autoinherit | sort-derives | codestyle install]`, re-stage, codestyle, `[semver-checks | tracey | js visual]`. Each step's output is printed whole when its phase ends. `cargo semver-checks`, `tracey --check`, `codestyle assert` and failing sort/autoinherit runs now fail the commit; before, only an explicit `exit 1` did.
