@@ -75,3 +75,4 @@ Labels are `github/labels.nix`, synced to every consumer; `github/git-ops.rs` li
 - When assigning `i:*` yourself, always keep on the safe side. `i:5` is already a very big issue (`i:6` is the default production bug, for comparison). `i:5`+ is reserved for implementations that drive business forward.
 - `h:N` is the estimate: 68% sure it's done within N hours. Fibonacci, `h:1`–`h:233`. Round up to the next step. `t:question` gets none. With a good grasp of the scope, you can set it yourself.
 - To hand an issue to Claude (CI implements it), label it `ext:claude`.
+  > Agents never add `ext:claude` themselves: it starts a browser Claude session implementing the issue, (which does worse than an agent spawned properly with proper instructions).
