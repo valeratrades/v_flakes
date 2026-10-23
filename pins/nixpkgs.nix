@@ -7,8 +7,8 @@
 # ║ Also the base of langs/rs/default_nightly.nix — moving this pin forks the   ║
 # ║ toolchain drv for everyone.                                                 ║
 # ║                                                                             ║
-# ║ >>> BUMP POLICY: same as langs/rs/default_nightly.nix — moving this pin     ║
-# ║ >>> requires AT LEAST a MINOR v_flakes bump (new vX.Y branch).              ║
+# ║ >>> BUMP POLICY: same as langs/rs/default_nightly.nix — avoid moving        ║
+# ║ >>> without a minor v_flakes bump.                                          ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 builtins.fetchTree {
   type = "github";
