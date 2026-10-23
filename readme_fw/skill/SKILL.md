@@ -8,6 +8,8 @@ description: "How a repo's README.md is produced from docs/.readme_assets/. Read
 `README.md` is a build artifact. Edit `docs/.readme_assets/`; the dev shell regenerates the
 README on entry and CI regenerates it and diffs, so a hand-edit is reverted, not merged.
 
+README is further from the code than ARCHITECTURE.md: it holds only what the **user** needs.
+
 | Asset | Becomes |
 |---|---|
 | `description` | the body under the title |
@@ -29,4 +31,6 @@ licence footer are generated. Nothing about them belongs in an asset.
 
 With `ste = true` in the readme-fw call, the dev shell checks `usage` and `installation*`
 against ASD-STE100 — see [ste_checker](https://github.com/valeratrades/ste_checker/blob/main/skill/SKILL.md).
+Write them for it: one meaning per word, active voice, short sentences. Words the project owns go
+in `docs/glossary.nix`, ordinary English never does.
 Off by default: those sections are prose in some repos and near-pure command listings in others.
