@@ -1,6 +1,6 @@
 ---
 name: v_flakes
-description: "Rules for working in ~/s/v_flakes (the shared Nix parts collection consumed by every other repo via `v_flakes.url = github:valeratrades/v_flakes?ref=v1.6`). Read BEFORE editing anything under ~/s/v_flakes, and before changing how any repo consumes v_flakes — covers how to release, what the pin policy is, and what re-exports exist. Also read before creating or labelling a GitHub issue in any v_flakes consumer: the label set and its lint come from here."
+description: "Rules for working in ~/s/v_flakes (the shared Nix parts collection consumed by every other repo via `v_flakes.url = github:valeratrades/v_flakes?ref=v1.6`). Read BEFORE editing anything under ~/s/v_flakes, and before changing how any repo consumes v_flakes — covers how to release, what the pin policy is, and what re-exports exist. Also read before creating or labelling a GitHub issue in any v_flakes consumer: the label set and its lint come from here. Also read before editing any Cargo.toml: how a crate depends on another repo we own (local path overrides) is set here."
 ---
 
 # v_flakes
@@ -65,7 +65,11 @@ It must be 1.
 written by v_flakes' own shellHook. They drift dirty on shell entry; that is normal, and the
 release commits them.
 
-> A `path = "../sibling"` dep breaks CI, which checks out only the repo. Tag its line `#ga: rm path` (CI keeps the `version`), `#ga: sub path` (becomes `"*"`), or `#ga: comment` (dropped); see `src/cargo_pre_ci.rs`.
+## Depending on another repo we own
+
+Manifest names it by version. For local dev against the sibling checkout, add it to the untracked
+`[patch.crates-io]` in `.cargo/config.toml` of the nearest parent dir holding both
+(e.g. `~/s/ev_invest/_quant/.cargo/config.toml`).
 
 ## Issues
 
