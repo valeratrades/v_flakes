@@ -1,10 +1,14 @@
 { pkgs
 , cranelift ? true
+, webUnstable ? false
 , extend ? { }
 ,
 }:
 let
   core = import ../../../utils/core.nix;
+  # A `--cfg` is the building crate's choice, never its dependents': a library built with it
+  # compiles against a web-sys API its crates.io users don't get.
+  webCfg = if webUnstable then [ "--cfg" "web_sys_unstable_apis" ] else [ ];
 
   base = {
     build.rustc-wrapper = "sccache";
@@ -18,11 +22,9 @@ let
         "threads=8"
         "-Z"
         "track-diagnostics"
-        "--cfg"
-        "web_sys_unstable_apis"
         #"--cfg" "procmacro2_semver_exempt"
-      ];
-    };
+      ] ++ webCfg;
+    } // (if webUnstable then { "wasm32-unknown-unknown".rustflags = webCfg; } else { });
   } // (if cranelift then {
     profile = {
       rust = {

@@ -33,6 +33,8 @@ args@{ pkgs ? null
   publishCachix ? null
 , # rs.cargoRoot: rust jobs run there
   cargoRoot ? "."
+, # rs.webUnstable: jobs that drop `.cargo/config.toml` get its `--cfg` back through RUSTFLAGS
+  webUnstable ? false
 ,
 }:
 
@@ -114,6 +116,11 @@ if nixpkgs != null && pkgs == null then {
     inCargoRoot = job:
       if cargoRoot == "." then job
       else pkgs.lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
+
+    # The jobs that `rm` `.cargo/config.toml`; the rest read the cfg from it.
+    withWebCfg = job:
+      if webUnstable then pkgs.lib.recursiveUpdate job { env.RUSTFLAGS = "--cfg web_sys_unstable_apis"; }
+      else job;
 
     files = {
       # shared {{{
@@ -278,7 +285,7 @@ if nixpkgs != null && pkgs == null then {
 
         value =
           if pkgs.lib.hasPrefix "rust-" jobName
-          then inCargoRoot valueWithNeeds
+          then inCargoRoot (if builtins.elem jobName [ "rust-clippy" "rust-doc" ] then withWebCfg valueWithNeeds else valueWithNeeds)
           else valueWithNeeds;
       in
       {
@@ -320,7 +327,7 @@ if nixpkgs != null && pkgs == null then {
         in
         builtins.mapAttrs
           (name: wf:
-            (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (wf // { jobs = wf.jobs // { build = inCargoRoot wf.jobs.build; }; }) [ "standalone" "filename" "default" ])
+            (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (wf // { jobs = wf.jobs // { build = withWebCfg (inCargoRoot wf.jobs.build); }; }) [ "standalone" "filename" "default" ])
           )
           spec.workflows
       else { };

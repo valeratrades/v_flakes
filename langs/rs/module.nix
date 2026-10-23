@@ -2,6 +2,8 @@
 , nixpkgs ? null
 , # config options
   cranelift ? true
+, # `--cfg web_sys_unstable_apis` on every target and in CI. For apps only: see files/config.nix
+  webUnstable ? false
 , targets ? { }
 , config ? { }
 , deny ? false
@@ -55,6 +57,7 @@ if nixpkgs != null && pkgs == null then {
     rs = v-utils.rs {
       inherit pkgs rust;  # rust is the nix toolchain package
       cranelift = true;  # Enable cranelift backend (default: true)
+      webUnstable = false; # Build against web-sys' unstable APIs (`--cfg web_sys_unstable_apis`), native + wasm + CI. Apps only: a library built so compiles against an API its dependents don't get (default: false)
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
       clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see langs/rs/files/clippy.nix)
       sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see langs/rs/files/sort_derives.nix)
@@ -188,7 +191,7 @@ if nixpkgs != null && pkgs == null then {
     targetsExtend = if targets != { } then { target.augment = targets; } else { };
     configExtend = assert !(config ? patch) || throw "v_flakes.rs: `config.patch` would be stripped from git by the `.cargo/config.toml` clean filter; put it in Cargo.toml"; core.mergeConfig targetsExtend config;
     configFile = import ./files/config.nix {
-      inherit pkgs cranelift;
+      inherit pkgs cranelift webUnstable;
       extend = configExtend;
     };
     denyExtend = if builtins.isAttrs deny then deny else { };
@@ -273,7 +276,7 @@ if nixpkgs != null && pkgs == null then {
   in
   {
     cargoRoot = cargoRootNormalized;
-    inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
+    inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall webUnstable;
 
     # For backwards compatibility, expose the first build file
     buildFile = makeBuildFile (workspace.${builtins.head workspaceDirs});

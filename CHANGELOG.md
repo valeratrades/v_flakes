@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`rs { webUnstable ? false; }`**: `--cfg web_sys_unstable_apis` is now opt-in, and when on it applies to the wasm32 target and to the CI jobs that drop `.cargo/config.toml` (Clippy, Documentation, release builds). Before, every repo got it on the native target only: native builds saw web-sys' unstable signatures (`MouseEvent::client_x() -> f64`), while wasm builds and CI saw the stable ones (`-> i32`), so local Clippy flagged casts that CI and wasm need. Off by default because a `--cfg` doesn't reach dependents: a library built with it compiles against an API its crates.io users don't get. Migrate: an app that uses unstable web APIs sets `webUnstable = true`.
+
 - `github`: CI runs once per pushed commit. The default `on` is `push` alone, so a PR no longer re-runs every job for commits its branch push already ran. Clippy and Code Duplication lose their `!= 'pull_request'` skip, which had made them skip PR runs. A fork's PR gets no CI; a repo that takes fork PRs adds `pull_request` to its section's `hooks`.
 - `rust`: Clippy, `cargo check` and `cargo test` take `--workspace` (Clippy and check also take `--all-targets`). A bare invocation covered only `default-members`, so other members, and their tests, were never linted or run in CI. Expect new findings in workspaces with `default-members` set.
 

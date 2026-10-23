@@ -86,6 +86,7 @@ let
   rsModuleFlags = if rs != null then (rs.moduleFlags or "") else "";
   rsCodestyleLazyInstall = if rs != null then (rs.codestyleLazyInstall or "") else "";
   cargoRoot = if rs != null then (rs.cargoRoot or ".") else ".";
+  webUnstable = if rs != null then (rs.webUnstable or false) else false;
 
   # Compute from style parameter if provided (for standalone usage without rs)
   styleModules = if style != null then (style.modules or { }) else { };
@@ -237,7 +238,7 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
     } // (if enable then {
-      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync cargoRoot;
+      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync cargoRoot webUnstable;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
