@@ -44,14 +44,14 @@ if nixpkgs != null && pkgs == null then {
     The shellHook will:
     - Copy ruff.toml to ./ruff.toml
     - Generate pyproject.toml with [build-system] if one doesn't exist
-    - Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml via py/pyproject-merge.rs
+    - Overwrite controlled [tool.*] sections (pytest, ty, inline-snapshot) in pyproject.toml via langs/py/pyproject-merge.rs
     - Create venv at venv_path if missing, activate it, and warn if stale
   '';
 } else
 
   let
-    files = import ../files;
-    utils = import ../utils;
+    files = import ../../files;
+    utils = import ../../utils;
 
     ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
 

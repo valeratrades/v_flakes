@@ -9,7 +9,7 @@
 # reject. The assert turns that into an eval-time error when this pin moves instead.
 system:
 let
-  pkgs = import (import ../default_nixpkgs.nix) { inherit system; };
+  pkgs = import (import ../../pins/nixpkgs.nix) { inherit system; };
 in
 assert pkgs.cargo-sort-derives.version == "0.13.0";
 pkgs.cargo-sort-derives.overrideAttrs (o: {

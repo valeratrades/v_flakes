@@ -1,5 +1,5 @@
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║ CANONICAL RUST-OVERLAY — see default_nixpkgs.nix; same bump policy.         ║
+# ║ CANONICAL RUST-OVERLAY — see pins/nixpkgs.nix; same bump policy.            ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 builtins.fetchTree {
   type = "github";

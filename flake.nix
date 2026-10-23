@@ -5,7 +5,7 @@
     Collection of reusable Nix components.
     See individual component descriptions in their respective directories.'';
 
-  # Revs must equal ./default_nixpkgs.nix and ./default_rust_overlay.nix (asserted
+  # Revs must equal ./pins/nixpkgs.nix and ./pins/rust_overlay.nix (asserted
   # below). Flake inputs can't reference those files, so they are restated here —
   # otherwise this repo, and every consumer of the re-exported inputs, would drift
   # off the pins we hand out.
@@ -34,8 +34,8 @@
   inputs.devenv.inputs.nix.inputs.flake-parts.follows = "flake-parts";
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, flake-parts, process-compose-flake, devenv, lean4-nix }:
-    assert nixpkgs.rev == (import ./default_nixpkgs.nix).rev;
-    assert rust-overlay.rev == (import ./default_rust_overlay.nix).rev;
+    assert nixpkgs.rev == (import ./pins/nixpkgs.nix).rev;
+    assert rust-overlay.rev == (import ./pins/rust_overlay.nix).rev;
     let
       pname = "v_flakes";
 
@@ -48,11 +48,11 @@
       parts = {
         files = (import ./files).description;
         github = (import ./github { inherit nixpkgs; }).description;
-        rs = (import ./rs { inherit nixpkgs; }).description;
-        py = (import ./py { inherit nixpkgs; }).description;
-        tex = (import ./tex { inherit nixpkgs; }).description;
-        typ = (import ./typ { inherit nixpkgs; }).description;
-        js = (import ./js { inherit nixpkgs; }).description;
+        rs = (import ./langs/rs { inherit nixpkgs; }).description;
+        py = (import ./langs/py { inherit nixpkgs; }).description;
+        tex = (import ./langs/tex { inherit nixpkgs; }).description;
+        typ = (import ./langs/typ { inherit nixpkgs; }).description;
+        js = (import ./langs/js { inherit nixpkgs; }).description;
       };
     in
     flake-utils.lib.eachDefaultSystem
@@ -63,17 +63,17 @@
             overlays = [ (import rust-overlay) ];
             config.allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [ "drawio" ];
           };
-          rust = (import ./rs).default_nightly system;
+          rust = (import ./langs/rs).default_nightly system;
           stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
           utils = import ./utils;
           files = import ./files;
 
-          rsModule = (import ./rs) { inherit pkgs rust; };
+          rsModule = (import ./langs/rs) { inherit pkgs rust; };
           github = (import ./github) {
             inherit pkgs pname;
             rs = rsModule;
             enable = true;
-            lastSupportedVersion = "nightly-${(import ./rs).nightly_version}";
+            lastSupportedVersion = "nightly-${(import ./langs/rs).nightly_version}";
             jobs = {
               default = true;
               errors.hooks = { push.paths = [ "src/**" ]; };
@@ -110,9 +110,9 @@
         {
           # Exposed as a package (not just `rs.sort_derives`) so CI can `nix run` the same
           # binary the dev shells get, instead of a divergent upstream build.
-          packages.cargo-sort-derives = (import ./rs).sort_derives system;
-          packages.cargo-machete = (import ./rs).machete system;
-          packages.v_flakes = (let build_rust = (import ./rs).build_nightly system; in pkgs.makeRustPlatform { cargo = build_rust; rustc = build_rust; }).buildRustPackage {
+          packages.cargo-sort-derives = (import ./langs/rs).sort_derives system;
+          packages.cargo-machete = (import ./langs/rs).machete system;
+          packages.v_flakes = (let build_rust = (import ./langs/rs).build_nightly system; in pkgs.makeRustPlatform { cargo = build_rust; rustc = build_rust; }).buildRustPackage {
             inherit pname;
             version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
             src = pkgs.lib.fileset.toSource {
@@ -186,7 +186,7 @@
         Generates README.md from docs/.readme_assets/ directory structure.
       '';
 
-      default_nixpkgs = import ./default_nixpkgs.nix;
+      default_nixpkgs = import ./pins/nixpkgs.nix;
       # Re-exported so consumers pin one input (v_flakes) instead of each carrying
       # their own copies — same rev everywhere means nix store dedup, shared caches.
       # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
@@ -195,15 +195,15 @@
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;
-      rs = import ./rs;
-      py = import ./py;
-      tex = import ./tex;
-      typ = import ./typ;
-      js = import ./js;
+      rs = import ./langs/rs;
+      py = import ./langs/py;
+      tex = import ./langs/tex;
+      typ = import ./langs/typ;
+      js = import ./langs/js;
       readme-fw = import ./readme_fw;
       utils = import ./utils;
       qlty = import ./qlty.nix;
-      lean = import ./lean { inherit lean4-nix; };
+      lean = import ./langs/lean { inherit lean4-nix; };
 
       # Backward compatibility aliases
       hooks = {

@@ -46,7 +46,7 @@ if nixpkgs != null && pkgs == null then {
     Self-pinned (own nixpkgs + rust-overlay + date, ignoring your inputs), so every
     repo on the same v_flakes minor resolves to a byte-identical store path: nix
     dedups it and sccache cross-references compilations between repos. The pin lives
-    in rs/default_nightly.nix and moves ONLY on at-least-minor v_flakes bumps.
+    in langs/rs/default_nightly.nix and moves ONLY on at-least-minor v_flakes bumps.
 
     Usage:
     ```nix
@@ -149,9 +149,9 @@ if nixpkgs != null && pkgs == null then {
     "rs module: `rust` toolchain package is required for the build/devshell path (only omittable when reading `.description` with just `nixpkgs`)";
 
   let
-    files = import ../files;
-    core = import ../utils/core.nix;
-    utils = import ../utils;
+    files = import ../../files;
+    core = import ../../utils/core.nix;
+    utils = import ../../utils;
     diet = (import ./diet.nix) pkgs.stdenv.hostPlatform.system;
 
     buildEnable = build.enable or true;
@@ -195,7 +195,7 @@ if nixpkgs != null && pkgs == null then {
 
     # Generate install commands for each workspace directory
     workspaceDirs = builtins.attrNames workspace;
-    buildRustfmtFile = ../files/rust/build/rustfmt.toml;
+    buildRustfmtFile = ../../files/rust/build/rustfmt.toml;
     buildHook =
       if buildEnable then
         builtins.concatStringsSep "\n"

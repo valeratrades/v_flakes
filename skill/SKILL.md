@@ -44,7 +44,7 @@ and another thing, - for `patch` updates no verification whatsoever is needed, y
 
 ## Pin policy
 
-`default_nixpkgs.nix` and `rs/default_nightly.nix` fork the toolchain derivation for the whole
+`pins/nixpkgs.nix` and `langs/rs/default_nightly.nix` fork the toolchain derivation for the whole
 fleet. Moving either requires at least a MINOR bump (a new `vX.Y` branch), never a patch.
 
 ## Adding an input

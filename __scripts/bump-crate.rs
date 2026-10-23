@@ -189,7 +189,7 @@ fn update_src_hash(content: &str, crate_name: &str, new_hash: &str) -> String {
 	re.replace(content, format!("${{1}}{}${{2}}", new_hash)).to_string()
 }
 
-// NB: Must match the pinned nightly in rs/default.nix
+// NB: Must match the pinned nightly in langs/rs/default.nix
 const CODESTYLE_NIGHTLY: &str = "2025-10-10";
 
 fn get_cargo_hash_from_build_error(crate_name: &str, version: &str, src_hash: &str, repo_root: &Path) -> Option<String> {
@@ -287,10 +287,10 @@ fn bump_crate_binstall(crate_cfg: &CrateConfig, repo_root: &Path) -> Result<bool
 	println!("  Latest version: {} (partial: {})", latest_full, latest);
 
 	let flake_path = repo_root.join("flake.nix");
-	let rs_path = repo_root.join("rs/default.nix");
+	let rs_path = repo_root.join("langs/rs/default.nix");
 
 	let flake_content = fs::read_to_string(&flake_path).map_err(|e| format!("Failed to read flake.nix: {}", e))?;
-	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read rs/default.nix: {}", e))?;
+	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read langs/rs/default.nix: {}", e))?;
 
 	let current = get_current_version(&flake_content, &crate_cfg.version_var).ok_or_else(|| format!("Could not find {} in flake.nix", crate_cfg.version_var))?;
 	println!("  Current version: {}", current);
@@ -308,7 +308,7 @@ fn bump_crate_binstall(crate_cfg: &CrateConfig, repo_root: &Path) -> Result<bool
 	let rs_content = update_version(&rs_content, &crate_cfg.version_var, &latest);
 
 	fs::write(&flake_path, &flake_content).map_err(|e| format!("Failed to write flake.nix: {}", e))?;
-	fs::write(&rs_path, &rs_content).map_err(|e| format!("Failed to write rs/default.nix: {}", e))?;
+	fs::write(&rs_path, &rs_content).map_err(|e| format!("Failed to write langs/rs/default.nix: {}", e))?;
 
 	println!("  SUCCESS: {} updated to {}", crate_cfg.name, latest);
 	Ok(true)
@@ -321,10 +321,10 @@ fn bump_crate_source(crate_cfg: &CrateConfig, repo_root: &Path) -> Result<bool, 
 	println!("  Latest version: {}", latest);
 
 	let flake_path = repo_root.join("flake.nix");
-	let rs_path = repo_root.join("rs/default.nix");
+	let rs_path = repo_root.join("langs/rs/default.nix");
 
 	let flake_content = fs::read_to_string(&flake_path).map_err(|e| format!("Failed to read flake.nix: {}", e))?;
-	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read rs/default.nix: {}", e))?;
+	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read langs/rs/default.nix: {}", e))?;
 
 	let current = get_current_version(&flake_content, &crate_cfg.version_var).ok_or_else(|| format!("Could not find {} in flake.nix", crate_cfg.version_var))?;
 	println!("  Current version: {}", current);
@@ -350,22 +350,22 @@ fn bump_crate_source(crate_cfg: &CrateConfig, repo_root: &Path) -> Result<bool, 
 
 	// Write updates
 	fs::write(&flake_path, &flake_content).map_err(|e| format!("Failed to write flake.nix: {}", e))?;
-	fs::write(&rs_path, &rs_content).map_err(|e| format!("Failed to write rs/default.nix: {}", e))?;
+	fs::write(&rs_path, &rs_content).map_err(|e| format!("Failed to write langs/rs/default.nix: {}", e))?;
 
 	// Try to build to get cargoHash
 	println!("  Building to determine cargoHash (will fail once)...");
 	if let Some(cargo_hash) = get_cargo_hash_from_build_error(&crate_cfg.name, &latest, &src_hash, repo_root) {
 		println!("  New cargoHash: {}", cargo_hash);
-		let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read rs/default.nix: {}", e))?;
+		let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read langs/rs/default.nix: {}", e))?;
 		let rs_content = update_cargo_hash(&rs_content, &crate_cfg.name, &cargo_hash);
-		fs::write(&rs_path, rs_content).map_err(|e| format!("Failed to write rs/default.nix: {}", e))?;
+		fs::write(&rs_path, rs_content).map_err(|e| format!("Failed to write langs/rs/default.nix: {}", e))?;
 	}
 
 	// Verify build by actually building the crate with the updated hashes
 	println!("  Verifying build...");
 
-	// Read the updated rs/default.nix to get the new cargoHash
-	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read rs/default.nix: {}", e))?;
+	// Read the updated langs/rs/default.nix to get the new cargoHash
+	let rs_content = fs::read_to_string(&rs_path).map_err(|e| format!("Failed to read langs/rs/default.nix: {}", e))?;
 
 	// Extract cargoHash from the file
 	let cargo_hash = {
@@ -384,7 +384,7 @@ fn bump_crate_source(crate_cfg: &CrateConfig, repo_root: &Path) -> Result<bool, 
 				break;
 			}
 		}
-		found_hash.ok_or_else(|| "Could not find cargoHash in rs/default.nix".to_string())?
+		found_hash.ok_or_else(|| "Could not find cargoHash in langs/rs/default.nix".to_string())?
 	};
 
 	// Build a verification expression

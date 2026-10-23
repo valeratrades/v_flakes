@@ -6,14 +6,14 @@
   };
 
   outputs =
-    {
-      self,
-      flake-utils,
+    { self
+    , flake-utils
+    ,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import (import ../default_nixpkgs.nix) { inherit system; };
+        pkgs = import (import ../pins/nixpkgs.nix) { inherit system; };
         utils = import ../utils;
         readme-fw = import ./.;
 
@@ -36,9 +36,9 @@
         workflows = import ../github/workflows/nix-parts {
           inherit pkgs;
           lastSupportedVersion = "nightly-1.86";
-          jobsErrors = [ ];  # Add your error jobs here
-          jobsWarnings = [ ];  # Add your warning jobs here
-          jobsOther = [ "loc-badge" ];  # LOC badge updater
+          jobsErrors = [ ]; # Add your error jobs here
+          jobsWarnings = [ ]; # Add your warning jobs here
+          jobsOther = [ "loc-badge" ]; # LOC badge updater
         };
 
         combined = utils.combine {
@@ -48,7 +48,8 @@
           rust = pkgs.cargo;
           modules = [
             readme
-            { shellHook = utils.mkShellHook ''
+            {
+              shellHook = utils.mkShellHook ''
                 # Generate workflows
                 mkdir -p .github/workflows
                 cp -f ${workflows.other} .github/workflows/other.yml

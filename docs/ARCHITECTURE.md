@@ -11,7 +11,10 @@ flake.nix (entry point)
     │
     ├── github/        (depends on: files/ for treefmt, gitignore)
     │
-    ├── rs/            (depends on: files/ for rust configs)
+    ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs)
+    │
+    ├── langs/         (per-language modules: rs py js tex typ lean)
+    │   └── rs/        (depends on: files/ for rust configs, pins/ for toolchain)
     │
     ├── readme_fw/     (standalone)
     │
@@ -21,7 +24,7 @@ flake.nix (entry point)
 ## Key Entry Points
 
 - `flake.nix` - Main flake definition, exports all modules
-- `*/default.nix` - Each module's entry point
+- `*/default.nix`, `langs/*/default.nix` - Each module's entry point
 
 ## Data Flow
 
@@ -52,7 +55,7 @@ GitHub-specific configuration:
 - `git-ops.rs` - Rust script for git operations
 - `org_properties.json` - org custom property definitions; `v_flakes org sync` (src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
 
-## rs/
+## langs/rs/
 
 Rust toolchain configuration:
 

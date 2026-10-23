@@ -4,8 +4,8 @@
 # nothing. Same bump policy as default_nightly.nix.
 system:
 let
-  nixpkgs = import ../default_nixpkgs.nix;
-  rust-overlay = import ../default_rust_overlay.nix;
+  nixpkgs = import ../../pins/nixpkgs.nix;
+  rust-overlay = import ../../pins/rust_overlay.nix;
   pkgs = import nixpkgs { inherit system; overlays = [ (import rust-overlay) ]; };
 in
 pkgs.rust-bin.nightly.${import ./nightly_version.nix}.minimal.override {

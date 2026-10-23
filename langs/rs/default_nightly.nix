@@ -14,13 +14,13 @@
 # difference — even a nixpkgs rev — changes rustc bytes and kills cache sharing.
 system:
 let
-  nixpkgs = import ../default_nixpkgs.nix;
-  rust-overlay = import ../default_rust_overlay.nix;
+  nixpkgs = import ../../pins/nixpkgs.nix;
+  rust-overlay = import ../../pins/rust_overlay.nix;
   pkgs = import nixpkgs { inherit system; overlays = [ (import rust-overlay) ]; };
 in
 # Targets are the union of fleet needs (wasm frontends, musl static deploys):
-# an extra rust-std component is ~free, while omitting one in some repos would
-# fork the toolchain drv (see rpath note above).
+  # an extra rust-std component is ~free, while omitting one in some repos would
+  # fork the toolchain drv (see rpath note above).
 pkgs.rust-bin.nightly.${import ./nightly_version.nix}.default.override {
   extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
   targets = [ "wasm32-unknown-unknown" "x86_64-unknown-linux-musl" ];

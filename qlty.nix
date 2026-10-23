@@ -2,11 +2,11 @@
 # release tarball. The musl builds are static and the darwin ones are self-contained, so the
 # archive is the whole package; qlty fetches its own linter plugins at runtime.
 #
-# Self-pinned like rs/sort_derives: the hashes below belong to one release, not to whatever
+# Self-pinned like langs/rs/sort_derives: the hashes below belong to one release, not to whatever
 # a consumer's nixpkgs happens to carry.
 system:
 let
-  pkgs = import (import ./default_nixpkgs.nix) { inherit system; };
+  pkgs = import (import ./pins/nixpkgs.nix) { inherit system; };
   version = "0.641.0";
   targets = {
     x86_64-linux = { target = "x86_64-unknown-linux-musl"; hash = "sha256-bXiAqdAdyi5uEAs1oju55y/ewpY542o+X3Cz9gcaAvc="; };

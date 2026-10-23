@@ -22,7 +22,7 @@ if pkgs == null then {
   '';
 } else
   let
-    utils = import ../utils;
+    utils = import ../../utils;
     nodejs = if node != null then node else pkgs.nodejs;
     preCommit' =
       assert pkgs.lib.assertMsg (preCommit != null)
