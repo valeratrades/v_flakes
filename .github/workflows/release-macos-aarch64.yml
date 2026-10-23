@@ -1,3 +1,5 @@
+%YAML 1.1
+---
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_NET_RETRY: '10'
@@ -16,25 +18,21 @@ jobs:
       with:
         targets: aarch64-apple-darwin
     - name: Remove .cargo/config.toml
-      run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
+      run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" 
+        "$GITHUB_WORKSPACE/.cargo/config"
     - name: Build release binary
       run: cargo build --release --target aarch64-apple-darwin
     - name: Package binary
-      run: 'cd target/aarch64-apple-darwin/release
-
-        PNAME="${GITHUB_REPOSITORY##*/}"
-
-        tar -czvf "$GITHUB_WORKSPACE/${PNAME}-aarch64-apple-darwin.tar.gz" $PNAME
-
-        '
+      run: "cd target/aarch64-apple-darwin/release\nPNAME=\"${GITHUB_REPOSITORY##*/}\"\
+        \ntar -czvf \"$GITHUB_WORKSPACE/${PNAME}-aarch64-apple-darwin.tar.gz\" $PNAME\n"
     - id: version
       name: Resolve version tag
-      run: "if [[ \"${{ github.ref_type }}\" == \"tag\" ]]; then\n  echo \"tag=${{\
-        \ github.ref_name }}\" >> \"$GITHUB_OUTPUT\"\nelse\n  LATEST=$(git tag -l\
-        \ 'v[0-9]*' --sort=-v:refname | head -1)\n  if [[ -n \"$LATEST\" ]]; then\n\
-        \    echo \"tag=$LATEST\" >> \"$GITHUB_OUTPUT\"\n  else\n    echo \"::notice::No\
-        \ existing v* tags found, skipping versioned release\"\n    echo \"tag=\"\
-        \ >> \"$GITHUB_OUTPUT\"\n  fi\nfi\n"
+      run: "if [[ \"${{ github.ref_type }}\" == \"tag\" ]]; then\n  echo \"tag=${{
+        github.ref_name }}\" >> \"$GITHUB_OUTPUT\"\nelse\n  LATEST=$(git tag -l 'v[0-9]*'
+        --sort=-v:refname | head -1)\n  if [[ -n \"$LATEST\" ]]; then\n    echo \"\
+        tag=$LATEST\" >> \"$GITHUB_OUTPUT\"\n  else\n    echo \"::notice::No existing
+        v* tags found, skipping versioned release\"\n    echo \"tag=\" >> \"$GITHUB_OUTPUT\"\
+        \n  fi\nfi\n"
       shell: bash
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

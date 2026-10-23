@@ -1,3 +1,5 @@
+%YAML 1.1
+---
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_NET_RETRY: '10'
@@ -18,32 +20,30 @@ jobs:
     - name: Install mold
       uses: rui314/setup-mold@v1
     - name: Remove .cargo/config.toml
-      run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
+      run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" 
+        "$GITHUB_WORKSPACE/.cargo/config"
     - name: Build release binary
       run: cargo build --release --target x86_64-unknown-linux-gnu
     - name: Package binary
-      run: 'cd target/x86_64-unknown-linux-gnu/release
-
-        PNAME="${GITHUB_REPOSITORY##*/}"
-
-        tar -czvf "$GITHUB_WORKSPACE/${PNAME}-x86_64-unknown-linux-gnu.tar.gz" $PNAME
-
-        '
+      run: "cd target/x86_64-unknown-linux-gnu/release\nPNAME=\"${GITHUB_REPOSITORY##*/}\"\
+        \ntar -czvf \"$GITHUB_WORKSPACE/${PNAME}-x86_64-unknown-linux-gnu.tar.gz\"\
+        \ $PNAME\n"
     - id: version
       name: Resolve version tag
-      run: "if [[ \"${{ github.ref_type }}\" == \"tag\" ]]; then\n  echo \"tag=${{\
-        \ github.ref_name }}\" >> \"$GITHUB_OUTPUT\"\nelse\n  LATEST=$(git tag -l\
-        \ 'v[0-9]*' --sort=-v:refname | head -1)\n  if [[ -n \"$LATEST\" ]]; then\n\
-        \    echo \"tag=$LATEST\" >> \"$GITHUB_OUTPUT\"\n  else\n    echo \"::notice::No\
-        \ existing v* tags found, skipping versioned release\"\n    echo \"tag=\"\
-        \ >> \"$GITHUB_OUTPUT\"\n  fi\nfi\n"
+      run: "if [[ \"${{ github.ref_type }}\" == \"tag\" ]]; then\n  echo \"tag=${{
+        github.ref_name }}\" >> \"$GITHUB_OUTPUT\"\nelse\n  LATEST=$(git tag -l 'v[0-9]*'
+        --sort=-v:refname | head -1)\n  if [[ -n \"$LATEST\" ]]; then\n    echo \"\
+        tag=$LATEST\" >> \"$GITHUB_OUTPUT\"\n  else\n    echo \"::notice::No existing
+        v* tags found, skipping versioned release\"\n    echo \"tag=\" >> \"$GITHUB_OUTPUT\"\
+        \n  fi\nfi\n"
       shell: bash
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       name: Release (latest)
       uses: softprops/action-gh-release@v3
       with:
-        files: ${{ github.event.repository.name }}-x86_64-unknown-linux-gnu.tar.gz
+        files: ${{ github.event.repository.name 
+          }}-x86_64-unknown-linux-gnu.tar.gz
         make_latest: false
         name: Latest linux-x86_64
         prerelease: true
@@ -54,7 +54,8 @@ jobs:
       name: Release (versioned)
       uses: softprops/action-gh-release@v3
       with:
-        files: ${{ github.event.repository.name }}-x86_64-unknown-linux-gnu.tar.gz
+        files: ${{ github.event.repository.name 
+          }}-x86_64-unknown-linux-gnu.tar.gz
         tag_name: ${{ steps.version.outputs.tag }}
 name: Release linux-x86_64
 'on':
