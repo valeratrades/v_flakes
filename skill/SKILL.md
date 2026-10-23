@@ -65,6 +65,8 @@ It must be 1.
 written by v_flakes' own shellHook. They drift dirty on shell entry; that is normal, and the
 release commits them.
 
+> A `path = "../sibling"` dep breaks CI, which checks out only the repo. Tag its line `#ga: rm path` (CI keeps the `version`), `#ga: sub path` (becomes `"*"`), or `#ga: comment` (dropped); see `src/cargo_pre_ci.rs`.
+
 ## Issues
 
 Labels are `github/labels.nix`, synced to every consumer; `github/git-ops.rs` lints open issues on commit.
