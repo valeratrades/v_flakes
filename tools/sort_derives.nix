@@ -11,7 +11,7 @@ system:
 let
   pkgs = import (import ../pins/nixpkgs.nix) { inherit system; };
 in
-assert pkgs.cargo-sort-derives.version == "0.13.0";
+assert pkgs.cargo-sort-derives.version == "0.14.0";
 pkgs.cargo-sort-derives.overrideAttrs (o: {
   patches = (o.patches or [ ]) ++ [ ./sort_derives_qualified_last.patch ];
 })

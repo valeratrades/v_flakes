@@ -9,7 +9,7 @@
   # below). Flake inputs can't reference those files, so they are restated here —
   # otherwise this repo, and every consumer of the re-exported inputs, would drift
   # off the pins we hand out.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/e73de5be04e0eff4190a1432b946d469c794e7b4";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/7a6522c868711d06e3a520bbcdfafe9806f4337f";
   inputs.rust-overlay.url = "github:oxalica/rust-overlay/5106a604b3d67cffe8eb51a8bd9f04e607f0d31d";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-utils.url = "github:numtide/flake-utils";

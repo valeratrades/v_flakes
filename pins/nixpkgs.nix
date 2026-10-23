@@ -14,6 +14,6 @@ builtins.fetchTree {
   type = "github";
   owner = "NixOS";
   repo = "nixpkgs";
-  rev = "e73de5be04e0eff4190a1432b946d469c794e7b4";
-  narHash = "sha256-pGvFkM8N0xEkIIXDe5YYfbEAvHrk4IxBrjB/x8OomhE=";
+  rev = "7a6522c868711d06e3a520bbcdfafe9806f4337f";
+  narHash = "sha256-mN15cwddbOOIzzXSSwYUeRfOYeizz47Vy6y3Hzq6DuY=";
 }
