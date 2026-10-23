@@ -1,6 +1,57 @@
 let
   core = import ./core.nix;
 
+  # Every shell entry (each direnv load) re-runs the hook, so its steady state execs nothing:
+  # outputs are compared with bash builtins, and work is redone only when its inputs changed.
+  # Stamps hold full input contents rather than mtimes, so a stale one only costs a rerun.
+  shellPrelude = ''
+    _vf_stamps="''${XDG_CACHE_HOME:-$HOME/.cache}/v_flakes/stamps/''${PWD//\//%}"
+    _vf_gitconfig=.git/config
+    if [ -f .git ]; then # worktree: `.git` names its gitdir, whose `commondir` holds the shared config
+      read -r _vf_gd < .git
+      _vf_gd=''${_vf_gd#gitdir: }
+      if [ -f "$_vf_gd/commondir" ]; then
+        read -r _vf_cd < "$_vf_gd/commondir"
+        [[ $_vf_cd == /* ]] && _vf_gd=$_vf_cd || _vf_gd=$_vf_gd/$_vf_cd
+      fi
+      _vf_gitconfig=$_vf_gd/config
+      unset _vf_gd _vf_cd
+    fi
+    _vf_same() {
+      [ -f "$1" ] && [ -f "$2" ] || return 1
+      local a b
+      IFS= read -rd "" a < "$1"
+      IFS= read -rd "" b < "$2"
+      [[ $a == "$b" ]]
+    }
+    _vf_cp() { _vf_same "$1" "$2" || cp -f "$1" "$2"; }
+    _vf_any() { [ -e "$1" ]; } # pass it a glob
+    _vf_inputs() {
+      local f c
+      _vf_in=$1
+      shift
+      for f; do
+        if [ -f "$f" ]; then IFS= read -rd "" c < "$f"; _vf_in+=$'\x1f+'"$c"; else _vf_in+=$'\x1f-'; fi
+      done
+    }
+    # <name> <key> <file>...: true while the files hold what they held at `_vf_stamp <name>` under the same key
+    _vf_fresh() {
+      local s=
+      _vf_inputs "''${@:2}"
+      [ -f "$_vf_stamps/$1" ] && IFS= read -rd "" s < "$_vf_stamps/$1"
+      [[ $s == "$_vf_in" ]] && return
+      [ -d "$_vf_stamps" ] || mkdir -p "$_vf_stamps"
+      return 1
+    }
+    _vf_stamp() { _vf_inputs "''${@:2}"; printf '%s' "$_vf_in" > "$_vf_stamps/$1"; }
+    _vf_replay() {
+      local w
+      [ -s "$_vf_stamps/$1.warn" ] || return 0
+      IFS= read -rd "" w < "$_vf_stamps/$1.warn"
+      printf '%s' "$w" >&2
+    }
+  '';
+
   # Wrap a raw shellHook string into the opaque form expected by `combine`.
   # All v_flakes producer modules expose `shellHook` via this helper rather
   # than as a plain string. That way `pkgs.mkShell { shellHook = mod.shellHook; }`
@@ -11,10 +62,9 @@ let
     then throw "v_flakes.utils.mkShellHook: expected a string, got ${builtins.typeOf raw}"
     else { __vFlakesHook = raw; };
 
-  # Unwrap an opaque shellHook back to a raw string. Throws if the value
-  # was not produced via `mkShellHook` — that catches consumers passing
-  # plain strings into `combine` (which would silently bypass the guard).
-  unwrapShellHook = h:
+  # Throws if the value was not produced via `mkShellHook` — that catches consumers
+  # passing plain strings into `combine` (which would silently bypass the guard).
+  rawShellHook = h:
     if builtins.isAttrs h && h ? __vFlakesHook then h.__vFlakesHook
     else
       throw ''
@@ -23,6 +73,9 @@ let
                then "a plain string (use `utils.mkShellHook \"...\"` to wrap it)"
                else builtins.typeOf h}
       '';
+
+  # For splicing one module's hook outside `combine`: module hooks call the `_vf_*` helpers.
+  unwrapShellHook = h: shellPrelude + rawShellHook h;
 
   # Helper to allow both `default` and `defaults` as aliases for the same attribute.
   # When one is provided, both are set to the same value. When neither is provided, neither is set
@@ -342,60 +395,10 @@ in
         fi
         unset _vf_nix _vf_cand _vf_nixconf
       '';
-      # Every shell entry (each direnv load) re-runs the hook, so its steady state execs nothing:
-      # outputs are compared with bash builtins, and work is redone only when its inputs changed.
-      # Stamps hold full input contents rather than mtimes, so a stale one only costs a rerun.
-      shellPrelude = ''
-        _vf_stamps="''${XDG_CACHE_HOME:-$HOME/.cache}/v_flakes/stamps/''${PWD//\//%}"
-        _vf_gitconfig=.git/config
-        if [ -f .git ]; then # worktree: `.git` names its gitdir, whose `commondir` holds the shared config
-          read -r _vf_gd < .git
-          _vf_gd=''${_vf_gd#gitdir: }
-          if [ -f "$_vf_gd/commondir" ]; then
-            read -r _vf_cd < "$_vf_gd/commondir"
-            [[ $_vf_cd == /* ]] && _vf_gd=$_vf_cd || _vf_gd=$_vf_gd/$_vf_cd
-          fi
-          _vf_gitconfig=$_vf_gd/config
-          unset _vf_gd _vf_cd
-        fi
-        _vf_same() {
-          [ -f "$1" ] && [ -f "$2" ] || return 1
-          local a b
-          IFS= read -rd "" a < "$1"
-          IFS= read -rd "" b < "$2"
-          [[ $a == "$b" ]]
-        }
-        _vf_cp() { _vf_same "$1" "$2" || cp -f "$1" "$2"; }
-        _vf_any() { [ -e "$1" ]; } # pass it a glob
-        _vf_inputs() {
-          local f c
-          _vf_in=$1
-          shift
-          for f; do
-            if [ -f "$f" ]; then IFS= read -rd "" c < "$f"; _vf_in+=$'\x1f+'"$c"; else _vf_in+=$'\x1f-'; fi
-          done
-        }
-        # <name> <key> <file>...: true while the files hold what they held at `_vf_stamp <name>` under the same key
-        _vf_fresh() {
-          local s=
-          _vf_inputs "''${@:2}"
-          [ -f "$_vf_stamps/$1" ] && IFS= read -rd "" s < "$_vf_stamps/$1"
-          [[ $s == "$_vf_in" ]] && return
-          [ -d "$_vf_stamps" ] || mkdir -p "$_vf_stamps"
-          return 1
-        }
-        _vf_stamp() { _vf_inputs "''${@:2}"; printf '%s' "$_vf_in" > "$_vf_stamps/$1"; }
-        _vf_replay() {
-          local w
-          [ -s "$_vf_stamps/$1.warn" ] || return 0
-          IFS= read -rd "" w < "$_vf_stamps/$1.warn"
-          printf '%s' "$w" >&2
-        }
-      '';
       getPackages = m: m.enabledPackages or [ ];
       # Each module's shellHook is opaque (built via mkShellHook). unwrap throws
       # if a plain string slipped in — that's a programmer error we want loud.
-      getHook = m: if m ? shellHook then unwrapShellHook m.shellHook else "";
+      getHook = m: if m ? shellHook then rawShellHook m.shellHook else "";
       combinedHooks = builtins.concatStringsSep "\n" (builtins.filter (h: h != "") (map getHook modules));
 
       # Advisory: flag heavyweight duplicated flake inputs (e.g. several nixpkgs revs pulled in because sub-inputs don't `follows` the root nixpkgs). Each

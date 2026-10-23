@@ -117,6 +117,18 @@ if nixpkgs != null && pkgs == null then {
       if cargoRoot == "." then job
       else pkgs.lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
 
+    # every bash `run` must parse, so a broken one fails shell entry instead of CI
+    yaml = value:
+      let generated = (pkgs.formats.yaml { }).generate "workflow.yml" value;
+      in pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ pkgs.yq-go pkgs.bash ]; } ''
+        yq -o json '[.jobs[].steps[]? | select(.run != null and (.shell == null or .shell == "bash")) | .run]' ${generated} > runs.json
+        for i in $(seq 0 $(($(yq -p json 'length' runs.json) - 1))); do
+          yq -p json -r ".[$i]" runs.json > run.sh
+          bash -n run.sh || { echo "v_flakes: a generated workflow's \`run\` doesn't parse:"; cat run.sh; exit 1; } >&2
+        done
+        cp ${generated} $out
+      '';
+
     # The jobs that `rm` `.cargo/config.toml`; the rest read the cfg from it.
     withWebCfg = job:
       if webUnstable then pkgs.lib.recursiveUpdate job { env.RUSTFLAGS = "--cfg web_sys_unstable_apis"; }
@@ -327,7 +339,7 @@ if nixpkgs != null && pkgs == null then {
         in
         builtins.mapAttrs
           (name: wf:
-            (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (wf // { jobs = wf.jobs // { build = withWebCfg (inCargoRoot wf.jobs.build); }; }) [ "standalone" "filename" "default" ])
+            yaml (builtins.removeAttrs (wf // { jobs = wf.jobs // { build = withWebCfg (inCargoRoot wf.jobs.build); }; }) [ "standalone" "filename" "default" ])
           )
           spec.workflows
       else { };
@@ -341,14 +353,14 @@ if nixpkgs != null && pkgs == null then {
           let unknown = builtins.removeAttrs containerRelease [ "registry" "deployKeys" "impure" "refresh" "buildTiming" "lfs" ]; in
           unknown == { } || throw "v_flakes containerRelease: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
         );
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs
+        yaml (builtins.removeAttrs
           (import files.container-release { inherit (pkgs) lib; inherit cache; registry = pkgs.lib.toLower containerRelease.registry; deployKeys = containerRelease.deployKeys or [ ]; impure = containerRelease.impure or false; refresh = containerRelease.refresh or false; buildTiming = containerRelease.buildTiming or false; lfs = containerRelease.lfs or true; })
           [ "standalone" "filename" ])
       else null;
 
     cachixWorkflow =
       if publishCachix != null then
-        (pkgs.formats.yaml { }).generate ""
+        yaml
           (builtins.removeAttrs
             (import files.cachix { name = publishCachix; }) [ "standalone" ])
       else null;
@@ -359,17 +371,17 @@ if nixpkgs != null && pkgs == null then {
         let
           syncSpec = import ./shared/sync-fork.nix;
         in
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs syncSpec [ "standalone" ])
+        yaml (builtins.removeAttrs syncSpec [ "standalone" ])
       else null;
 
     # Claude Code workflows (standalone, generic). Generated as a pair when `claude` is set.
     claudeWorkflow =
       if claude then
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude.nix) [ "standalone" "label" ])
+        yaml (builtins.removeAttrs (import ./shared/claude.nix) [ "standalone" "label" ])
       else null;
     claudeReviewWorkflow =
       if claude then
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (import ./shared/claude-review.nix) [ "standalone" ])
+        yaml (builtins.removeAttrs (import ./shared/claude-review.nix) [ "standalone" ])
       else null;
 
     # GitLab sync workflow (triggers on any push)
@@ -383,7 +395,7 @@ if nixpkgs != null && pkgs == null then {
         let
           syncSpec = import files.sync-gitlab (stripTrailingSlash gitlabSync.mirrorBaseUrl);
         in
-        (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs syncSpec [ "standalone" ])
+        yaml (builtins.removeAttrs syncSpec [ "standalone" ])
       else null;
 
     # Generate load_nix job for a section if it has packages
@@ -398,7 +410,7 @@ if nixpkgs != null && pkgs == null then {
       #Q: Potentially standardize each file providing a set of outs, like `jobs`, `env`, etc, then manually join on them?
       errors =
         if jobsErrors != [ ] then
-          (pkgs.formats.yaml { }).generate ""
+          yaml
             (
               pkgs.lib.recursiveUpdate base {
                 name = "Errors";
@@ -413,7 +425,7 @@ if nixpkgs != null && pkgs == null then {
 
       warnings =
         if jobsWarnings != [ ] then
-          (pkgs.formats.yaml { }).generate ""
+          yaml
             (
               pkgs.lib.recursiveUpdate base {
                 name = "Warnings";
@@ -428,7 +440,7 @@ if nixpkgs != null && pkgs == null then {
 
       other =
         if jobsOther != [ ] then
-          (pkgs.formats.yaml { }).generate ""
+          yaml
             (
               pkgs.lib.recursiveUpdate base {
                 name = "Other";

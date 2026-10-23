@@ -338,7 +338,7 @@ if nixpkgs != null && pkgs == null then {
     preCommit = import ../git/pre_commit.nix;
 
     shellHook = utils.mkShellHook ''
-      ${utils.unwrapShellHook workflows.shellHook}
+      ${workflows.shellHook.__vFlakesHook}
       ${if enable then ''
       ${preCommitInstallHook}
       _vf_cp ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
