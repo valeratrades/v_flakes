@@ -62,7 +62,8 @@ Don't modify them by hand; ignore their appearence in diffs.
 
 ## Developing against another repo we own
 
-Manifest names it by version. For local dev against the sibling checkout, add it to the untracked `[patch.crates-io]` in `.cargo/config.toml` by path.
+For local dev against the sibling checkout, add path ref overrides to the untracked `[patch.crates-io]` in `.cargo/config.toml`.
+Manifest names it by version always.
 
 ## Issues
 
