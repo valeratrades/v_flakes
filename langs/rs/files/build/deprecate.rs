@@ -153,8 +153,7 @@ fn patch_legacy_v_prefix(path: &std::path::Path, content: &str) {
 			Some((since_version, corrected_version)) => {
 				needs_patch = true;
 				new_lines.push(
-					line
-						.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
+					line.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
 						.replace(&format!("since=\"{}\"", since_version), &format!("since = \"{}\"", corrected_version)),
 				);
 			}

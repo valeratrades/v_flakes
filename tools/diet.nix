@@ -2,11 +2,11 @@
 # walk a workspace, and it selects the same default members `cargo release` publishes.
 #DEPRECATE: drop once nixpkgs carries >=1.4.0
 #
-# Self-pinned (not taking the consumer's pkgs) for the same reason as langs/rs/machete: one store path
+# Self-pinned (not taking the consumer's pkgs) for the same reason as machete.nix: one store path
 # for the whole fleet, so nix dedups it across repos.
 system:
 let
-  pkgs = import (import ../../pins/nixpkgs.nix) { inherit system; };
+  pkgs = import (import ../pins/nixpkgs.nix) { inherit system; };
 in
 pkgs.cargo-diet.overrideAttrs (o: rec {
   version = "1.4.0";

@@ -1,6 +1,6 @@
-{ pkgs, extend ? {} }:
+{ pkgs, extend ? { } }:
 let
-  core = import ../../utils/core.nix;
+  core = import ../../../utils/core.nix;
 
   base = {
     "allow-print-in-tests" = true;

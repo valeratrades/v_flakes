@@ -6,11 +6,11 @@
 # This build is our fork, which adds that cross-manifest join.
 #DEPRECATE: switch `owner`/`rev` back to bnjbvr once https://github.com/bnjbvr/cargo-machete/pull/274 merges
 #
-# Self-pinned (not taking the consumer's pkgs) for the same reason as langs/rs/sort_derives: one store
+# Self-pinned (not taking the consumer's pkgs) for the same reason as sort_derives.nix: one store
 # path for the whole fleet, so nix dedups it across repos.
 system:
 let
-  pkgs = import (import ../../pins/nixpkgs.nix) { inherit system; };
+  pkgs = import (import ../pins/nixpkgs.nix) { inherit system; };
 in
 pkgs.rustPlatform.buildRustPackage (finalAttrs: {
   pname = "cargo-machete";

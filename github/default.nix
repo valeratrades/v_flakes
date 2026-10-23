@@ -303,7 +303,7 @@ if nixpkgs != null && pkgs == null then {
     # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
     # module is what says one is owed; a repo that passes none (typst, docs) takes
     # the rest of the hook without it. Forced only through the `enable` branch.
-    customSh = (import ./pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
+    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
         assert (rust != null) || throw
@@ -311,7 +311,7 @@ if nixpkgs != null && pkgs == null then {
         ''
           ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
           ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
-          [[ ! -f .git/hooks/pre-commit || $(<.git/hooks/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${./append-custom.rs} ./.git/hooks/pre-commit
+          [[ ! -f .git/hooks/pre-commit || $(<.git/hooks/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} ./.git/hooks/pre-commit
           [[ -x .git/hooks/custom.sh && $(<.git/hooks/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} ./.git/hooks/custom.sh
         '';
 
@@ -332,8 +332,8 @@ if nixpkgs != null && pkgs == null then {
     inherit workflows;
     inherit (workflows) errors warnings other;
 
-    appendCustom = ./append-custom.rs;
-    preCommit = import ./pre_commit.nix;
+    appendCustom = ../git/append-custom.rs;
+    preCommit = import ../git/pre_commit.nix;
 
     shellHook = utils.mkShellHook ''
       ${utils.unwrapShellHook workflows.shellHook}

@@ -1,6 +1,6 @@
-{ pkgs, extend ? {} }:
+{ pkgs, extend ? { } }:
 let
-  core = import ../../utils/core.nix;
+  core = import ../../../utils/core.nix;
   mkTarget = triple: { inherit triple; };
 
   base = {
@@ -19,7 +19,7 @@ let
       unsound = "deny";
       vulnerability = "deny";
       yanked = "deny";
-      ignore = [];
+      ignore = [ ];
     };
 
     # Considered when running `cargo deny check licenses`
@@ -31,18 +31,18 @@ let
       private = { ignore = true; };
       confidence-threshold = 0.925;
       allow = [
-				"Apache-2.0 WITH LLVM-exception" # https://spdx.org/licenses/LLVM-exception.html
-				"Apache-2.0"                     # https://spdx.org/licenses/Apache-2.0.html
-				"BSD-3-Clause"                   # https://spdx.org/licenses/BSD-3-Clause.html
-				"BlueOak-1.0.0"                 # https://blueoakcouncil.org/license/1.0.0
-				"CC0-1.0"                       # https://spdx.org/licenses/CC0-1.0.html
-				"ISC"                           # https://spdx.org/licenses/ISC.html
-				"MIT"                           # https://spdx.org/licenses/MIT.html
-				"MPL-2.0"                       # https://spdx.org/licenses/MPL-2.0.html
-				"Unicode-DFS-2016"              # https://spdx.org/licenses/Unicode-DFS-2016.html
-				"Unlicense"                     # https://spdx.org/licenses/Unlicense.html
+        "Apache-2.0 WITH LLVM-exception" # https://spdx.org/licenses/LLVM-exception.html
+        "Apache-2.0" # https://spdx.org/licenses/Apache-2.0.html
+        "BSD-3-Clause" # https://spdx.org/licenses/BSD-3-Clause.html
+        "BlueOak-1.0.0" # https://blueoakcouncil.org/license/1.0.0
+        "CC0-1.0" # https://spdx.org/licenses/CC0-1.0.html
+        "ISC" # https://spdx.org/licenses/ISC.html
+        "MIT" # https://spdx.org/licenses/MIT.html
+        "MPL-2.0" # https://spdx.org/licenses/MPL-2.0.html
+        "Unicode-DFS-2016" # https://spdx.org/licenses/Unicode-DFS-2016.html
+        "Unlicense" # https://spdx.org/licenses/Unlicense.html
       ];
-      exceptions = [];
+      exceptions = [ ];
     };
 
     # Considered when running `cargo deny check bans`
@@ -50,9 +50,9 @@ let
     bans = {
       multiple-versions = "warn";
       wildcards = "allow";
-      deny = [];
-      skip = [];
-      skip-tree = [];
+      deny = [ ];
+      skip = [ ];
+      skip-tree = [ ];
     };
 
     # Considered when running `cargo deny check sources`
@@ -60,7 +60,7 @@ let
     sources = {
       unknown-registry = "deny";
       unknown-git = "deny";
-      allow-org.github = ["valeratrades"];
+      allow-org.github = [ "valeratrades" ];
     };
   };
 

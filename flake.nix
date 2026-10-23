@@ -202,15 +202,15 @@
       js = import ./langs/js;
       readme-fw = import ./readme_fw;
       utils = import ./utils;
-      qlty = import ./qlty.nix;
+      qlty = import ./tools/qlty.nix;
       lean = import ./langs/lean { inherit lean4-nix; };
 
       # Backward compatibility aliases
       hooks = {
         description = "DEPRECATED: Use github module instead";
-        appendCustom = ./github/append-custom.rs;
+        appendCustom = ./git/append-custom.rs;
         treefmt = import ./files/treefmt.nix;
-        preCommit = import ./github/pre_commit.nix;
+        preCommit = import ./git/pre_commit.nix;
       };
       workflows = import ./github/workflows/nix-parts;
       ci = import ./github;

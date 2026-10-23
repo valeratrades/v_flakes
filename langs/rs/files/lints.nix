@@ -1,6 +1,6 @@
 { pkgs, extend ? { } }:
 let
-  core = import ../../utils/core.nix;
+  core = import ../../../utils/core.nix;
 
   # `extend` applies to `rust` only.
   base = {

@@ -54,8 +54,8 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs rust;  # rust is the nix toolchain package
       cranelift = true;  # Enable cranelift backend (default: true)
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
-      clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see files/rust/clippy.nix)
-      sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see files/rust/sort_derives.nix)
+      clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see langs/rs/files/clippy.nix)
+      sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see langs/rs/files/sort_derives.nix)
       lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
       tracey = true;     # Enable tracey spec coverage (default: true)
       style = {
@@ -149,10 +149,9 @@ if nixpkgs != null && pkgs == null then {
     "rs module: `rust` toolchain package is required for the build/devshell path (only omittable when reading `.description` with just `nixpkgs`)";
 
   let
-    files = import ../../files;
     core = import ../../utils/core.nix;
     utils = import ../../utils;
-    diet = (import ./diet.nix) pkgs.stdenv.hostPlatform.system;
+    diet = (import ../../tools/diet.nix) pkgs.stdenv.hostPlatform.system;
 
     buildEnable = build.enable or true;
     workspace = build.workspace or { "./" = [ "git_version" "log_directives" ]; };
@@ -168,20 +167,20 @@ if nixpkgs != null && pkgs == null then {
       in
       if stripped == "." || stripped == "" then "./build.rs" else "${stripped}/build.rs";
 
-    rustfmtFile = files.rust.rustfmt { inherit pkgs; };
+    rustfmtFile = import ./files/rustfmt.nix { inherit pkgs; };
     targetsExtend = if targets != { } then { target.augment = targets; } else { };
     configExtend = core.mergeConfig targetsExtend config;
-    configFile = files.rust.config {
+    configFile = import ./files/config.nix {
       inherit pkgs cranelift;
       extend = configExtend;
     };
     denyExtend = if builtins.isAttrs deny then deny else { };
-    denyFile = files.rust.deny { inherit pkgs; extend = denyExtend; };
-    clippyFile = files.rust.clippy { inherit pkgs; extend = clippy; };
-    sortDerivesFile = files.rust.sort_derives { inherit pkgs; extend = sortDerives; };
+    denyFile = import ./files/deny.nix { inherit pkgs; extend = denyExtend; };
+    clippyFile = import ./files/clippy.nix { inherit pkgs; extend = clippy; };
+    sortDerivesFile = import ./files/sort_derives.nix { inherit pkgs; extend = sortDerives; };
     lintsExtend = if builtins.isAttrs lints then lints else { };
     lintsEnabled = if builtins.isBool lints then lints else true;
-    lintsFile = files.rust.lints { inherit pkgs; extend = lintsExtend; };
+    lintsFile = import ./files/lints.nix { inherit pkgs; extend = lintsExtend; };
     lintsHook =
       if lintsEnabled then ''
         export CARGO_UNSTABLE_CARGO_LINTS=true # pinned nightly ignores [lints.cargo] without it
@@ -191,11 +190,11 @@ if nixpkgs != null && pkgs == null then {
       '' else "";
 
     # Generate a build file for each workspace directory with its specific modules
-    makeBuildFile = modules: files.rust.build { inherit pkgs modules; };
+    makeBuildFile = modules: import ./files/build.nix { inherit pkgs modules; };
 
     # Generate install commands for each workspace directory
     workspaceDirs = builtins.attrNames workspace;
-    buildRustfmtFile = ../../files/rust/build/rustfmt.toml;
+    buildRustfmtFile = ./files/build/rustfmt.toml;
     buildHook =
       if buildEnable then
         builtins.concatStringsSep "\n"

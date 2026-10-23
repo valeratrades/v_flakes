@@ -6,23 +6,23 @@
     agpl = { name = "AGPL-3.0"; path = ./licenses/agpl.txt; };
     gl = { name = "GLWTS"; path = ./licenses/glwts.txt; };
   };
-  preCommit = import ./pre_commit.nix;
+  preCommit = import ../git/hooks.nix;
   treefmt = import ./treefmt.nix;
   rust = {
-    rustfmt = import ./rust/rustfmt.nix;
-    deny = import ./rust/deny.nix;
-    toolchain = import ./rust/toolchain.nix;
-    config = import ./rust/config.nix;
-    clippy = import ./rust/clippy.nix;
-    sort_derives = import ./rust/sort_derives.nix;
-    lints = import ./rust/lints.nix;
-    build = import ./rust/build.nix;
+    rustfmt = import ../langs/rs/files/rustfmt.nix;
+    deny = import ../langs/rs/files/deny.nix;
+    toolchain = import ../langs/rs/files/toolchain.nix;
+    config = import ../langs/rs/files/config.nix;
+    clippy = import ../langs/rs/files/clippy.nix;
+    sort_derives = import ../langs/rs/files/sort_derives.nix;
+    lints = import ../langs/rs/files/lints.nix;
+    build = import ../langs/rs/files/build.nix;
   };
   python = {
-    ruff = import ./python/ruff.nix;
+    ruff = import ../langs/py/files/ruff.nix;
   };
   golang = {
-    gofumpt = import ./golang/gofumpt.nix;
+    gofumpt = import ../langs/go/files/gofumpt.nix;
   };
   gitignore = import ./gitignore.nix;
   gitattributes = import ./gitattributes.nix;

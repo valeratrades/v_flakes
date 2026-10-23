@@ -7,14 +7,18 @@ v-utils is a Nix flake providing reusable components for project configuration. 
 ```
 flake.nix (entry point)
     │
-    ├── files/         (standalone - no dependencies)
+    ├── files/         (lang-agnostic templates: gitignore, envrc, treefmt, licenses; re-exports langs/*/files)
     │
-    ├── github/        (depends on: files/ for treefmt, gitignore)
+    ├── git/           (pre-commit: hooks.nix for git-hooks.nix, pre_commit.nix + pre-commit.rs for .git/hooks/custom.sh)
+    │
+    ├── github/        (depends on: files/, git/)
     │
     ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs)
     │
-    ├── langs/         (per-language modules: rs py js tex typ lean)
-    │   └── rs/        (depends on: files/ for rust configs, pins/ for toolchain)
+    ├── tools/         (self-pinned binaries: qlty, cargo-machete, cargo-diet, cargo-sort-derives; depend on pins/)
+    │
+    ├── langs/         (per-language modules: rs py js tex typ lean go)
+    │   └── <lang>/files/  (that language's config templates)
     │
     ├── readme_fw/     (standalone)
     │
@@ -41,7 +45,6 @@ Templates for project files. Each submodule generates a derivation containing th
 
 - `gitignore/` - Language-specific gitignore rules
 - `envrc/` - `.envrc`, the `--impure` nix wrapper behind `impure`
-- `rust/` - rustfmt.toml, cargo config, deny.toml
 - `treefmt.nix` - treefmt configuration
 - `licenses/` - License file templates
 
@@ -50,14 +53,13 @@ Templates for project files. Each submodule generates a derivation containing th
 GitHub-specific configuration:
 
 - `workflows/` - CI workflow generation (errors.yml, warnings.yml)
-- `pre_commit.nix` - Pre-commit hook with treefmt
 - `labels.nix` - GitHub label synchronization
 - `git-ops.rs` - Rust script for git operations
 - `org_properties.json` - org custom property definitions; `v_flakes org sync` (src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
 
 ## langs/rs/
 
-Rust toolchain configuration:
+Rust toolchain configuration (config templates in `files/`):
 
 - Generates `build.rs` for cranelift backend detection
 - Integrates cargo-deny for dependency auditing

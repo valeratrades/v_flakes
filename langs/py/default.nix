@@ -50,10 +50,9 @@ if nixpkgs != null && pkgs == null then {
 } else
 
   let
-    files = import ../../files;
     utils = import ../../utils;
 
-    ruffFile = files.python.ruff { inherit pkgs; extend = ruff; };
+    ruffFile = import ./files/ruff.nix { inherit pkgs; extend = ruff; };
 
     # `py` is independent of `rs`, but pyproject-merge.rs is a `cargo -Zscript`.
     # Route through `utils.withCargo` so we use the nix cargo when `rs` is in

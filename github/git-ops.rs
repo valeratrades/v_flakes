@@ -1055,7 +1055,7 @@ fn sync_conventions(version_key: String, files: Vec<String>) {
 }
 
 // ERE, shared by `git log --grep -E` (which commits match) and `sed -E` (what to cut).
-// Same two shapes files/strip_claude_signature.nix applies to new commit messages.
+// Same two shapes git/strip_claude_signature.nix applies to new commit messages.
 const CLAUDE_TRAILERS: [&str; 2] = ["^[[:space:]]*Co-authored-by:.*(Claude|noreply@anthropic\\.com)", "Generated with \\[?Claude Code"];
 
 fn strip_history(yes: bool) {
