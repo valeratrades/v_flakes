@@ -1,5 +1,3 @@
-%YAML 1.1
----
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_NET_RETRY: '10'
@@ -29,16 +27,21 @@ jobs:
       run: echo "RUSTFLAGS=-Dwarnings" >> $GITHUB_ENV
     - if: matrix.rust == 'nightly'
       name: Enable type layout randomization
-      run: "printf '#!/bin/sh\\nexec \"$@\" -Zrandomize-layout --cfg=exhaustive\\\
-        n' > /tmp/randomize-layout.sh\nchmod +x /tmp/randomize-layout.sh\necho RUSTC_WORKSPACE_WRAPPER=/tmp/randomize-layout.sh
-        >> $GITHUB_ENV\n"
+      run: 'printf ''#!/bin/sh\nexec "$@" -Zrandomize-layout --cfg=exhaustive\n''
+        > /tmp/randomize-layout.sh
+
+        chmod +x /tmp/randomize-layout.sh
+
+        echo RUSTC_WORKSPACE_WRAPPER=/tmp/randomize-layout.sh >> $GITHUB_ENV
+
+        '
     - name: Download modified by pre-ci Cargo.toml files
       uses: actions/download-artifact@v7
       with:
         name: modified-cargo-files
     - run: cargo update
-    - run: cargo check --workspace --all-targets
-    - run: cargo test --workspace
+    - run: cargo check
+    - run: cargo test
     strategy:
       fail-fast: false
       matrix:
