@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `github`: CI runs once per pushed commit. The default `on` is `push` alone, so a PR no longer re-runs every job for commits its branch push already ran. Clippy and Code Duplication lose their `!= 'pull_request'` skip, which had made them skip PR runs. A fork's PR gets no CI; a repo that takes fork PRs adds `pull_request` to its section's `hooks`.
+- `rust`: Clippy, `cargo check` and `cargo test` take `--workspace` (Clippy and check also take `--all-targets`). A bare invocation covered only `default-members`, so other members, and their tests, were never linted or run in CI. Expect new findings in workspaces with `default-members` set.
+
 - `rs`: `.cargo/config.toml` keeps its local `[patch.*]` tables across shell entries, and a git clean filter (`filter.vf-cargo-patch`, attribute in `<commondir>/info/attributes`) strips them from the index, so a sibling path override never reaches a commit. Everything else in the file is still v_flakes-owned and rewritten; `rs { config.patch = …; }` is now an eval error. A local `nix build` from a dirty tree still reads the unfiltered file. A checkout that changes the file drops the local patch, because smudge is identity.
 
 - `github`: new `t:epic` label (`#0b3d91`) — a large implementation scope tracked through sub-issues, too big to call one `t:feature` / `t:enhancement`.

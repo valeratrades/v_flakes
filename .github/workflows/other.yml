@@ -58,7 +58,6 @@ jobs:
         '
 name: Other
 'on':
-  pull_request: {}
   push: {}
   workflow_dispatch: {}
 permissions:

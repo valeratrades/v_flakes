@@ -15,7 +15,7 @@ args@{ pkgs ? null
   installErrors ? { }
 , installWarnings ? { }
 , installOther ? { }
-, # Per-section `on` triggers. Default: push + pull_request.
+, # Per-section `on` triggers. Default: push.
   # workflow_dispatch is always appended unless already present in the provided value.
   hooksErrors ? null
 , hooksWarnings ? null
@@ -53,7 +53,7 @@ if nixpkgs != null && pkgs == null then {
       # Or with args: { name = "rust-tests"; args.skipPatterns = [ "pattern1" "pattern2" ]; }
       jobsWarnings = [ "rust-clippy" "rust-machete" ];
       jobsOther = [ "loc-badge" ];
-      # Per-section `on` triggers (default: push + pull_request; workflow_dispatch always appended):
+      # Per-section `on` triggers (default: push; workflow_dispatch always appended):
       # hooksErrors = { push = { branches = [ "main" ]; }; pull_request = {}; };
     };
     ```

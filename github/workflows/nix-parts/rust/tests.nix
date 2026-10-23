@@ -61,8 +61,9 @@ in
     # not sure why dtolnay has this
     #{ run = "cargo check --locked"; }
     { run = "cargo update"; }
-    { run = "cargo check"; }
-    { run = "cargo test${skipArgs}"; }
+    # `--workspace`: a bare invocation covers only `default-members`
+    { run = "cargo check --workspace --all-targets"; }
+    { run = "cargo test --workspace${skipArgs}"; }
     #TODO: figure this out
     #  if: matrix.os == 'ubuntu' && matrix.rust == 'nightly'
     #- run: cargo run -- expand --manifest-path tests/Cargo.toml > expand.rs && diff tests/lib.expand.rs expand.rs

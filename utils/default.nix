@@ -241,9 +241,9 @@ in
   # Default GitHub Actions `on` triggers for standard CI workflows.
   # Fires on every push, every PR, and allows manual dispatch.
   # Override per-section via jobs.errors.hooks = { ... } in github/default.nix.
+  # Every pushed commit, exactly once: a PR's commits already ran on their branch push.
   defaultHooks = {
     push = { };
-    pull_request = { };
   };
 
   # `nix run .#help`, listed off the flake's own outputs so it can't drift from them:

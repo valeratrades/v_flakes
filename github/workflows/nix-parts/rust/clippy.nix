@@ -2,7 +2,6 @@
   name = "Clippy";
   needs = "pre_ci";
   runs-on = "ubuntu-latest";
-  "if" = "github.event_name != 'pull_request'";
   timeout-minutes = 45;
   steps = [
     { uses = "actions/checkout@v5"; }
@@ -13,6 +12,6 @@
       "with".name = "modified-cargo-files";
     }
     { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # it can have eg `threads=8`; which could lead to races when reasoning about macros
-    { run = "cargo clippy --tests -- -Dwarnings"; } #-Dclippy::all #-Dclippy::pedantic
+    { run = "cargo clippy --workspace --all-targets -- -Dwarnings"; } #-Dclippy::all #-Dclippy::pedantic
   ];
 }

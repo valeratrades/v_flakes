@@ -6,7 +6,6 @@ env:
   RUST_BACKTRACE: short
 jobs:
   code-duplication:
-    if: github.event_name != 'pull_request'
     name: Code Duplication
     needs: pre_ci
     runs-on: ubuntu-latest
@@ -35,7 +34,6 @@ jobs:
     defaults:
       run:
         working-directory: cli
-    if: github.event_name != 'pull_request'
     name: Clippy
     needs: pre_ci
     runs-on: ubuntu-latest
@@ -47,7 +45,7 @@ jobs:
       with:
         name: modified-cargo-files
     - run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
-    - run: cargo clippy --tests -- -Dwarnings
+    - run: cargo clippy --workspace --all-targets -- -Dwarnings
     timeout-minutes: 45
   rust-doc:
     defaults:
