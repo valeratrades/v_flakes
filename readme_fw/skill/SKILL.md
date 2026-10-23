@@ -8,8 +8,6 @@ description: "How a repo's README.md is produced from docs/.readme_assets/. Read
 `README.md` is a build artifact. Edit `docs/.readme_assets/`; the dev shell regenerates the
 README on entry and CI regenerates it and diffs, so a hand-edit is reverted, not merged.
 
-README is further from the code than ARCHITECTURE.md: it holds only what the **user** needs.
-
 | Asset | Becomes |
 |---|---|
 | `description` | the body under the title |
