@@ -11,8 +11,7 @@ Shared Nix parts. Every consumer repo pins exactly one input:
 inputs.v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
 ```
 
-and takes everything else off the re-exports — never its own `nixpkgs` / `flake-utils` /
-`rust-overlay` / `pre-commit-hooks` / `flake-parts` / `process-compose-flake` / `devenv` input.
+and takes everything else off the re-exports — never its own `nixpkgs` / `flake-utils` / `rust-overlay` / `pre-commit-hooks` / `flake-parts` / `process-compose-flake` / `devenv` input.
 
 ```nix
 outputs = { self, v_flakes }:
@@ -24,9 +23,7 @@ outputs = { self, v_flakes }:
     in { ... });
 ```
 
-`default_nixpkgs` is a bare source tree for `import`; `v_flakes.nixpkgs` is the same rev as a
-flake, for consumers that need `.lib` (or that pass `inputs.nixpkgs` on to a third-party
-flakeModule, as devenv's does).
+`default_nixpkgs` is a bare source tree for `import`; `v_flakes.nixpkgs` is the same rev as a flake, for consumers that need `.lib` (or that pass `inputs.nixpkgs` on to a third-party flakeModule, as devenv's does).
 
 ## Releasing
 
@@ -44,14 +41,11 @@ and another thing, - for `patch` updates no verification whatsoever is needed, y
 
 ## Pin policy
 
-`pins/nixpkgs.nix` and `langs/rs/default_nightly.nix` fork the toolchain derivation for the whole
-fleet. Moving either requires at least a MINOR bump (a new `vX.Y` branch), never a patch.
+`default_nixpkgs.nix` and `rs/default_nightly.nix` fork the toolchain derivation for the whole fleet. Moving either requires at least a MINOR bump (a new `vX.Y` branch), never a patch.
 
 ## Adding an input
 
-Anything added here lands in every consumer's lock. Follow the nested `nixpkgs` of whatever you
-add (`<input>.inputs.<sub>.inputs.nixpkgs.follows = "nixpkgs"`) — the devShell prints a
-duplicate-input warning with the wasted size if you miss one. Verify with:
+Anything added here lands in every consumer's lock. Follow the nested `nixpkgs` of whatever you add (`<input>.inputs.<sub>.inputs.nixpkgs.follows = "nixpkgs"`) — the devShell prints a duplicate-input warning with the wasted size if you miss one. Verify with:
 
 ```
 nix flake metadata --json | jq '[.locks.nodes|to_entries[]|select(.value.locked.repo=="nixpkgs")]|length'
@@ -64,12 +58,11 @@ It must be 1.
 `.cargo/config.toml`, `.github/workflows/*`, `README.md`, `.gitignore`, `.treefmt.toml` are
 written by v_flakes' own shellHook. They drift dirty on shell entry; that is normal, and the
 release commits them.
+Don't modify them by hand; ignore their appearence in diffs.
 
-## Depending on another repo we own
+## Developing against another repo we own
 
-Manifest names it by version. For local dev against the sibling checkout, add it to the untracked
-`[patch.crates-io]` in `.cargo/config.toml` of the nearest parent dir holding both
-(e.g. `~/s/ev_invest/_quant/.cargo/config.toml`).
+Manifest names it by version. For local dev against the sibling checkout, add it to the untracked `[patch.crates-io]` in `.cargo/config.toml` by path.
 
 ## Issues
 
