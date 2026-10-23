@@ -12,6 +12,8 @@
 , style ? { }
 , # build.rs options
   build ? { }
+, # directory of the Cargo root (the crate or workspace manifest), relative to the repo root
+  cargoRoot ? "."
 , # rust toolchain package - required to prepend to PATH so nix rust takes
   # precedence over rustup. Defaulted to null so the module can be imported with
   # just `nixpkgs` to read `.description` (flake.nix); real build paths assert it.
@@ -58,6 +60,7 @@ if nixpkgs != null && pkgs == null then {
       sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see langs/rs/files/sort_derives.nix)
       lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
       tracey = true;     # Enable tracey spec coverage (default: true)
+      cargoRoot = ".";   # Dir holding the Cargo root, relative to the repo root (default: "."). Same meaning as nixpkgs buildRustPackage.cargoRoot
       style = {
         format = true;   # Auto-fix style issues in pre-commit (default: true)
         check = false;   # Error on unfixable style issues (default: false)
@@ -68,7 +71,7 @@ if nixpkgs != null && pkgs == null then {
       };
       build = {
         enable = true;          # Generate build.rs (default: true)
-        workspace = {           # Per-directory build.rs modules (default: { "./" = [ "git_version" "log_directives" ]; })
+        workspace = {           # Per-directory build.rs modules, keys relative to the repo root (default: { "<cargoRoot>" = [ "git_version" "log_directives" ]; })
           "./" = [ "git_version" "log_directives" ];
           "./cli" = [ "git_version" "log_directives" { deprecate = { by_version = "2.0.0"; }; } ];
         };
@@ -131,9 +134,13 @@ if nixpkgs != null && pkgs == null then {
     - Copy rustfmt.toml to ./rustfmt.toml
     - Copy cargo config to ./.cargo/config.toml
     - Copy clippy config to ./.cargo/clippy.toml
-    - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into ./Cargo.toml
+    - Copy sort-derives config to <cargoRoot>/.sort-derives.toml
+    - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into <cargoRoot>/Cargo.toml
     - Copy build.rs to each directory in build.workspace (with write permissions for treefmt)
-    - Copy deny.toml to ./deny.toml (if deny = true)
+    - Copy deny.toml to <cargoRoot>/deny.toml (if deny = true)
+
+    cargoRoot: rustfmt.toml and .cargo/ stay at the repo root, as rustfmt and cargo search upward for them.
+    The github module reads `rs.cargoRoot`: rust CI jobs and the rust pre-commit steps run there.
 
     enabledPackages includes:
     - `tracey` - spec coverage tool (if tracey = true)
@@ -153,8 +160,18 @@ if nixpkgs != null && pkgs == null then {
     utils = import ../../utils;
     diet = (import ../../tools/diet.nix) pkgs.stdenv.hostPlatform.system;
 
+    cargoRootNormalized =
+      let
+        stripped = pkgs.lib.removeSuffix "/" (pkgs.lib.removePrefix "./" cargoRoot);
+        dir = if stripped == "" then "." else stripped;
+      in
+      assert pkgs.lib.assertMsg (!pkgs.lib.hasPrefix "/" dir && !builtins.elem ".." (pkgs.lib.splitString "/" dir))
+        "rs module: cargoRoot must be a relative path without `..`, got ${cargoRoot}";
+      dir;
+    inRoot = f: if cargoRootNormalized == "." then "./${f}" else "./${cargoRootNormalized}/${f}";
+
     buildEnable = build.enable or true;
-    workspace = build.workspace or { "./" = [ "git_version" "log_directives" ]; };
+    workspace = build.workspace or { ${inRoot ""} = [ "git_version" "log_directives" ]; };
 
     # codestyle installed via binstall (same as tracey)
     # Building from source fails in nix sandbox due to TMPDIR issues during cargo build
@@ -181,11 +198,12 @@ if nixpkgs != null && pkgs == null then {
     lintsExtend = if builtins.isAttrs lints then lints else { };
     lintsEnabled = if builtins.isBool lints then lints else true;
     lintsFile = import ./files/lints.nix { inherit pkgs; extend = lintsExtend; };
+    manifest = inRoot "Cargo.toml";
     lintsHook =
       if lintsEnabled then ''
         export CARGO_UNSTABLE_CARGO_LINTS=true # pinned nightly ignores [lints.cargo] without it
-        if [ -f ./Cargo.toml ] && ! _vf_fresh cargo-lints "${./cargo-merge.rs} ${lintsFile}" ./Cargo.toml; then
-          cargo -Zscript -q ${./cargo-merge.rs} ./Cargo.toml ${lintsFile} && _vf_stamp cargo-lints "${./cargo-merge.rs} ${lintsFile}" ./Cargo.toml
+        if [ -f ${manifest} ] && ! _vf_fresh cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest}; then
+          cargo -Zscript -q ${./cargo-merge.rs} ${manifest} ${lintsFile} && _vf_stamp cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest}
         fi
       '' else "";
 
@@ -218,7 +236,7 @@ if nixpkgs != null && pkgs == null then {
     denyEnabled = if builtins.isBool deny then deny else deny != { };
     denyHook =
       if denyEnabled then ''
-        _vf_cp ${denyFile} ./deny.toml
+        _vf_cp ${denyFile} ${inRoot "deny.toml"}
       '' else "";
 
     # Normalize style config
@@ -234,6 +252,7 @@ if nixpkgs != null && pkgs == null then {
     codestyleLazyInstall = if styleEnabled then utils.binstallCrate { name = "codestyle"; } else "";
   in
   {
+    cargoRoot = cargoRootNormalized;
     inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall;
 
     # For backwards compatibility, expose the first build file
@@ -250,7 +269,7 @@ if nixpkgs != null && pkgs == null then {
       _vf_cp ${rustfmtFile} ./rustfmt.toml
       _vf_cp ${configFile} ./.cargo/config.toml
       _vf_cp ${clippyFile} ./.cargo/clippy.toml
-      _vf_cp ${sortDerivesFile} ./.sort-derives.toml
+      _vf_cp ${sortDerivesFile} ${inRoot ".sort-derives.toml"}
       ${lintsHook}
       ${buildHook}
       ${denyHook}
@@ -258,6 +277,6 @@ if nixpkgs != null && pkgs == null then {
     '';
 
     # cargo-binstall for tracey and codestyle
-    enabledPackages = [ pkgs.cargo-binstall diet pkgs.cargo-release ((import ./cpublish.nix) pkgs diet) ];
+    enabledPackages = [ pkgs.cargo-binstall diet pkgs.cargo-release ((import ./cpublish.nix) pkgs diet cargoRootNormalized) ];
     traceyCheck = tracey;
   }

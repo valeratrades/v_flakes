@@ -27,6 +27,8 @@ enum Style {
 #[derive(Debug)]
 struct Config {
 	pname: String,
+	/// `./<dir>`, so it compares with the repo-root-relative `exclude_dirs`
+	cargo_root: PathBuf,
 	semver_checks: bool,
 	tracey_check: bool,
 	style: Option<Style>,
@@ -39,7 +41,7 @@ struct Config {
 
 impl Config {
 	fn from_args() -> Self {
-		let mut pname = None;
+		let (mut pname, mut cargo_root) = (None, None);
 		let (mut semver_checks, mut tracey_check, mut js_visual) = (false, false, false);
 		let (mut style_format, mut style_assert) = (false, false);
 		let (mut module_flags, mut exclude_dirs) = (Vec::new(), Vec::new());
@@ -49,6 +51,11 @@ impl Config {
 			let mut value = || args.next().unwrap_or_else(|| panic!("{arg} takes a value"));
 			match arg.as_str() {
 				"--pname" => pname = Some(value()),
+				"--cargo-root" =>
+					cargo_root = Some(match value().as_str() {
+						"." => PathBuf::from("./"),
+						d => Path::new(".").join(d),
+					}),
 				"--semver-checks" => semver_checks = true,
 				"--tracey-check" => tracey_check = true,
 				"--style-format" => style_format = true,
@@ -69,6 +76,7 @@ impl Config {
 		};
 		Self {
 			pname: pname.expect("--pname is always passed by pre_commit.nix"),
+			cargo_root: cargo_root.expect("--cargo-root is always passed by pre_commit.nix"),
 			semver_checks,
 			tracey_check,
 			style,
@@ -195,10 +203,10 @@ fn home() -> PathBuf {
 	PathBuf::from(env::var_os("HOME").expect("HOME is set in a git hook"))
 }
 
-fn sort_manifests(log: &mut Log) -> bool {
+fn sort_manifests(cfg: &Config, log: &mut Log) -> bool {
 	if log.require_tool("cargo-sort", "cargo install cargo-sort") {
 		let mut sort_log = Log::default();
-		if !sort_log.run(Command::new("cargo").args(["sort", "--workspace", "--grouped"])) {
+		if !sort_log.run(Command::new("cargo").args(["sort", "--workspace", "--grouped"]).current_dir(&cfg.cargo_root)) {
 			log.0.push_str(&sort_log.0);
 			return false;
 		}
@@ -214,12 +222,12 @@ fn sort_manifests(log: &mut Log) -> bool {
 			}
 		}
 	}
-	let workspace = fs::read_to_string("Cargo.toml")
+	let workspace = fs::read_to_string(cfg.cargo_root.join("Cargo.toml"))
 		.expect("guarded by Cargo.toml existing")
 		.lines()
 		.any(|l| l.starts_with("[workspace]"));
 	if workspace && log.require_tool("cargo-autoinherit", "cargo install cargo-autoinherit") {
-		return log.run(Command::new("cargo").arg("autoinherit"));
+		return log.run(Command::new("cargo").arg("autoinherit").current_dir(&cfg.cargo_root));
 	}
 	true
 }
@@ -231,7 +239,7 @@ fn sort_derives(cfg: &Config, log: &mut Log) -> bool {
 	// Upstream's cargo-sort-derives ignores unknown config keys, so an unpatched binary would
 	// sort qualified derives mid-list, silently, while CI (which runs the patched build)
 	// rejects it. Fail here instead, where the fix is obvious.
-	if fs::read_to_string(".sort-derives.toml").is_ok_and(|s| s.contains("qualified_last")) {
+	if fs::read_to_string(cfg.cargo_root.join(".sort-derives.toml")).is_ok_and(|s| s.contains("qualified_last")) {
 		let help = Command::new("cargo").args(["sort-derives", "--help"]).output().expect("spawn cargo sort-derives --help");
 		if !String::from_utf8_lossy(&help.stdout).contains("--qualified-last") {
 			log.line("pre-commit: .sort-derives.toml sets qualified_last but cargo-sort-derives on PATH does not support it");
@@ -240,12 +248,15 @@ fn sort_derives(cfg: &Config, log: &mut Log) -> bool {
 		}
 	}
 	if cfg.exclude_dirs.is_empty() {
-		return log.run(Command::new("cargo").arg("sort-derives"));
+		return log.run(Command::new("cargo").arg("sort-derives").current_dir(&cfg.cargo_root));
 	}
 	// sort-derives has no native --exclude flag
 	let mut files = Vec::new();
-	walk(Path::new("."), cfg, &mut files, &|p| p.extension().is_some_and(|e| e == "rs"));
-	files.iter().all(|f| log.run(Command::new("cargo").args(["sort-derives", "--path"]).arg(f)))
+	walk(&cfg.cargo_root, cfg, &mut files, &|p| p.extension().is_some_and(|e| e == "rs"));
+	files.iter().all(|f| {
+		let f = f.strip_prefix(&cfg.cargo_root).expect("walked from cargo_root");
+		log.run(Command::new("cargo").args(["sort-derives", "--path"]).arg(f).current_dir(&cfg.cargo_root))
+	})
 }
 
 fn patched_manifests(cfg: &Config) {
@@ -271,10 +282,10 @@ fn codestyle(cfg: &Config, style: Style, path: &std::ffi::OsStr) -> bool {
 	for d in &cfg.exclude_dirs {
 		cmd.args(["--exclude", d]); // a top-level arg, so before the `rust` subcommand
 	}
-	cmd.arg("rust").args(&cfg.module_flags).args([action, "./"]);
+	cmd.arg("rust").args(&cfg.module_flags).arg(action).arg(&cfg.cargo_root);
 	let target = match cfg.exclude_dirs.is_empty() {
-		true => "./".to_string(),
-		false => format!("./ (excluding: {})", cfg.exclude_dirs.join(", ")),
+		true => cfg.cargo_root.display().to_string(),
+		false => format!("{} (excluding: {})", cfg.cargo_root.display(), cfg.exclude_dirs.join(", ")),
 	};
 	println!("Running: codestyle {action} {target}");
 	let ok = cmd.status().expect("spawn codestyle").success();
@@ -331,7 +342,7 @@ fn main() -> ExitCode {
 		path = env::join_paths(dirs).expect("PATH entries came from PATH");
 	}
 
-	let rust = Path::new("Cargo.toml").is_file();
+	let rust = cfg.cargo_root.join("Cargo.toml").is_file();
 	let mut staged = Vec::new();
 	let mut steps: Vec<Step> = vec![Box::new(|log| copy_config(&cfg, log))];
 	if rust {
@@ -343,7 +354,7 @@ fn main() -> ExitCode {
 		assert!(out.status.success(), "git diff --cached: {}", String::from_utf8_lossy(&out.stderr));
 		staged = String::from_utf8(out.stdout).expect("git paths are utf-8").lines().map(String::from).collect();
 		// mutators split by the files they write, so no two steps touch the same file
-		steps.push(Box::new(sort_manifests));
+		steps.push(Box::new(|log| sort_manifests(&cfg, log)));
 		steps.push(Box::new(|log| sort_derives(&cfg, log)));
 		if let (Some(_), Some(install)) = (cfg.style, &cfg.codestyle_install) {
 			steps.push(Box::new(|log| log.run(Command::new("bash").args(["-c", install]))));
@@ -365,7 +376,7 @@ fn main() -> ExitCode {
 		}
 		if cfg.semver_checks {
 			steps.push(Box::new(|log| {
-				!log.require_tool("cargo-semver-checks", "cargo install cargo-semver-checks") || log.run(Command::new("cargo").arg("semver-checks"))
+				!log.require_tool("cargo-semver-checks", "cargo install cargo-semver-checks") || log.run(Command::new("cargo").arg("semver-checks").current_dir(&cfg.cargo_root))
 			}));
 		}
 		if cfg.tracey_check {

@@ -26,22 +26,21 @@ if [[ ! -L "$cnix_release_link" ]] || [[ ! -e "$cnix_release_link" ]]; then
     exit 1
 fi
 
-# Check if ./src changed since the last tagged commit
+# Check if ./cli/src changed since the last tagged commit
 last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
 
 src_changed=false
 if [[ -z "$last_tag" ]]; then
     # No tags yet — treat src as changed
     src_changed=true
-elif git diff --quiet "$last_tag" HEAD -- src/; then
+elif git diff --quiet "$last_tag" HEAD -- cli/src/; then
     src_changed=false
 else
     src_changed=true
 fi
 
 if [[ "$src_changed" == "true" ]]; then
-    cargo t
-    cargo release --no-confirm --execute --no-tag --no-push "${flag#--}"
+    (cd cli && cargo t && cargo release --no-confirm --execute --no-tag --no-push "${flag#--}")
 
     # cargo release made a version-bump commit; squash it into the commit before it
     git reset --soft HEAD~1

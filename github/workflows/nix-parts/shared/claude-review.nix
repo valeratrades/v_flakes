@@ -4,7 +4,7 @@ let
   utils = import ../../../../utils;
   prop = "pr_auto_review";
 in
-assert builtins.any (p: p.property_name == prop) (builtins.fromJSON (builtins.readFile ../../../org_properties.json));
+assert builtins.any (p: p.property_name == prop) (builtins.fromJSON (builtins.readFile ../../../../cli/org_properties.json));
 {
   standalone = true;
 

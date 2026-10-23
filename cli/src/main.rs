@@ -6,7 +6,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value};
 
-const SPEC: &str = include_str!("../github/org_properties.json");
+const SPEC: &str = include_str!("../org_properties.json");
 
 #[derive(Parser)]
 #[command(version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")"))]

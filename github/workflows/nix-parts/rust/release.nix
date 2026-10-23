@@ -108,11 +108,11 @@ let
           }] else [ ]) ++ [
             (if isWindows target then {
               name = "Remove .cargo/config.toml";
-              run = "Remove-Item -Force -ErrorAction SilentlyContinue .cargo/config.toml, .cargo/config";
+              run = "Remove-Item -Force -ErrorAction SilentlyContinue \"$env:GITHUB_WORKSPACE/.cargo/config.toml\", \"$env:GITHUB_WORKSPACE/.cargo/config\"";
               shell = "pwsh";
             } else {
               name = "Remove .cargo/config.toml";
-              run = "rm -f .cargo/config.toml .cargo/config";
+              run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\"";
             })
             {
               name = "Build release binary";
@@ -125,7 +125,7 @@ let
             run = ''
               cd target/${target}/release
               ''$PNAME = ''$env:GITHUB_REPOSITORY.Split('/')[-1]
-              Compress-Archive -Path "''$PNAME.exe" -DestinationPath "../../../''$PNAME-${target}.zip"
+              Compress-Archive -Path "''$PNAME.exe" -DestinationPath "''$env:GITHUB_WORKSPACE/''$PNAME-${target}.zip"
             '';
             shell = "pwsh";
           }] else [{
@@ -133,7 +133,7 @@ let
             run = ''
               cd target/${target}/release
               PNAME="''${GITHUB_REPOSITORY##*/}"
-              tar -czvf ../../../''${PNAME}-${target}.tar.gz ''$PNAME
+              tar -czvf "''$GITHUB_WORKSPACE/''${PNAME}-${target}.tar.gz" ''$PNAME
             '';
           }])
           ++ [

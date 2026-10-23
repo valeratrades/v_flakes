@@ -90,4 +90,3 @@ fn reassign_positions(table: &mut Table, counter: &mut isize) {
 		}
 	}
 }
-

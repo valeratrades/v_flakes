@@ -6,13 +6,13 @@
 # `-r` restores full visibility, and `-n` makes it a read: diet clears the manifest only long
 # enough to take the listing, then writes the original bytes back. Deciding what to do about a
 # reported change is the human's, so nothing here rewrites a manifest.
-pkgs: diet:
+pkgs: diet: cargoRoot:
 pkgs.writeShellApplication {
   name = "cpublish";
   runtimeInputs = [ diet pkgs.cargo-release pkgs.git ];
   # No rust here: cargo must be the repo's own toolchain, not one we pin.
   text = ''
-    cd "$(git rev-parse --show-toplevel)"
+    cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
 
     report="$(cargo diet -n -r)"
     case "$report" in

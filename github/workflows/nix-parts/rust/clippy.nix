@@ -12,7 +12,7 @@
       uses = "actions/download-artifact@v7";
       "with".name = "modified-cargo-files";
     }
-    { run = "rm -f .cargo/config.toml .cargo/config"; } # it can have eg `threads=8`; which could lead to races when reasoning about macros
+    { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # it can have eg `threads=8`; which could lead to races when reasoning about macros
     { run = "cargo clippy --tests -- -Dwarnings"; } #-Dclippy::all #-Dclippy::pedantic
   ];
 }

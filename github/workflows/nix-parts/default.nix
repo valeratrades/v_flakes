@@ -31,6 +31,8 @@ args@{ pkgs ? null
   rustRepo ? false
 , # Cachix cache name to publish `packages.default` to. See shared/cachix.nix.
   publishCachix ? null
+, # rs.cargoRoot: rust jobs run there
+  cargoRoot ? "."
 ,
 }:
 
@@ -107,6 +109,11 @@ if nixpkgs != null && pkgs == null then {
       if packages == [ ] then ""
       # Use --command with bash to set LD_LIBRARY_PATH from buildInputs before running
       else "nix-shell -p ${pkgList} --command ";
+
+    # job-level, not workflow-level: the shared jobs alongside need the repo root
+    inCargoRoot = job:
+      if cargoRoot == "." then job
+      else pkgs.lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
 
     files = {
       # shared {{{
@@ -264,10 +271,15 @@ if nixpkgs != null && pkgs == null then {
             else [ "load_nix" existingNeeds ]
           else existingNeeds;
 
-        value =
+        valueWithNeeds =
           if newNeeds != null
           then valueWithWrappedRuns // { needs = newNeeds; }
           else valueWithWrappedRuns;
+
+        value =
+          if pkgs.lib.hasPrefix "rust-" jobName
+          then inCargoRoot valueWithNeeds
+          else valueWithNeeds;
       in
       {
         name = jobName;
@@ -297,7 +309,7 @@ if nixpkgs != null && pkgs == null then {
     # Path to the Cargo.toml of the crate being packaged for binstall.
     # In a workspace, point this at the binary crate's manifest (the workspace
     # root has no [package] section and would fail the binstall metadata check).
-    releaseCargoTomlPath = if releaseEnabled then (release.cargoTomlPath or "Cargo.toml") else "Cargo.toml";
+    releaseCargoTomlPath = release.cargoTomlPath or (if cargoRoot == "." then "Cargo.toml" else "${cargoRoot}/Cargo.toml");
 
     # Per-target release workflows (one file per target)
     releaseWorkflows =
@@ -308,7 +320,7 @@ if nixpkgs != null && pkgs == null then {
         in
         builtins.mapAttrs
           (name: wf:
-            (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs wf [ "standalone" "filename" "default" ])
+            (pkgs.formats.yaml { }).generate "" (builtins.removeAttrs (wf // { jobs = wf.jobs // { build = inCargoRoot wf.jobs.build; }; }) [ "standalone" "filename" "default" ])
           )
           spec.workflows
       else { };

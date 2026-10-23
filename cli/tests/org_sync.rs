@@ -31,7 +31,7 @@ fn sync(test: &str, remote: &str) -> (String, Option<String>) {
 }
 
 fn spec() -> String {
-	include_str!("../github/org_properties.json").to_owned()
+	include_str!("../org_properties.json").to_owned()
 }
 
 #[test]

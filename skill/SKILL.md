@@ -33,7 +33,7 @@ cnix_release --ignore-cargo --patch --fast
 
 Run it from `main`, tree clean. It pushes `main`, force-updates `release` / `v1` / `v1.6`, and
 tags `v1.6.N`. `__scripts/release.sh` is the slow path (runs `cargo t` + `cargo release` first) —
-use it only when `src/` changed.
+use it only when `cli/src/` changed.
 
 Prefer using `patch` unless some MASSIVE breaking changes happened. In which case you consult with me, and it will be me specifically who runs the command. Because if you push a minor+ version, I'll need to manually update all consumers to it, so just don't.
 

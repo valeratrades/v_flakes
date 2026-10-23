@@ -22,6 +22,8 @@ flake.nix (entry point)
     │
     ├── readme_fw/     (standalone)
     │
+    ├── cli/           (the v_flakes crate: helpers the nix scripts depend on, `v_flakes` binary)
+    │
     └── utils/         (standalone - helper functions)
 ```
 
@@ -55,7 +57,10 @@ GitHub-specific configuration:
 - `workflows/` - CI workflow generation (errors.yml, warnings.yml)
 - `labels.nix` - GitHub label synchronization
 - `git-ops.rs` - Rust script for git operations
-- `org_properties.json` - org custom property definitions; `v_flakes org sync` (src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
+
+## cli/
+
+- `org_properties.json` - org custom property definitions; `v_flakes org sync` (cli/src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
 
 ## langs/rs/
 

@@ -85,6 +85,7 @@ let
   rsStyleAssert = if rs != null then (rs.styleAssert or false) else false;
   rsModuleFlags = if rs != null then (rs.moduleFlags or "") else "";
   rsCodestyleLazyInstall = if rs != null then (rs.codestyleLazyInstall or "") else "";
+  cargoRoot = if rs != null then (rs.cargoRoot or ".") else ".";
 
   # Compute from style parameter if provided (for standalone usage without rs)
   styleModules = if style != null then (style.modules or { }) else { };
@@ -236,7 +237,7 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
     } // (if enable then {
-      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync;
+      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync cargoRoot;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
@@ -303,7 +304,7 @@ if nixpkgs != null && pkgs == null then {
     # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
     # module is what says one is owed; a repo that passes none (typst, docs) takes
     # the rest of the hook without it. Forced only through the `enable` branch.
-    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
+    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
         assert (rust != null) || throw

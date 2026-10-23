@@ -32,6 +32,9 @@ jobs:
   pre_ci:
     uses: valeratrades/.github/.github/workflows/pre_ci.yml@main
   rust-clippy:
+    defaults:
+      run:
+        working-directory: cli
     if: github.event_name != 'pull_request'
     name: Clippy
     needs: pre_ci
@@ -43,10 +46,13 @@ jobs:
       uses: actions/download-artifact@v7
       with:
         name: modified-cargo-files
-    - run: rm -f .cargo/config.toml .cargo/config
+    - run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
     - run: cargo clippy --tests -- -Dwarnings
     timeout-minutes: 45
   rust-doc:
+    defaults:
+      run:
+        working-directory: cli
     env:
       RUSTDOCFLAGS: -Dwarnings
     if: needs.pre_ci.outputs.continue
@@ -61,12 +67,15 @@ jobs:
       with:
         name: modified-cargo-files
     - uses: dtolnay/install@cargo-docs-rs
-    - run: rm -f .cargo/config.toml .cargo/config
+    - run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
     - run: "for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[]\
         \ | select([.targets[].kind[]] | any(. == \"lib\" or . == \"proc-macro\"))\
         \ | .name'); do\n  cargo docs-rs -p \"$p\"\ndone\n"
     timeout-minutes: 45
   rust-machete:
+    defaults:
+      run:
+        working-directory: cli
     name: Unused Dependencies
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +86,9 @@ jobs:
         \t\t\t\tif [ $exit_code != 0 ]; then\n\t\t\t\t\techo \"Found unused dependencies\"\
         \n\t\t\t\t\texit $exit_code\n\t\t\t\tfi\n\t\t\t"
   rust-sorted:
+    defaults:
+      run:
+        working-directory: cli
     name: Cargo Sorted
     runs-on: ubuntu-latest
     steps:
@@ -90,6 +102,9 @@ jobs:
         \ != 0 ]; then\n  echo \"Cargo.toml is not sorted. Run \\`cargo sort -w\\\
         ` to fix it.\"\n  exit $exit_code\nfi\n"
   rust-sorted-derives:
+    defaults:
+      run:
+        working-directory: cli
     name: Sorted Derives
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +142,7 @@ name: Warnings
 'on':
   push:
     paths:
-    - src/**
+    - cli/src/**
   workflow_dispatch: {}
 permissions:
   contents: read

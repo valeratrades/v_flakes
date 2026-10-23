@@ -68,7 +68,7 @@
           utils = import ./utils;
           files = import ./files;
 
-          rsModule = (import ./langs/rs) { inherit pkgs rust; };
+          rsModule = (import ./langs/rs) { inherit pkgs rust; cargoRoot = "cli"; };
           github = (import ./github) {
             inherit pkgs pname;
             rs = rsModule;
@@ -76,8 +76,8 @@
             lastSupportedVersion = "nightly-${(import ./langs/rs).nightly_version}";
             jobs = {
               default = true;
-              errors.hooks = { push.paths = [ "src/**" ]; };
-              warnings.hooks = { push.paths = [ "src/**" ]; };
+              errors.hooks = { push.paths = [ "cli/src/**" ]; };
+              warnings.hooks = { push.paths = [ "cli/src/**" ]; };
             };
             release.hooks = { push.tags = [ "v[0-9]+.[0-9]+.0" ]; };
           };
@@ -114,12 +114,12 @@
           packages.cargo-machete = (import ./langs/rs).machete system;
           packages.v_flakes = (let build_rust = (import ./langs/rs).build_nightly system; in pkgs.makeRustPlatform { cargo = build_rust; rustc = build_rust; }).buildRustPackage {
             inherit pname;
-            version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).package.version;
+            version = (builtins.fromTOML (builtins.readFile ./cli/Cargo.toml)).package.version;
             src = pkgs.lib.fileset.toSource {
-              root = ./.;
-              fileset = pkgs.lib.fileset.unions [ ./Cargo.toml ./Cargo.lock ./build.rs ./src ./github/org_properties.json ];
+              root = ./cli;
+              fileset = pkgs.lib.fileset.unions [ ./cli/Cargo.toml ./cli/Cargo.lock ./cli/build.rs ./cli/src ./cli/org_properties.json ];
             };
-            cargoLock.lockFile = ./Cargo.lock;
+            cargoLock.lockFile = ./cli/Cargo.lock;
             doCheck = false; # tests/ is outside the fileset
           };
 
@@ -131,7 +131,7 @@
               Parts (v_flakes.<attr>):  files github rs py tex typ js readme-fw utils qlty container lean
               Re-exported inputs:       nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
                                         flake-parts process-compose-flake devenv lean4-nix
-              v_flakes org sync <ORG>   converge org custom property definitions (github/org_properties.json)
+              v_flakes org sync <ORG>   converge org custom property definitions (cli/org_properties.json)
               ./__scripts/release.sh    release (see `docs/`)
             '';
           };
@@ -153,8 +153,8 @@
               ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "ste_checker"; currentVersion = steCheckerVersion; bumpScript = "$_bump_script"; }}
               # Bootstrap: build our own binaries and put them on PATH for local testing
-              cargo b -q 2>/dev/null
-              export PATH="$PWD/target/debug:$PATH"
+              cargo b -q --manifest-path cli/Cargo.toml 2>/dev/null
+              export PATH="$PWD/cli/target/debug:$PATH"
             '';
             env.RUST_BACKTRACE = 1;
           };

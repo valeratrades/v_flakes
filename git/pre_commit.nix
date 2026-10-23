@@ -15,6 +15,8 @@
   jsVisual ? false
 , # `git_ops` package whose `sync-labels` the hook starts detached; null when labels are off
   gitOps ? null
+, # rs.cargoRoot: where the rust steps run
+  cargoRoot
 , # backwards compat
   styleCheck ? null
 ,
@@ -25,7 +27,7 @@ let
   actualStyleAssert = if styleCheck != null then false else styleAssert;
 
   flag = cond: name: if cond then [ name ] else [ ];
-  args = [ "--pname" pname ]
+  args = [ "--pname" pname "--cargo-root" cargoRoot ]
     ++ flag semverChecks "--semver-checks"
     ++ flag traceyCheck "--tracey-check"
     ++ flag actualStyleFormat "--style-format"

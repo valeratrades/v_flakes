@@ -53,6 +53,7 @@ github = v-utils.github {
   # subsequent rebuilds are no-ops until v_flakes itself is bumped. Default: false.
   conventions = true;
   # Style settings are inherited from rs module automatically.
+  # Rust jobs (with their hookPre steps) and rust pre-commit steps run in `rs.cargoRoot`.
   # Override with style = { ... } or traceyCheck = ... if needed.
 
   # Binary releases — one workflow per target (release-{shortName}.yml)
@@ -64,10 +65,10 @@ github = v-utils.github {
     aptDeps = [ "libssl-dev" ];  # Optional apt deps for linux builds
     # hooks: override `on` triggers (default: push.tags = ["v[0-9]+.*"]; workflow_dispatch always appended)
     hooks = { push.tags = [ "v[0-9]+.*" ]; push.branches = [ "release" ]; };
-    # gate: shell condition — release only runs if true. Default: no gate (always run).
+    # gate: shell condition, run at the repo root — release only runs if true. Default: no gate (always run).
     gate = "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\"";
     # cargoTomlPath: path to the binary crate's Cargo.toml (relative to repo root).
-    # Required in workspaces where the root has no [package] section. Default: "Cargo.toml".
+    # Required in workspaces where the root has no [package] section. Default: "<rs.cargoRoot>/Cargo.toml".
     cargoTomlPath = "./social_networks/Cargo.toml";
   };
 

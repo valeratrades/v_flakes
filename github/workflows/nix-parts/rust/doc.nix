@@ -28,7 +28,7 @@ in
       "with".name = "modified-cargo-files";
     }
     { uses = "dtolnay/install@cargo-docs-rs"; }
-    { run = "rm -f .cargo/config.toml .cargo/config"; } # local-dev flags (mold linker, `-Z threads`) the runner doesn't have
+    { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # local-dev flags (mold linker, `-Z threads`) the runner doesn't have
     { run = cargoDocsCmd; }
   ];
 }

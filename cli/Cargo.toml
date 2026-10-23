@@ -8,12 +8,11 @@ license = "BlueOak-1.0.0"
 repository = "https://github.com/valeratrades/v_flakes"
 include = [
     "src/**/*",
-    "github/org_properties.json",
+    "org_properties.json",
+    "build.rs",
     "LICENSE",
     "README.md",
     "CHANGELOG.md",
-    ".cargo/*",
-    "build.rs",
 ]
 
 [package.metadata]

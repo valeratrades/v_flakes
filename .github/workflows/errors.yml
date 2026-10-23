@@ -8,6 +8,9 @@ jobs:
   pre_ci:
     uses: valeratrades/.github/.github/workflows/pre_ci.yml@main
   rust-tests:
+    defaults:
+      run:
+        working-directory: cli
     if: needs.pre_ci.outputs.continue
     name: Rust ${{matrix.rust}}
     needs: pre_ci
@@ -50,7 +53,7 @@ name: Errors
 'on':
   push:
     paths:
-    - src/**
+    - cli/src/**
   workflow_dispatch: {}
 permissions:
   contents: read
