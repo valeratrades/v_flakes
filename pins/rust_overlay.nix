@@ -5,6 +5,6 @@ builtins.fetchTree {
   type = "github";
   owner = "oxalica";
   repo = "rust-overlay";
-  rev = "5106a604b3d67cffe8eb51a8bd9f04e607f0d31d";
-  narHash = "sha256-WJPfr9EAWVIuTMyb/ilHKUYlg/RNa0xrNiWR+p1iHUg=";
+  rev = "892c035d7c2ff75acd5da10424a47ab454e1f3dc";
+  narHash = "sha256-KJhq0HYg2gIZjpsj47z1kWrjoUUAqSqdD2mMWAsOg4k=";
 }

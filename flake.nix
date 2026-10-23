@@ -10,7 +10,7 @@
   # otherwise this repo, and every consumer of the re-exported inputs, would drift
   # off the pins we hand out.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/7a6522c868711d06e3a520bbcdfafe9806f4337f";
-  inputs.rust-overlay.url = "github:oxalica/rust-overlay/5106a604b3d67cffe8eb51a8bd9f04e607f0d31d";
+  inputs.rust-overlay.url = "github:oxalica/rust-overlay/892c035d7c2ff75acd5da10424a47ab454e1f3dc";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.pre-commit-hooks.url = "github:cachix/git-hooks.nix";

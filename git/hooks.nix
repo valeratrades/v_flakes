@@ -13,6 +13,19 @@ assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames we
   || throw "v_flakes files.preCommit: webAssets is { allow ? [ ]; }, got ${builtins.toJSON webAssets}";
 {
   src = ./.;
+  # pre-commit's install truncates the hook before writing it; a second shell reinstalling at the
+  # same time reads it empty, takes it for a foreign hook and moves it to `.legacy` (migration mode).
+  package = pkgs.writeShellApplication
+    {
+      name = "pre-commit";
+      runtimeInputs = [ pkgs.flock pkgs.git ];
+      text = ''
+        case "''${1-}" in
+          install | uninstall) exec flock "$(git rev-parse --path-format=absolute --git-common-dir)/v_flakes-hooks.lock" ${lib.getExe pkgs.pre-commit} "$@" ;;
+          *) exec ${lib.getExe pkgs.pre-commit} "$@" ;;
+        esac
+      '';
+    } // { pname = "pre-commit"; }; # git-hooks.nix branches on `package.pname` (prek vs pre-commit)
   hooks = {
     strip-claude-signature = {
       enable = stripClaudeSignature;
