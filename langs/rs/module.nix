@@ -135,7 +135,7 @@ if nixpkgs != null && pkgs == null then {
     The shellHook will:
     - Prepend nix rust to PATH so it takes precedence over rustup shims
     - Copy rustfmt.toml to ./rustfmt.toml
-    - Write cargo config to ./.cargo/config.toml, keeping its local `[patch.*]` tables (a git clean filter keeps them out of the index)
+    - Merge cargo config into ./.cargo/config.toml: only the keys v_flakes generates are overwritten, everything else is kept (a git clean filter keeps local `[patch.*]` out of the index)
     - Copy clippy config to ./.cargo/clippy.toml
     - Copy sort-derives config to <cargoRoot>/.sort-derives.toml
     - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into <cargoRoot>/Cargo.toml
@@ -248,11 +248,14 @@ if nixpkgs != null && pkgs == null then {
         fi
         unset _vf_attrs
       fi
-      if ! _vf_fresh cargo-config "${configFile} ${patchAwkKey}" ./.cargo/config.toml; then
-        { cat ${configFile}; [ ! -f ./.cargo/config.toml ] || awk -v keep=1 ${pkgs.lib.escapeShellArg patchAwk} ./.cargo/config.toml; } > ./.cargo/config.toml.vf &&
-          _vf_cp ./.cargo/config.toml.vf ./.cargo/config.toml && rm ./.cargo/config.toml.vf &&
+      if ! _vf_fresh cargo-config "${configFile} ${./cargo-config-merge.rs}" ./.cargo/config.toml; then
+        _vf_owned=("$_vf_stamps/cargo-config.owned") # what we last generated, so keys dropped from it get retracted
+        [ -f "$_vf_owned" ] || _vf_owned=()
+        cargo -Zscript -q ${./cargo-config-merge.rs} ./.cargo/config.toml ${configFile} "''${_vf_owned[@]}" &&
+          cp -f ${configFile} "$_vf_stamps/cargo-config.owned" &&
           { [ ! -e .git ] || ! git ls-files --error-unmatch -- .cargo/config.toml >/dev/null 2>&1 || ! git diff --quiet -- .cargo/config.toml || git add -- .cargo/config.toml; } && # re-records the stat: git calls a file whose size differs from the index modified without running the filter
-          _vf_stamp cargo-config "${configFile} ${patchAwkKey}" ./.cargo/config.toml
+          _vf_stamp cargo-config "${configFile} ${./cargo-config-merge.rs}" ./.cargo/config.toml
+        unset _vf_owned
       fi
     '';
 

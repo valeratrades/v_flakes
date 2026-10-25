@@ -70,7 +70,7 @@ Rust toolchain configuration (config templates in `files/`):
 - Integrates cargo-deny for dependency auditing
 - Configures tracey for spec coverage
 - Sets up codestyle linting
-- `.cargo/config.toml` is regenerated keeping its local `[patch.*]` tables (`cargo-patch.awk`); the same awk, as a git clean filter registered in `info/attributes`, keeps them out of the index
+- `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
 
 ## readme_fw/
 
