@@ -117,16 +117,21 @@ if nixpkgs != null && pkgs == null then {
       if cargoRoot == "." then job
       else pkgs.lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
 
-    # every bash `run` must parse, so a broken one fails shell entry instead of CI
+    # every bash `run` must parse, so a broken one fails shell entry instead of CI.
+    # Not `pkgs.formats.yaml`: its remarshal folded a long `run` right after a `\\`, which reads back with a space in it.
     yaml = value:
-      let generated = (pkgs.formats.yaml { }).generate "workflow.yml" value;
+      let json = pkgs.writeText "workflow.json" (builtins.toJSON value);
       in pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ pkgs.yq-go pkgs.bash ]; } ''
-        yq -o json '[.jobs[].steps[]? | select(.run != null and (.shell == null or .shell == "bash")) | .run]' ${generated} > runs.json
+        generated=workflow.yml
+        yq -p json -o yaml '(.. style="") | (.. | select(tag == "!!str" and test("\t"))) style="double"' ${json} > $generated # yq writes a tab into a block scalar, which no parser reads
+        [ "$(yq -p json -o json -I0 'sort_keys(..)' ${json})" = "$(yq -o json -I0 'sort_keys(..)' $generated)" ] \
+          || { echo "v_flakes: a generated workflow doesn't read back as what it was generated from" >&2; exit 1; }
+        yq -o json '[.jobs[].steps[]? | select(.run != null and (.shell == null or .shell == "bash")) | .run]' $generated > runs.json
         for i in $(seq 0 $(($(yq -p json 'length' runs.json) - 1))); do
           yq -p json -r ".[$i]" runs.json > run.sh
           bash -n run.sh || { echo "v_flakes: a generated workflow's \`run\` doesn't parse:"; cat run.sh; exit 1; } >&2
         done
-        cp ${generated} $out
+        cp $generated $out
       '';
 
     # The jobs that `rm` `.cargo/config.toml`; the rest read the cfg from it.
