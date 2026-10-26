@@ -49,6 +49,9 @@ fn main() {
 	let merged = doc.to_string();
 	if merged != existing {
 		std::fs::create_dir_all(args.config.parent().expect("config path has a parent")).expect("creating .cargo/");
+		if args.config.exists() {
+			std::fs::remove_file(&args.config).expect("removing the old cargo config"); // older v_flakes copied it out of the store read-only
+		}
 		std::fs::write(&args.config, merged).expect("writing cargo config");
 	}
 }
