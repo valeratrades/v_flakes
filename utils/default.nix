@@ -363,9 +363,34 @@ in
   # hashes that diverge from CI, so private git inputs fail to verify. There is no
   # eval-time way to detect Determinate (nixVersion is identical, settings aren't
   # readable from eval), so the check lives here in the sourced shellHook.
-  combine = { rust, modules, determinate_nix ? true }:
+  #
+  # `generator` is this v_flakes' own `{ stamp = self.lastModified; rev; }`, filled in by
+  # v_flakes' flake outputs; consumers never pass it. `null` for v_flakes' own repo. See
+  # `generationGuard`.
+  combine = { rust, modules, generator, determinate_nix ? true }:
     assert (rust != null) || throw "v_flakes.utils.combine: `rust` is required — pass the nix rust toolchain (e.g. `rs.rust`) so module hooks have a guaranteed cargo on PATH.";
     let
+      # Generated files are written on every shell entry, so a shell built on an older
+      # v_flakes (a stale direnv env, an old worktree's lock) silently rewrites them with its
+      # older output. `.v_flakes.lock` records the generator that last wrote the repo; an older
+      # one refuses to run at all.
+      generationGuard = if generator == null then "" else ''
+        _vf_gen=${toString generator.stamp}
+        _vf_locked=
+        [ -f .v_flakes.lock ] && read -r _vf_locked _vf_locked_rev < .v_flakes.lock
+        if [ -n "$_vf_locked" ] && (( _vf_locked > _vf_gen )) && [ "''${V_FLAKES_FORCE:-}" != 1 ]; then
+          printf '%s\n' \
+            "✘ v_flakes: this repo's generated files come from a newer v_flakes ($_vf_locked_rev) than this shell's (${generator.rev})." \
+            "  The shell would overwrite them with older output. Reload it (\`direnv reload\`), or update the input (\`nix flake update v_flakes\`)." \
+            "  To overwrite anyway: V_FLAKES_FORCE=1 nix develop" >&2
+          exit 1
+        fi
+      '';
+      generationStamp = if generator == null then "" else ''
+        _vf_lock="$_vf_gen ${generator.rev}"
+        [ "$_vf_locked $_vf_locked_rev" = "$_vf_lock" ] || printf '%s\n' "$_vf_lock" > .v_flakes.lock
+        unset _vf_gen _vf_locked _vf_locked_rev _vf_lock
+      '';
       # `nix` is usually NOT on the devShell's own PATH — mkShell does not inherit the
       # user profile. On NixOS it leaks in via /run/current-system/sw/bin, which is the
       # only reason this ever passed; against a profile-based install the probe found
@@ -467,9 +492,11 @@ in
         fi
         ${shellPrelude}
         ${determinateGuard}
+        ${generationGuard}
         # Guarantee cargo for the rust scripts module hooks invoke.
         export PATH="${rust}/bin:$PATH"
         ${combinedHooks}
+        ${generationStamp}
         ${dedupeCheck}
         ${helpCheck}
       '';

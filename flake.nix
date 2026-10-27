@@ -39,6 +39,12 @@
     let
       pname = "v_flakes";
 
+      # `combine` stamps every repo it generates into with this v_flakes, and refuses to run
+      # under an older one than the stamp; see `utils.combine`.
+      utils =
+        let raw = import ./utils;
+        in raw // { combine = args: raw.combine (args // { generator = { stamp = self.lastModified; rev = self.shortRev or self.dirtyShortRev; }; }); };
+
       # Version constants for bundled packages - update these when bumping
       # Use partial semver (major.minor) - patch versions auto-resolve via cargo-binstall
       traceyVersion = "1.3";
@@ -95,6 +101,8 @@
           });
           combined = utils.combine {
             inherit rust;
+            # Its own repo is always written by itself; a stamp of its own `lastModified` would lag every commit.
+            generator = null;
             modules = [
               rsModule
               github
@@ -201,7 +209,7 @@
       typ = import ./langs/typ;
       js = import ./langs/js;
       readme-fw = import ./readme_fw;
-      utils = import ./utils;
+      inherit utils;
       qlty = import ./tools/qlty.nix;
       lean = import ./langs/lean { inherit lean4-nix; };
 

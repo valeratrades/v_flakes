@@ -60,6 +60,10 @@ written by v_flakes' own shellHook. They drift dirty on shell entry; that is nor
 release commits them.
 Don't modify them by hand; ignore their appearence in diffs.
 
+`.v_flakes.lock` names the v_flakes that last wrote them, and is committed with them. A shell
+on an older v_flakes refuses to start (a stale direnv env would otherwise roll the files back);
+`direnv reload` or `nix flake update v_flakes` fixes it, `V_FLAKES_FORCE=1 nix develop` overrides.
+
 ## Developing against another repo we own
 
 For local dev against the sibling checkout, add path ref overrides to the untracked `[patch.crates-io]` in `.cargo/config.toml`.
