@@ -76,7 +76,7 @@ if nixpkgs != null && pkgs == null then {
     - npmRelease = { scope = "evinvest"; packagesDir = "ts"; }
         release-npm.yml: a pushed `@evinvest/<pkg>-v<version>` tag publishes `ts/<pkg>` through npm
         trusted publishing (OIDC), building its `file:` dependencies first. Each package's trusted
-        publisher on npmjs.com must name this repo and `release-npm.yml`.
+        publisher on npmjs.com must name this repo and `release-npm.yml`: the shell's `npm-trust` sets that up.
     - gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; }
         Sync to GitLab mirror (triggers on push to any branch/tag)
         Repo name is appended from GitHub context. Requires GITLAB_TOKEN secret

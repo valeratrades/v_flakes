@@ -69,7 +69,10 @@
         run = ''
           test "$(node -p 'require("./package.json").version')" = "$VERSION"
           npm ci
-          npm publish --access public
+          npm publish --access public || {
+            echo "::error::npm refused $(node -p 'require("./package.json").name'): if it is new, or not yet linked to this repo, run \`npm-trust\` in the repo's dev shell"
+            exit 1
+          }
         '';
       }
     ];

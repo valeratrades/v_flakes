@@ -365,6 +365,7 @@ if nixpkgs != null && pkgs == null then {
       if enable then
         [ git_ops code_duplication pkgs.treefmt ]
           ++ (if semverChecks then [ pkgs.cargo-semver-checks ] else [ ])
+          ++ (if npmRelease != null then [ (import ./npm-trust.nix { inherit pkgs; inherit (npmRelease) scope packagesDir; }) ] else [ ])
       else [ ];
   } // (if enable then { inherit git_ops code_duplication; } else { }))
 

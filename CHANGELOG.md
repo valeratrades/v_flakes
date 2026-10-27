@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **`github { npmRelease = { scope; packagesDir; }; }`** writes `release-npm.yml`: a pushed `@<scope>/<pkg>-v<version>` tag publishes `<packagesDir>/<pkg>` through npm trusted publishing (OIDC), no token and no 2FA, building the package's `file:` dependencies first. npm accepts it only once the package's trusted publisher on npmjs.com names the repo and `release-npm.yml`, and the package's `repository.url` names the same repo.
+- **`github { npmRelease = { scope; packagesDir; }; }`** writes `release-npm.yml`: a pushed `@<scope>/<pkg>-v<version>` tag publishes `<packagesDir>/<pkg>` through npm trusted publishing (OIDC), no token and no 2FA, building the package's `file:` dependencies first. npm accepts it only once the package's trusted publisher on npmjs.com names the repo and `release-npm.yml`, and the package's `repository.url` names the same repo. npm sets that up per package only, never per scope, and only for a package already on the registry: the dev shell's `npm-trust` links every package not yet publishing from CI, publishing a new one from the shell first, all under one 2FA approval; a CI run npm refuses points to it.
 
 - `github`: every generated workflow's bash `run` steps go through `bash -n` when the YAML is built, so a script that doesn't parse fails shell entry instead of CI. This caught the YAML emitter in the 7a6522c nixpkgs folding the sort-derives message's escaped backtick into ``\ ` ``, which broke the Sorted Derives job in every consumer. The sort scripts' messages now use single quotes, with no backslashes left to fold.
 
