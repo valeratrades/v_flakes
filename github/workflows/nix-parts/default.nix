@@ -9,6 +9,8 @@ args@{ pkgs ? null
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , release ? null
 , containerRelease ? null
+, # { scope; packagesDir; }: npm trusted publishing of `@<scope>/<pkg>-v<version>` tags. See shared/npm-release.nix.
+  npmRelease ? null
 , gitlabSync ? null
 , syncFork ? false
 , # Per-section install dependencies: { packages = [ "pkg1" ]; apt = [ "pkg2" ]; }
@@ -71,6 +73,10 @@ if nixpkgs != null && pkgs == null then {
         Per-target binary release for cargo-binstall. Generates one workflow file per target (release-{shortName}.yml).
         Default hooks: push.tags = ["v[0-9]+.*"] + workflow_dispatch. Override via hooks = { ... }.
         Default targets: x86_64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin
+    - npmRelease = { scope = "evinvest"; packagesDir = "ts"; }
+        release-npm.yml: a pushed `@evinvest/<pkg>-v<version>` tag publishes `ts/<pkg>` through npm
+        trusted publishing (OIDC), building its `file:` dependencies first. Each package's trusted
+        publisher on npmjs.com must name this repo and `release-npm.yml`.
     - gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; }
         Sync to GitLab mirror (triggers on push to any branch/tag)
         Repo name is appended from GitHub context. Requires GITLAB_TOKEN secret
@@ -363,6 +369,15 @@ if nixpkgs != null && pkgs == null then {
           [ "standalone" "filename" ])
       else null;
 
+    npmReleaseWorkflow =
+      if npmRelease != null then
+        assert (
+          let unknown = builtins.removeAttrs npmRelease [ "scope" "packagesDir" ]; in
+          unknown == { } || throw "v_flakes npmRelease: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
+        );
+        yaml (builtins.removeAttrs (import ./shared/npm-release.nix { inherit (npmRelease) scope packagesDir; }) [ "standalone" ])
+      else null;
+
     cachixWorkflow =
       if publishCachix != null then
         yaml
@@ -464,7 +479,8 @@ if nixpkgs != null && pkgs == null then {
     ensureBinstallScript = ../../ensure-binstall-metadata.rs;
 
     releaseExpectedFiles = map (name: "release-${name}.yml") (builtins.attrNames releaseWorkflows)
-      ++ pkgs.lib.optional (containerReleaseWorkflow != null) "release-container.yml";
+      ++ pkgs.lib.optional (containerReleaseWorkflow != null) "release-container.yml"
+      ++ pkgs.lib.optional (npmReleaseWorkflow != null) "release-npm.yml";
 
     releaseHook =
       if releaseWorkflows != { } then
@@ -514,6 +530,11 @@ if nixpkgs != null && pkgs == null then {
         _vf_cp ${containerReleaseWorkflow} ./.github/workflows/release-container.yml
       '' else "";
 
+    npmReleaseHook =
+      if npmReleaseWorkflow != null then ''
+        _vf_cp ${npmReleaseWorkflow} ./.github/workflows/release-npm.yml
+      '' else "";
+
     cachixHook =
       if cachixWorkflow != null then ''
         _vf_cp ${cachixWorkflow} ./.github/workflows/cachix.yml
@@ -545,7 +566,7 @@ if nixpkgs != null && pkgs == null then {
       '';
   in
   workflows // {
-    inherit releaseWorkflows containerReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
+    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
@@ -554,6 +575,7 @@ if nixpkgs != null && pkgs == null then {
       ${releaseHook}
       ${releaseStaleWarningHook}
       ${containerReleaseHook}
+      ${npmReleaseHook}
       ${syncForkHook}
       ${gitlabSyncHook}
       ${claudeHook}

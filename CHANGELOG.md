@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`github { npmRelease = { scope; packagesDir; }; }`** writes `release-npm.yml`: a pushed `@<scope>/<pkg>-v<version>` tag publishes `<packagesDir>/<pkg>` through npm trusted publishing (OIDC), no token and no 2FA, building the package's `file:` dependencies first. npm accepts it only once the package's trusted publisher on npmjs.com names the repo and `release-npm.yml`, and the package's `repository.url` names the same repo.
+
 - `github`: every generated workflow's bash `run` steps go through `bash -n` when the YAML is built, so a script that doesn't parse fails shell entry instead of CI. This caught the YAML emitter in the 7a6522c nixpkgs folding the sort-derives message's escaped backtick into ``\ ` ``, which broke the Sorted Derives job in every consumer. The sort scripts' messages now use single quotes, with no backslashes left to fold.
 
 - **`rs { webUnstable ? false; }`**: `--cfg web_sys_unstable_apis` is now opt-in, and when on it applies to the wasm32 target and to the CI jobs that drop `.cargo/config.toml` (Clippy, Documentation, release builds). Before, every repo got it on the native target only: native builds saw web-sys' unstable signatures (`MouseEvent::client_x() -> f64`), while wasm builds and CI saw the stable ones (`-> i32`), so local Clippy flagged casts that CI and wasm need. Off by default because a `--cfg` doesn't reach dependents: a library built with it compiles against an API its crates.io users don't get. Migrate: an app that uses unstable web APIs sets `webUnstable = true`.

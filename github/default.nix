@@ -36,6 +36,8 @@ args@{ pkgs ? null
   publishCachix ? null
 , release ? null
 , containerRelease ? null
+, # { scope; packagesDir; }: release-npm.yml, npm trusted publishing on `@<scope>/<pkg>-v*` tags
+  npmRelease ? null
 , gitlabSync ? null
 , syncFork ? false
 , # Claude Code workflows (PR assistant + auto code review). On by default for enabled repos.
@@ -50,7 +52,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -238,7 +240,7 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
     } // (if enable then {
-      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease gitlabSync cargoRoot webUnstable;
+      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease gitlabSync cargoRoot webUnstable;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
