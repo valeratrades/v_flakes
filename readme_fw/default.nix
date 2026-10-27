@@ -220,7 +220,12 @@ let
                 typFile = builtins.path { path = fullPath; };
               in
               builtins.readFile (pkgs.runCommand "typst-to-markdown" { buildInputs = [ pkgs.pandoc ]; } ''
-                pandoc -f typst -t gfm ${typFile} -o $out
+                # typst links relative to the asset; the README sits two levels up. GitHub drops `style`, keeps `width`
+                pandoc -f typst -t gfm ${typFile} | sed -E \
+                  -e 's#(\]\(|src=")([^/"):#][^"):]*)([)"])#\1./docs/.readme_assets/\2\3#g' \
+                  -e 's#\./docs/\.readme_assets/\./#./docs/.readme_assets/#g' \
+                  -e 's#\./docs/\.readme_assets/\.\./#./docs/#g' \
+                  -e 's#style="width:([0-9.]+%)"#width="\1"#g' > $out
               '')
             else "";
 
@@ -323,65 +328,39 @@ let
     else
       "";
 
+  # `installation.<ext>` is the section's body; each `installation-<target>.<ext>` folds inside it
   installation_out =
     let
-      installPattern = "(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
-      installDir = "${rootStr}/docs/.readme_assets";
-      installDirExists = builtins.pathExists installDir;
-      allInstallFiles = if installDirExists then builtins.attrNames (builtins.readDir installDir) else [ ];
-      matchingInstallFiles = builtins.filter (name: builtins.match installPattern name != null && fileHasContent "docs/.readme_assets/${name}") allInstallFiles;
-      isMulti = builtins.length matchingInstallFiles >= 2;
+      fold = tag: header: body: ''
+        <!-- markdownlint-disable -->
+        <details>
+        <summary>
+        <${tag}>${header}</${tag}>
+        </summary>
 
-      folds = processSection {
-        path = "docs/.readme_assets/(installation|install)(-[a-zA-Z0-9\\-]+)?\\.(sh|md|typ)";
-        transform =
-          content: path:
-          let
-            fileName = builtins.baseNameOf path;
-            fileExt = builtins.elemAt (pkgs.lib.splitString "." fileName) 1;
-            isMd = fileExt == "md";
-            isTyp = fileExt == "typ";
+        ${body}
 
-            basePart = builtins.substring (builtins.stringLength "installation") (builtins.stringLength fileName - builtins.stringLength "installation" - builtins.stringLength ".${fileExt}") fileName;
-
-            hasSuffix = pkgs.lib.hasPrefix "-" basePart;
-            suffixPart = if hasSuffix then pkgs.lib.removePrefix "-" basePart else "";
-            titleCaseWord = word: if builtins.stringLength word == 0 then "" else pkgs.lib.toUpper (builtins.substring 0 1 word) + builtins.substring 1 (builtins.stringLength word) word;
-
-            formatSuffix =
-              suffix:
-              let
-                segments = pkgs.lib.splitString "-" suffix;
-                titledSegments = map titleCaseWord segments;
-                concat_back = builtins.concatStringsSep " " titledSegments;
-              in
-              concat_back;
-
-            headerText = if suffixPart == "" then "Installation" else "Installation: ${formatSuffix suffixPart}";
-            headerTag = if isMulti then "h3" else "h2";
-            contentRendered =
-              if isMd || isTyp then
-                content
-              else
-                ''```sh
-${content}
-```'';
-          in
-          ''
-            <!-- markdownlint-disable -->
-            <details>
-            <summary>
-            <${headerTag}>${headerText}</${headerTag}>
-            </summary>
-
-            ${contentRendered}
-
-            </details>
-            <!-- markdownlint-restore -->'';
+        </details>
+        <!-- markdownlint-restore -->'';
+      render = content: path: if pkgs.lib.hasSuffix ".sh" path then "```sh\n${content}\n```" else content;
+      title = path:
+        let
+          target = builtins.elemAt (builtins.match "(installation|install)-([a-zA-Z0-9\\-]+)\\.(sh|md|typ)" (builtins.baseNameOf path)) 1;
+          titleCase = word: pkgs.lib.toUpper (builtins.substring 0 1 word) + builtins.substring 1 (builtins.stringLength word) word;
+        in
+        builtins.concatStringsSep " " (map titleCase (builtins.filter (w: w != "") (pkgs.lib.splitString "-" target)));
+      base = processSection {
+        path = "docs/.readme_assets/(installation|install)\\.(sh|md|typ)";
         optional = true;
+        transform = render;
+      };
+      targets = processSection {
+        path = "docs/.readme_assets/(installation|install)-[a-zA-Z0-9\\-]+\\.(sh|md|typ)";
+        optional = true;
+        transform = content: path: fold "h3" (title path) (render content path);
       };
     in
-    if isMulti && folds != "" then "## Installation\n\n" + folds else folds;
+    if base == "" && targets == "" then "" else fold "h2" "Installation" (base + targets) + "\n";
 
   usage_out = processSection {
     path = "docs/.readme_assets/usage\\.(sh|md|typ)";

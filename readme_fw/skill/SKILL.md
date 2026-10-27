@@ -13,12 +13,14 @@ README on entry and CI regenerates it and diffs, so a hand-edit is reverted, not
 | `description` | the body under the title |
 | `warning` | a banner above everything |
 | `usage` | `## Usage` |
-| `installation[-suffix]` | `## Installation`, one fold per file, suffix as its title |
+| `installation` | `## Installation`, folded |
+| `installation-<target>` | a fold inside `## Installation`, under the base's general steps, titled by `<target>` |
 | `other` | appended verbatim |
 | `logo` | one image line under the title |
 
 Anything else directly in `docs/.readme_assets/` warns and is dropped. Images and other blobs a
-section links to go one level down, in `docs/.readme_assets/assets/`, linked as `(./assets/x.png)`.
+section links to go one level down, in `docs/.readme_assets/assets/`, linked as `(./assets/x.png)`, or from
+`.typ` as `#image("assets/x.png", width: 50%)`.
 
 `.md`, `.typ` and (for usage/installation) `.sh` are accepted; a `.sh` asset is fenced as a
 shell block. Headers in an asset are demoted one level to fit under the section they land in —
