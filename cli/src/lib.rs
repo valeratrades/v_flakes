@@ -1,3 +1,4 @@
+#![feature(default_field_values)]
 #[cfg(feature = "toml")]
 pub mod cargo_merge;
 #[cfg(feature = "toml")]

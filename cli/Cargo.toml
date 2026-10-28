@@ -1,6 +1,6 @@
 [package]
 name = "v_flakes"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 authors = ["Valeriy Sakharov <valeratrades@gmail.com>"]
 description = "Shared primitives for v_flakes nix module scripts"

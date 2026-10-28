@@ -11,6 +11,9 @@ use crate::gh;
 
 const PLACEHOLDER: &str = "<!-- v_flakes clean-up-gitlfs-dangerous placeholder -->";
 
+/// gh as the credential helper, so git and git-lfs authenticate with gh's token
+const CRED: [&str; 4] = ["-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"];
+
 struct Ctx<'a> {
 	owner: &'a str,
 	name: &'a str,
@@ -653,9 +656,6 @@ fn enc(s: &str) -> String {
 		})
 		.collect()
 }
-
-/// gh as the credential helper, so git and git-lfs authenticate with gh's token
-const CRED: [&str; 4] = ["-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"];
 
 /// stderr is inherited, so long fetches and pushes show progress
 fn git(dir: &Path, args: &[&str], stdin: Option<&str>) -> Result<String, String> {
