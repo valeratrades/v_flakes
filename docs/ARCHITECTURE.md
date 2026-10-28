@@ -61,6 +61,7 @@ GitHub-specific configuration:
 ## cli/
 
 - `org_properties.json` - org custom property definitions; `v_flakes org sync` (cli/src/main.rs) writes them, generated workflows read them (`pr_auto_review` gates claude-code-review.yml)
+- `src/clean_up_gitlfs.rs` - `v_flakes clean-up-gitlfs-dangerous`: GitHub bills LFS objects until the repo is deleted, and refuses pushes whose history points at objects it lacks (GH008). So: rewrite history without the pointers no branch tip uses, push it to a new repo, transfer issues at their own numbers, swap names, archive the old one as `.bak`. Needs gh, git-lfs, git-filter-repo on PATH
 
 ## langs/rs/
 

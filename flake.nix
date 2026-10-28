@@ -140,6 +140,8 @@
               Re-exported inputs:       nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
                                         flake-parts process-compose-flake devenv lean4-nix
               v_flakes org sync <ORG>   converge org custom property definitions (cli/org_properties.json)
+              v_flakes clean-up-gitlfs-dangerous <OWNER/REPO>
+                                        re-home a repo without the LFS objects no branch tip uses; old one archived as .bak
               ./__scripts/release.sh    release (see `docs/`)
             '';
           };

@@ -6,6 +6,8 @@ use std::{
 use clap::{Parser, Subcommand};
 use serde_json::{Map, Value};
 
+mod clean_up_gitlfs;
+
 const SPEC: &str = include_str!("../org_properties.json");
 
 #[derive(Parser)]
@@ -19,6 +21,8 @@ struct Cli {
 enum Commands {
 	#[command(subcommand)]
 	Org(OrgCommands),
+	/// Re-home OWNER/REPO keeping issue numbers and only the LFS objects branch tips reference; history is rewritten, the old repo is archived as `<repo>.bak`
+	CleanUpGitlfsDangerous { repo: String },
 }
 
 #[derive(Subcommand)]
@@ -28,14 +32,16 @@ enum OrgCommands {
 }
 
 fn main() -> ExitCode {
-	match Cli::parse().command {
-		Commands::Org(OrgCommands::Sync { org }) => match org_sync(&org) {
-			Ok(()) => ExitCode::SUCCESS,
-			Err(e) => {
-				eprintln!("error: {e}");
-				ExitCode::FAILURE
-			}
-		},
+	let result = match Cli::parse().command {
+		Commands::Org(OrgCommands::Sync { org }) => org_sync(&org),
+		Commands::CleanUpGitlfsDangerous { repo } => clean_up_gitlfs::run(&repo),
+	};
+	match result {
+		Ok(()) => ExitCode::SUCCESS,
+		Err(e) => {
+			eprintln!("error: {e}");
+			ExitCode::FAILURE
+		}
 	}
 }
 
