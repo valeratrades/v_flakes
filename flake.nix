@@ -201,7 +201,47 @@
       # their own copies — same rev everywhere means nix store dedup, shared caches.
       # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
       # is the same rev as a bare source tree, for `import`.
-      inherit nixpkgs flake-utils rust-overlay pre-commit-hooks flake-parts process-compose-flake devenv lean4-nix;
+      inherit nixpkgs rust-overlay pre-commit-hooks process-compose-flake devenv lean4-nix;
+      # Wrapped to give every flake built through them an `apps.help`, unless it defines its own `help`.
+      flake-utils =
+        let
+          withHelp = f: system:
+            let out = f system; in
+            if out ? apps.help || out ? packages.help then out
+            else out // {
+              apps = (out.apps or { }) // {
+                help = import ./utils/help.nix {
+                  pkgs = nixpkgs.legacyPackages.${system};
+                  apps = out.apps or { };
+                  packages = out.packages or { };
+                  devShells = out.devShells or { };
+                };
+              };
+            };
+        in
+        flake-utils // {
+          lib = flake-utils.lib // {
+            eachSystem = systems: f: flake-utils.lib.eachSystem systems (withHelp f);
+            eachDefaultSystem = f: flake-utils.lib.eachDefaultSystem (withHelp f);
+          };
+        };
+      flake-parts = flake-parts // {
+        lib = flake-parts.lib // {
+          mkFlake = args: module: flake-parts.lib.mkFlake args {
+            imports = [
+              module
+              {
+                perSystem = { config, system, lib, ... }: {
+                  apps.help = lib.mkIf (!(config.packages ? help)) (lib.mkDefault (import ./utils/help.nix {
+                    pkgs = nixpkgs.legacyPackages.${system};
+                    inherit (config) apps packages devShells;
+                  }));
+                };
+              }
+            ];
+          };
+        };
+      };
       files = import ./files;
       github = import ./github;
       container = import ./github/container/lib.nix;

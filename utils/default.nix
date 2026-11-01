@@ -299,25 +299,14 @@ in
     push = { };
   };
 
-  # `nix run .#help`, listed off the flake's own outputs so it can't drift from them:
+  # `v_flakes.flake-utils` / `v_flakes.flake-parts` already give every flake an `apps.help`; this is for adding `about`:
   #   apps.help = v_flakes.utils.help { inherit pkgs self system; about = "what isn't a flake output"; };
-  # Every app owes a `meta.description`.
-  help = { pkgs, self, system, about ? "" }:
-    let
-      lib = pkgs.lib;
-      row = cmd: desc: "  ${cmd}" + lib.optionalString (desc != "") "${lib.strings.replicate (lib.max 1 (32 - builtins.stringLength cmd)) " "}${desc}";
-      apps = lib.mapAttrsToList
-        (name: app: row "nix run .#${name}" (app.meta.description or (throw "v_flakes.utils.help: apps.${system}.${name} has no meta.description")))
-        (removeAttrs (self.apps.${system} or { }) [ "help" ]);
-      packages = lib.mapAttrsToList (name: p: row "nix build .#${name}" (p.meta.description or "")) (self.packages.${system} or { });
-      shells = map (name: row "nix develop${lib.optionalString (name != "default") " .#${name}"}" "") (builtins.attrNames (self.devShells.${system} or { }));
-      text = lib.concatStringsSep "\n" (lib.filter (s: s != "") [ about (lib.concatStringsSep "\n" (apps ++ packages ++ shells)) ]);
-    in
-    {
-      type = "app";
-      meta.description = "this listing";
-      program = "${pkgs.writeShellScriptBin "help" "cat <<'EOF'\n${text}\nEOF\n"}/bin/help";
-    };
+  help = { pkgs, self, system, about ? "" }: import ./help.nix {
+    inherit pkgs about;
+    apps = self.apps.${system} or { };
+    packages = self.packages.${system} or { };
+    devShells = self.devShells.${system} or { };
+  };
 
   inherit binstallCrate binstallOnEntry checkCrateVersion optionalDefaults mkShellHook unwrapShellHook withCargo;
   publish = import ./publish.nix;
@@ -466,11 +455,11 @@ in
       # it) and `packages.<sys>.help`, which `.#help` does resolve.
       helpCheck = ''
         if command -v nix >/dev/null 2>&1 && ! _vf_fresh help "" flake.nix flake.lock; then # an apps.help defined outside flake.nix is only seen once flake.nix or flake.lock changes
-          if ! nix eval --quiet ".#apps.${rust.system}.help" >/dev/null 2>&1 && ! nix eval --quiet .#help >/dev/null 2>&1; then
+          if ! nix eval --quiet ".#apps.${rust.system}.help.type" >/dev/null 2>&1 && ! nix eval --quiet .#help.type >/dev/null 2>&1; then # `.type`: forcing the whole app would fail on any undescribed app
             echo "" >&2
             echo "⚠️  v_flakes: this repo defines no \`nix run .#help\`." >&2
             echo "    Every v_flakes consumer owes one — the entrypoint listing what the repo can do." >&2
-            echo "    Add to the per-system outputs of flake.nix:" >&2
+            echo "    Build outputs through v_flakes' flake-utils / flake-parts re-export (it injects one), or add to the per-system outputs of flake.nix:" >&2
             echo "      apps.help = v_flakes.utils.help { inherit pkgs self system; };" >&2
             echo "" >&2
           fi 2> "$_vf_stamps/help.warn"
