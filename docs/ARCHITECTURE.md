@@ -56,7 +56,7 @@ GitHub-specific configuration:
 
 - `workflows/` - CI workflow generation (errors.yml, warnings.yml)
 - `labels.nix` - GitHub label synchronization
-- `git-ops.rs` - Rust script for git operations
+- `git-ops.rs` - Rust script for git operations; `sync-labels` (detached on pre-commit) converges the GitHub repo's state, and records one-time setups (Discussions) in `.v_flakes.lock` next to the generator line
 
 ## cli/
 

@@ -797,6 +797,7 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	}
 
 	follow_rename();
+	ensure_discussions(&repo_root);
 	let mut open_issues = fetch_open_issues();
 
 	// Fingerprint gates only the label block (not an early return): on a fresh repo
@@ -831,6 +832,71 @@ fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
 		exit_reporting();
 	}
 	flush_report();
+}
+
+const DISCUSSIONS_STAMP: &str = "discussions enabled";
+
+/// Enabled through the API, Discussions gets GitHub's default categories at once, so no setup page precedes the first post.
+fn ensure_discussions(repo_root: &str) {
+	let lock = PathBuf::from(repo_root).join(".v_flakes.lock");
+	let text = match fs::read_to_string(&lock) {
+		Ok(t) => t,
+		Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
+		Err(e) => return report!("discussions", "can't read {}: {e}", lock.display()),
+	};
+	if text.lines().any(|l| l == DISCUSSIONS_STAMP) {
+		return;
+	}
+	let gh = |args: &[&str]| -> Result<String, String> {
+		let out = run_gh(args).map_err(|e| format!("running gh: {e}"))?;
+		if !out.status.success() {
+			return Err(format!("gh {} failed: {}", args[..2].join(" "), String::from_utf8_lossy(&out.stderr).trim()));
+		}
+		Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+	};
+	let ready = || -> Result<bool, String> {
+		match gh(&[
+			"api",
+			"graphql",
+			"-F",
+			"owner={owner}",
+			"-F",
+			"name={repo}",
+			"-f",
+			"query=query($owner:String!,$name:String!){repository(owner:$owner,name:$name){hasDiscussionsEnabled discussionCategories(first:1){totalCount}}}",
+			"--jq",
+			".data.repository | .hasDiscussionsEnabled and .discussionCategories.totalCount > 0",
+		])?
+		.as_str()
+		{
+			"true" => Ok(true),
+			"false" => Ok(false),
+			other => Err(format!("unexpected discussions state `{other}`")),
+		}
+	};
+	let converged = ready().and_then(|r| {
+		if r {
+			return Ok(true);
+		}
+		gh(&["api", "--method", "PATCH", "repos/{owner}/{repo}", "-F", "has_discussions=true", "--silent"])?;
+		ready()
+	});
+	match converged {
+		Ok(true) => {
+			let sep = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
+			// append, not rewrite: the shellHook may be restamping the generator line concurrently
+			let written = fs::OpenOptions::new()
+				.create(true)
+				.append(true)
+				.open(&lock)
+				.and_then(|mut f| f.write_all(format!("{sep}{DISCUSSIONS_STAMP}\n").as_bytes()));
+			if let Err(e) = written {
+				report!("discussions", "can't write {}: {e}", lock.display());
+			}
+		}
+		Ok(false) => report!("discussions", "enabled, but GitHub lists no categories, so the tab opens on its setup page"),
+		Err(e) => report!("discussions", "{e}"),
+	}
 }
 
 fn fetch_remote_labels() -> HashMap<String, (String, Option<String>)> {

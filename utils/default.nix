@@ -362,11 +362,15 @@ in
       # Generated files are written on every shell entry, so a shell built on an older
       # v_flakes (a stale direnv env, an old worktree's lock) silently rewrites them with its
       # older output. `.v_flakes.lock` records the generator that last wrote the repo; an older
-      # one refuses to run at all.
+      # one refuses to run at all. Its other lines are repo state (`git_ops sync-labels`), kept as-is.
       generationGuard = if generator == null then "" else ''
         _vf_gen=${toString generator.stamp}
-        _vf_locked=
-        [ -f .v_flakes.lock ] && read -r _vf_locked _vf_locked_rev < .v_flakes.lock
+        _vf_locked= _vf_locked_rev= _vf_lock_rest=
+        if [ -f .v_flakes.lock ]; then
+          while IFS= read -r _vf_l || [ -n "$_vf_l" ]; do
+            if [[ $_vf_l =~ ^([0-9]+)\ (.*)$ ]]; then _vf_locked=''${BASH_REMATCH[1]} _vf_locked_rev=''${BASH_REMATCH[2]}; else _vf_lock_rest+=$_vf_l$'\n'; fi
+          done < .v_flakes.lock
+        fi
         if [ -n "$_vf_locked" ] && (( _vf_locked > _vf_gen )) && [ "''${V_FLAKES_FORCE:-}" != 1 ]; then
           printf '%s\n' \
             "✘ v_flakes: this repo's generated files come from a newer v_flakes ($_vf_locked_rev) than this shell's (${generator.rev})." \
@@ -377,8 +381,8 @@ in
       '';
       generationStamp = if generator == null then "" else ''
         _vf_lock="$_vf_gen ${generator.rev}"
-        [ "$_vf_locked $_vf_locked_rev" = "$_vf_lock" ] || printf '%s\n' "$_vf_lock" > .v_flakes.lock
-        unset _vf_gen _vf_locked _vf_locked_rev _vf_lock
+        [ "$_vf_locked $_vf_locked_rev" = "$_vf_lock" ] || printf '%s\n%s' "$_vf_lock" "$_vf_lock_rest" > .v_flakes.lock
+        unset _vf_gen _vf_locked _vf_locked_rev _vf_lock _vf_lock_rest _vf_l
       '';
       # `nix` is usually NOT on the devShell's own PATH — mkShell does not inherit the
       # user profile. On NixOS it leaks in via /run/current-system/sw/bin, which is the
