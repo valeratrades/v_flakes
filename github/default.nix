@@ -323,6 +323,11 @@ if nixpkgs != null && pkgs == null then {
       git config merge.ours.driver true
       ${"# `git wt <path> [worktree-add args]`: a worktree without the LFS-tracked files, which a checkout would copy out of .git/lfs one by one"}
       git config alias.wt '!f() { set -f; top="$(git rev-parse --show-toplevel)"; cd "''${GIT_PREFIX:-.}" && git worktree add --no-checkout "$@" && git -C "$1" sparse-checkout set --no-cone "/*" $(sed -n "s/^\([^ #]*\) .*filter=lfs.*/!\1/p" "$top/.gitattributes") && git -C "$1" checkout -q; }; f'
+      ${"# prune keeps only what a checkout, worktree, stash or unpushed commit references, and deletes nothing origin lacks"}
+      git config lfs.fetchrecentrefsdays 0
+      git config lfs.fetchrecentcommitsdays 0
+      git config lfs.pruneverifyremotealways true
+      git config lfs.pruneverifyunreachablealways true # staged-never-committed objects are unreachable; without this, prune deletes them
     '';
 
     envrcFile = files.envrc { inherit pkgs; impure = envrc.impure or false; extra = envrc.extra or ""; };
@@ -355,6 +360,7 @@ if nixpkgs != null && pkgs == null then {
         ${lfsGitConfig}
         _vf_stamp lfs-git-config "${builtins.hashString "sha256" lfsGitConfig}" "$_vf_gitconfig"
       fi
+      (${pkgs.git-lfs}/bin/git-lfs prune --when-unverified=continue </dev/null >/dev/null 2>/dev/null 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &) # fd 3+: direnv waits on its env-dump pipe
       '' else ""}
       ${conventionsHook}
       ''
