@@ -323,12 +323,12 @@ fn main() -> ExitCode {
 		// so ^C on the commit doesn't take it down; null stdin, as a background job reading the
 		// tty hangs on SIGTTIN. stderr is its only channel.
 		Command::new(git_ops)
-			.arg("sync-labels")
+			.arg("sync-github")
 			.stdin(Stdio::null())
 			.stdout(Stdio::null())
 			.process_group(0)
 			.spawn()
-			.expect("spawn label sync");
+			.expect("spawn github sync");
 	}
 
 	// codestyle_install puts ~/.cargo/bin on its own PATH; codestyle is then run from there

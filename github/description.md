@@ -109,5 +109,5 @@ Label sync also runs todo-sync: every `<comment-leader>TODO<bangs>:` comment in 
   `FIXTURE_PATHSPECS` in `github/git-ops.rs` for the exact list.
 
 enabledPackages includes:
-- `git_ops` - GitHub operations (sync-labels, etc.)
+- `git_ops` - GitHub operations (sync-github, etc.)
 - `code_duplication` - Run the same duplication detection used in CI locally (requires qlty)

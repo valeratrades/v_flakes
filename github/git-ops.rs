@@ -34,8 +34,8 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-	/// Sync repository labels with local configuration
-	SyncLabels {
+	/// Converge the GitHub repo to local configuration: labels, Discussions, issues from TODOs
+	SyncGithub {
 		/// JSON array of {name, color, description?} (leading # in color optional)
 		#[arg(long)]
 		labels_json: String,
@@ -293,7 +293,7 @@ struct GhIssue {
 	labels: Vec<GhLabel>,
 }
 
-/// stderr of `sync-labels`, grouped by section and written in one go: it runs backgrounded
+/// stderr of `sync-github`, grouped by section and written in one go: it runs backgrounded
 /// from a shellHook, so anything else printing meanwhile would split a group apart.
 static REPORT: Mutex<Vec<(&str, String)>> = Mutex::new(Vec::new());
 
@@ -771,7 +771,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 	}
 }
 
-fn sync_labels(local_labels: Vec<LabelSpec>, check_colors: bool) {
+fn sync_github(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	let repo_root = get_repo_root().expect("not in a git repository");
 
 	// Concurrent shell-start runs must not race: `gh issue create` is not
@@ -1263,7 +1263,7 @@ fn main() {
 	let args = Args::parse();
 
 	match args.command {
-		Commands::SyncLabels {
+		Commands::SyncGithub {
 			labels_json,
 			check_duplicate_colors,
 		} => {
@@ -1278,7 +1278,7 @@ fn main() {
 					std::process::exit(1);
 				}
 			};
-			sync_labels(labels, check_duplicate_colors);
+			sync_github(labels, check_duplicate_colors);
 		}
 		Commands::SyncConventions { version_key, file } => {
 			if file.is_empty() {

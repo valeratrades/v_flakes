@@ -362,7 +362,7 @@ in
       # Generated files are written on every shell entry, so a shell built on an older
       # v_flakes (a stale direnv env, an old worktree's lock) silently rewrites them with its
       # older output. `.v_flakes.lock` records the generator that last wrote the repo; an older
-      # one refuses to run at all. Its other lines are repo state (`git_ops sync-labels`), kept as-is.
+      # one refuses to run at all. Its other lines are repo state (`git_ops sync-github`), kept as-is.
       generationGuard = if generator == null then "" else ''
         _vf_gen=${toString generator.stamp}
         _vf_locked= _vf_locked_rev= _vf_lock_rest=

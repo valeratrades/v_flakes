@@ -13,7 +13,7 @@
 , # Run `pnpm test:visual` (playwright) in the hook. Driven by the js module's
   # `preCommit.visual`. Runs outside the Cargo.toml guard — it is not rust-gated.
   jsVisual ? false
-, # `git_ops` package whose `sync-labels` the hook starts detached; null when labels are off
+, # `git_ops` package whose `sync-github` the hook starts detached; null when labels are off
   gitOps ? null
 , # rs.cargoRoot: where the rust steps run
   cargoRoot
