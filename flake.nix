@@ -38,6 +38,7 @@
     assert rust-overlay.rev == (import ./pins/rust_overlay.nix).rev;
     let
       pname = "v_flakes";
+      isRust = packages: (builtins.tryEval (packages ? default && packages.default ? cargoDeps)).value; # a packages.default that fails to evaluate gets no apps.default
 
       # `combine` stamps every repo it generates into with this v_flakes, and refuses to run
       # under an older one than the stamp; see `utils.combine`.
@@ -202,17 +203,22 @@
       # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
       # is the same rev as a bare source tree, for `import`.
       inherit nixpkgs rust-overlay pre-commit-hooks process-compose-flake devenv lean4-nix;
-      # Wrapped to give every flake built through them an `apps.help`, unless it defines its own `help`.
+      # Wrapped to give every flake built through them an `apps.help`, unless it defines its own `help`,
+      # and a rust `packages.default` an `apps.default` (utils/cargo-run.nix), unless it defines its own.
       flake-utils =
         let
-          withHelp = f: system:
-            let out = f system; in
-            if out ? apps.help || out ? packages.help then out
-            else out // {
-              apps = (out.apps or { }) // {
+          withApps = f: system:
+            let
+              out = f system;
+              pkgs = nixpkgs.legacyPackages.${system};
+              apps = (out.apps or { }) // nixpkgs.lib.optionalAttrs (!(out ? apps.default) && isRust (out.packages or { })) {
+                default = import ./utils/cargo-run.nix { inherit pkgs; package = out.packages.default; };
+              };
+            in
+            out // {
+              apps = apps // nixpkgs.lib.optionalAttrs (!(out ? apps.help || out ? packages.help)) {
                 help = import ./utils/help.nix {
-                  pkgs = nixpkgs.legacyPackages.${system};
-                  apps = out.apps or { };
+                  inherit pkgs apps;
                   packages = out.packages or { };
                   devShells = out.devShells or { };
                 };
@@ -221,8 +227,8 @@
         in
         flake-utils // {
           lib = flake-utils.lib // {
-            eachSystem = systems: f: flake-utils.lib.eachSystem systems (withHelp f);
-            eachDefaultSystem = f: flake-utils.lib.eachDefaultSystem (withHelp f);
+            eachSystem = systems: f: flake-utils.lib.eachSystem systems (withApps f);
+            eachDefaultSystem = f: flake-utils.lib.eachDefaultSystem (withApps f);
           };
         };
       flake-parts = flake-parts // {
@@ -235,6 +241,10 @@
                   apps.help = lib.mkIf (!(config.packages ? help)) (lib.mkDefault (import ./utils/help.nix {
                     pkgs = nixpkgs.legacyPackages.${system};
                     inherit (config) apps packages devShells;
+                  }));
+                  apps.default = lib.mkIf (isRust config.packages) (lib.mkDefault (import ./utils/cargo-run.nix {
+                    pkgs = nixpkgs.legacyPackages.${system};
+                    package = config.packages.default;
                   }));
                 };
               }
