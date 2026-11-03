@@ -374,7 +374,7 @@ in
         if [ -n "$_vf_locked" ] && (( _vf_locked > _vf_gen )) && [ "''${V_FLAKES_FORCE:-}" != 1 ]; then
           printf '%s\n' \
             "✘ v_flakes: this repo's generated files come from a newer v_flakes ($_vf_locked_rev) than this shell's (${generator.rev})." \
-            "  The shell would overwrite them with older output. Reload it (\`direnv reload\`), or update the input (\`nix flake update v_flakes\`)." \
+            "  The shell would overwrite them with older output. Reload it (\`nix-direnv-reload\`), or update the input (\`nix flake update v_flakes\`)." \
             "  To overwrite anyway: V_FLAKES_FORCE=1 nix develop" >&2
           exit 1
         fi
