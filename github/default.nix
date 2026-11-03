@@ -33,6 +33,7 @@ args@{ pkgs ? null
   cache ? { }
 , # Cachix cache name to publish `packages.default` to on every push to main, so
   # downstream flakes substitute instead of rebuilding. Needs CACHIX_AUTH_TOKEN.
+  # "<name>", or { name; systems = [ "x86_64-linux" "aarch64-darwin" ]; }.
   publishCachix ? null
 , release ? null
 , containerRelease ? null

@@ -4,7 +4,14 @@
 #
 # Distinct from `cache` (github/cache.nix), which only speeds up THIS repo's CI.
 # Requires the CACHIX_AUTH_TOKEN secret. Public cache ⇒ public repos only.
-{ name }:
+{ name, systems ? [ "x86_64-linux" "aarch64-linux" ] }:
+let
+  runners = {
+    x86_64-linux = "ubuntu-latest";
+    aarch64-linux = "ubuntu-24.04-arm";
+    aarch64-darwin = "macos-latest";
+  };
+in
 {
   standalone = true;
 
@@ -17,10 +24,12 @@
     name = "build \${{ matrix.system }}";
     strategy = {
       fail-fast = false;
-      matrix.include = [
-        { runner = "ubuntu-latest"; system = "x86_64-linux"; }
-        { runner = "ubuntu-24.04-arm"; system = "aarch64-linux"; }
-      ];
+      matrix.include = map
+        (system: {
+          inherit system;
+          runner = runners.${system} or (throw "v_flakes publishCachix: no runner for ${system}");
+        })
+        systems;
     };
     runs-on = "\${{ matrix.runner }}";
     steps = [

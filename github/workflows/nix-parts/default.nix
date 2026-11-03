@@ -382,7 +382,7 @@ if nixpkgs != null && pkgs == null then {
       if publishCachix != null then
         yaml
           (builtins.removeAttrs
-            (import files.cachix { name = publishCachix; }) [ "standalone" ])
+            (import files.cachix (if builtins.isString publishCachix then { name = publishCachix; } else publishCachix)) [ "standalone" ])
       else null;
 
     # Sync fork workflow (rebase over upstream)
