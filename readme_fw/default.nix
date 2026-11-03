@@ -504,16 +504,17 @@ ${content}
         '' else "";
       readmeInputs = "${readme} ./README.md \"$_vf_gitconfig\""; # `origin` lives in the git config
       # `origin` is the only place owner/repo actually lives; a repo that has never
-      # been pushed has no correct answer, so refuse rather than guess an owner.
+      # been pushed has no correct answer, so the placeholders stay and the stamp is withheld
+      # rather than guessing an owner. Failing the shell instead would block the very first push.
       # `@@OWNER@@` is for hand-written links (`https://@@OWNER@@.github.io/<repo>/`), so an org rename can't strand them.
       slugResolve = ''
+        __slug_ok=1
         if grep -q '@@REPO_SLUG@@\|@@OWNER@@' ./README.md; then
           __slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$##')"
           case "$__slug" in
-            */*) ;;
-            *) echo "readme-fw: cannot resolve owner/repo — no github 'origin' remote (push the repo first; README links need it)" >&2; exit 1 ;;
+            */*) sed -i "s#@@REPO_SLUG@@#$__slug#g; s#@@OWNER@@#''${__slug%%/*}#g" ./README.md ;;
+            *) echo "readme-fw: no github 'origin' remote; README links keep @@REPO_SLUG@@/@@OWNER@@ until the repo is pushed" >&2; __slug_ok= ;;
           esac
-          sed -i "s#@@REPO_SLUG@@#$__slug#g; s#@@OWNER@@#''${__slug%%/*}#g" ./README.md
           unset __slug
         fi
       '';
@@ -555,7 +556,8 @@ ${content}
       if ! _vf_fresh readme ${readmeInputs}; then
         cp -f ${readme} ./README.md
         ${slugResolve}
-        _vf_stamp readme ${readmeInputs}
+        if [ -n "$__slug_ok" ]; then _vf_stamp readme ${readmeInputs}; fi
+        unset __slug_ok
       fi
       ${steCheck}
     '';
