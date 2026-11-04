@@ -1,6 +1,8 @@
 ---
-name: readme_fw
+name: readme-fw
 description: "How a repo's README.md is produced from docs/.readme_assets/. Read before editing any README.md or any file under docs/.readme_assets/ in a repo that consumes v_flakes' readme-fw."
+metadata:
+  version: "0.1.0"
 ---
 
 # readme_fw

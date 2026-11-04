@@ -80,6 +80,11 @@ github = v-utils.github {
   gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; };
   # Repo name appended from GitHub context. Requires GITLAB_TOKEN secret
 
+  # skills.yml for a repo shipping agent skills (https://github.com/EV-Main/skills): `skargo check`
+  # on PRs, `skargo publish` on main. skargo defaults to the EV-Main/skills rev in pins/skargo.nix.
+  skills = { };
+  skills = { skargo = "."; };  # the skills repo itself checks with its own skargo
+
   # Publish packages.default to a cachix cache on every push to main, so downstream
   # flakes substitute instead of rebuilding. Requires CACHIX_AUTH_TOKEN; public repos only.
   publishCachix = "valeratrades";

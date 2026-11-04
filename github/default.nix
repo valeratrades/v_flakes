@@ -39,6 +39,8 @@ args@{ pkgs ? null
 , containerRelease ? null
 , # { scope; packagesDir; }: release-npm.yml, npm trusted publishing on `@<scope>/<pkg>-v*` tags
   npmRelease ? null
+, # { skargo ? <pins/skargo.nix rev>; }: skills.yml, `skargo check` / `publish` of a repo shipping agent skills
+  skills ? null
 , gitlabSync ? null
 , syncFork ? false
 , # Claude Code workflows (PR assistant + auto code review). On by default for enabled repos.
@@ -53,7 +55,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -242,6 +244,7 @@ if nixpkgs != null && pkgs == null then {
       syncFork = effectiveSyncFork;
     } // (if enable then {
       inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease gitlabSync cargoRoot webUnstable;
+      skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
@@ -316,8 +319,8 @@ if nixpkgs != null && pkgs == null then {
         ''
           ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
           ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
-          [[ ! -f .git/hooks/pre-commit || $(<.git/hooks/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} ./.git/hooks/pre-commit
-          [[ -x .git/hooks/custom.sh && $(<.git/hooks/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} ./.git/hooks/custom.sh
+          [[ ! -f $_vf_hooks/pre-commit || $(<"$_vf_hooks"/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} "$_vf_hooks"/pre-commit
+          [[ -x $_vf_hooks/custom.sh && $(<"$_vf_hooks"/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} "$_vf_hooks"/custom.sh
         '';
 
     lfsGitConfig = ''

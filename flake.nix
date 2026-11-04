@@ -87,6 +87,7 @@
               warnings.hooks = { push.paths = [ "cli/src/**" ]; };
             };
             release.hooks = { push.tags = [ "v[0-9]+.[0-9]+.0" ]; };
+            skills = { };
           };
           readme = (import ./readme_fw) {
             inherit pkgs pname;

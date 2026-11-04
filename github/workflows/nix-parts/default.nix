@@ -12,6 +12,8 @@ args@{ pkgs ? null
 , # { scope; packagesDir; }: npm trusted publishing of `@<scope>/<pkg>-v<version>` tags. See shared/npm-release.nix.
   npmRelease ? null
 , gitlabSync ? null
+, # { skargo; }: skills.yml, `skargo check` / `publish` of a skills repo. See shared/skills.nix.
+  skills ? null
 , syncFork ? false
 , # Per-section install dependencies: { packages = [ "pkg1" ]; apt = [ "pkg2" ]; }
   installErrors ? { }
@@ -77,6 +79,9 @@ if nixpkgs != null && pkgs == null then {
         release-npm.yml: a pushed `@evinvest/<pkg>-v<version>` tag publishes `ts/<pkg>` through npm
         trusted publishing (OIDC), building its `file:` dependencies first. Each package's trusted
         publisher on npmjs.com must name this repo and `release-npm.yml`: the shell's `npm-trust` sets that up.
+    - skills = { skargo = "github:EV-Main/skills/<rev>"; }
+        skills.yml: `skargo check` on PRs, `skargo publish` (tags `<name>--v<version>`) on main, and
+        `claude plugin validate --strict` when the repo has a marketplace.
     - gitlabSync = { mirrorBaseUrl = "https://gitlab.com/user"; }
         Sync to GitLab mirror (triggers on push to any branch/tag)
         Repo name is appended from GitHub context. Requires GITLAB_TOKEN secret
@@ -378,6 +383,15 @@ if nixpkgs != null && pkgs == null then {
         yaml (builtins.removeAttrs (import ./shared/npm-release.nix { inherit (npmRelease) scope packagesDir; }) [ "standalone" ])
       else null;
 
+    skillsWorkflow =
+      if skills != null then
+        assert (
+          let unknown = builtins.removeAttrs skills [ "skargo" ]; in
+          unknown == { } || throw "v_flakes skills: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
+        );
+        yaml (builtins.removeAttrs (import ./shared/skills.nix { inherit (skills) skargo; inherit cache; }) [ "standalone" ])
+      else null;
+
     cachixWorkflow =
       if publishCachix != null then
         yaml
@@ -535,6 +549,11 @@ if nixpkgs != null && pkgs == null then {
         _vf_cp ${npmReleaseWorkflow} ./.github/workflows/release-npm.yml
       '' else "";
 
+    skillsHook =
+      if skillsWorkflow != null then ''
+        _vf_cp ${skillsWorkflow} ./.github/workflows/skills.yml
+      '' else "";
+
     cachixHook =
       if cachixWorkflow != null then ''
         _vf_cp ${cachixWorkflow} ./.github/workflows/cachix.yml
@@ -566,7 +585,7 @@ if nixpkgs != null && pkgs == null then {
       '';
   in
   workflows // {
-    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
+    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
@@ -576,6 +595,7 @@ if nixpkgs != null && pkgs == null then {
       ${releaseStaleWarningHook}
       ${containerReleaseHook}
       ${npmReleaseHook}
+      ${skillsHook}
       ${syncForkHook}
       ${gitlabSyncHook}
       ${claudeHook}

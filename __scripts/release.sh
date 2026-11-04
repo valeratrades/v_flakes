@@ -27,7 +27,7 @@ if [[ ! -L "$cnix_release_link" ]] || [[ ! -e "$cnix_release_link" ]]; then
 fi
 
 # Check if ./cli/src changed since the last tagged commit
-last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+last_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true) # not the `<skill>--v<version>` tags skills.yml pushes
 
 src_changed=false
 if [[ -z "$last_tag" ]]; then

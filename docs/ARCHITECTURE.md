@@ -13,7 +13,7 @@ flake.nix (entry point)
     │
     ├── github/        (depends on: files/, git/)
     │
-    ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs)
+    ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs; the skargo rev skills.yml runs)
     │
     ├── tools/         (self-pinned binaries: qlty, cargo-machete, cargo-diet, cargo-sort-derives; depend on pins/)
     │

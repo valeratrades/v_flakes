@@ -1,6 +1,8 @@
 ---
-name: v_flakes
+name: v-flakes
 description: "Rules for working in ~/s/v_flakes (the shared Nix parts collection consumed by every other repo via `v_flakes.url = github:valeratrades/v_flakes?ref=v1.6`). Read BEFORE editing anything under ~/s/v_flakes, and before changing how any repo consumes v_flakes — covers how to release, what the pin policy is, and what re-exports exist. Also read before creating or labelling a GitHub issue in any v_flakes consumer: the label set and its lint come from here. Also read before editing any Cargo.toml: how a crate depends on another repo we own (local path overrides) is set here."
+metadata:
+  version: "0.1.0"
 ---
 
 # v_flakes

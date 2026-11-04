@@ -17,6 +17,7 @@ let
       _vf_gitconfig=$_vf_gd/config
       unset _vf_gd _vf_cd
     fi
+    _vf_hooks=''${_vf_gitconfig%/config}/hooks # shared by every worktree
     _vf_same() {
       [ -f "$1" ] && [ -f "$2" ] || return 1
       local a b
