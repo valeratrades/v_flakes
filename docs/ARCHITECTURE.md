@@ -73,6 +73,11 @@ Rust toolchain configuration (config templates in `files/`):
 - Sets up codestyle linting
 - `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
 
+## langs/typ/
+
+- Given `src`, the module reads every `@preview/<name>:<version>` import in it from the source text and bundles those packages from nixpkgs' `typstPackages` (or `extraPackages`, sources with a typst.toml) into the shipped `typst`, so documents build in the network-less sandbox. The devShell and tinymist get the same package path. They still fall back to downloading, so adding a new import doesn't require reloading the shell
+- `typst` always has the `html` feature enabled; `document` compiles `main` to PDF (plus HTML with `html = true`)
+
 ## readme_fw/
 
 README generation from `docs/.readme_assets/`:
