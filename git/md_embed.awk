@@ -1,15 +1,21 @@
 # Fills each `<!-- embed path -->` line of an md with the md at `path` (relative to `dir`), quoted, its `# ` title replaced by a link.
-# Both markers are written as vim folds, so a reader can tell the block from duplication. A marker already folded was written here:
-# its old block, to `<!-- /embed -->` or its last `>` line, is replaced.
+# Both markers are written as vim folds, so a reader can tell the block from duplication. `>` lines after the marker are its old block
+# if `<!-- /embed -->` closes them, and the md's own text otherwise.
 function close_block() {
 	print "<!-- /embed }}}always-->"
 	inside = 0
 }
 
-inside && /^<!-- \/embed( *\}\}\}[a-z0-9]*)? *-->$/ { close_block(); next }
+function give_back() {
+	close_block()
+	for (i = 1; i <= held; i++) print hold[i]
+	held = 0
+}
+
+inside && /^<!-- \/embed( *\}\}\}[a-z0-9]*)? *-->$/ { held = 0; close_block(); next }
+inside && /^>/ { hold[++held] = $0; next }
+inside { give_back() }
 /^<!-- \/embed( *\}\}\}[a-z0-9]*)? *-->$/ { next } # closed already, by the block above it
-inside && /^>/ { next }
-inside { close_block() }
 
 match($0, /^<!-- embed ([^ ]+)( *\{\{\{[a-z0-9]*)? *-->$/, m) {
 	path = m[1]
@@ -23,11 +29,10 @@ match($0, /^<!-- embed ([^ ]+)( *\{\{\{[a-z0-9]*)? *-->$/, m) {
 	}
 	if (got < 0) { print FILENAME ": no " dir "/" path > "/dev/stderr"; exit 1 }
 	close(dir "/" path)
-	if (m[2] == "") close_block()
-	else inside = 1
+	inside = 1
 	next
 }
 
 { print }
 
-END { if (inside) close_block() }
+END { if (inside) give_back() }
