@@ -5,6 +5,7 @@ let
   # `extend` applies to `rust` only.
   base = {
     "unused_features" = "allow";
+    "stable_features" = "allow"; # a newer toolchain stabilizes what the pinned one still gates; code quality over feature-gate churn
   };
 
   # Top-level keys are tool names, placed under either [lints] or [workspace.lints].
