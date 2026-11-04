@@ -29,9 +29,17 @@ in
         nixCi.installStep
         nixCi.cacheStep
         {
+          name = "Build skargo";
+          # not `nix run`: inside skargo's own checkout, its apps.default is `cargo run` on the runner's toolchain
+          run = ''
+            out=$(nix build --no-link --print-out-paths ${skargo})
+            echo "skargo=$out/bin/skargo" >> "$GITHUB_ENV"
+          '';
+        }
+        {
           name = "Check";
           "if" = "github.event_name != 'push'";
-          run = "nix run ${skargo} -- check";
+          run = "$skargo check";
         }
         {
           name = "Validate Claude marketplace";
@@ -41,7 +49,7 @@ in
         {
           name = "Publish";
           "if" = "github.event_name == 'push'";
-          run = "nix run ${skargo} -- publish";
+          run = "$skargo publish";
         }
       ];
   };
