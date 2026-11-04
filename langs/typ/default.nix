@@ -6,10 +6,10 @@
   #                max_width = 190 / ruff line-length = 210).
   #   indentWidth: typstyle `--indent-width` (spaces; typstyle has no hard-tab
   #                mode, unlike rustfmt/ruff, so `.typ` stays space-indented).
-  #   src          : project root. Its `@preview/<name>:<version>` imports are
+  #   src          : project root. Its `@preview`/`@local` `<name>:<version>` imports are
   #                  vendored into the `typst` this module ships, so `nix build` works
   #                  in the network-less sandbox.
-  #   extraPackages: sources of imported packages absent from nixpkgs' typstPackages;
+  #   extraPackages: sources of `@local` packages and of `@preview` ones absent from nixpkgs' typstPackages;
   #                  name/version come from their typst.toml, deps from their imports.
   #   main         : document entrypoint relative to `src`; enables `document`.
   #   html         : `document` also emits output.html.
@@ -71,33 +71,55 @@ if nixpkgs != null && pkgs == null then {
     utils = import ../../utils;
 
     # shortcut: a regex over the source, so an import whose spec is built at runtime is missed (the build then fails on download).
-    previewImports = dir: lib.unique (lib.concatMap
-      (f: builtins.filter builtins.isList (builtins.split "@preview/([a-z0-9-]+):([0-9]+\\.[0-9]+\\.[0-9]+)" (builtins.readFile f)))
-      (builtins.filter (lib.hasSuffix ".typ") (lib.filesystem.listFilesRecursive dir)));
+    imports = dir: lib.unique (map
+      (m: { ns = builtins.elemAt m 0; name = builtins.elemAt m 1; version = builtins.elemAt m 2; })
+      (lib.concatMap
+        (f: builtins.filter builtins.isList (builtins.split "@(preview|local)/([a-z0-9-]+):([0-9]+\\.[0-9]+\\.[0-9]+)" (builtins.readFile f)))
+        (builtins.filter (lib.hasSuffix ".typ") (lib.filesystem.listFilesRecursive dir))));
 
     extra = map (s: (builtins.fromTOML (builtins.readFile "${s}/typst.toml")).package // { src = s; }) extraPackages;
+    extraFor = i: lib.findFirst (e: e.name == i.name && e.version == i.version) null extra;
 
-    resolve = imp:
-      let
-        name = builtins.elemAt imp 0;
-        version = builtins.elemAt imp 1;
-        e = lib.findFirst (e: e.name == name && e.version == version) null extra;
-        attr = "${name}_${lib.replaceStrings [ "." ] [ "_" ] version}";
-      in
+    local = i:
+      let e = extraFor i; in
+      if e != null then e else throw "typ: @local/${i.name}:${i.version} has no source; pass it via `extraPackages`";
+
+    # @local packages are linked as-is rather than built, so their own imports are vendored alongside.
+    closure = dir:
+      let is = imports dir; in
+      is ++ lib.concatMap (i: lib.optionals (i.ns == "local") (closure (local i).src)) is;
+
+    resolve = i:
+      let e = extraFor i; in
       if e != null then
         pkgs.buildTypstPackage
           {
-            pname = name;
-            inherit version;
+            pname = i.name;
+            inherit (i) version;
             inherit (e) src;
-            typstDeps = map resolve (builtins.filter (i: builtins.head i != name) (previewImports e.src));
+            typstDeps = map resolve (builtins.filter (d: d.ns == "preview" && d.name != i.name) (imports e.src));
           }
       else
-        pkgs.typstPackages.${attr} or (throw "typ: @preview/${name}:${version} is not in nixpkgs' typstPackages; pass its source via `extraPackages`");
+        pkgs.typstPackages."${i.name}_${lib.replaceStrings [ "." ] [ "_" ] i.version}"
+          or (throw "typ: @preview/${i.name}:${i.version} is not in nixpkgs' typstPackages; pass its source via `extraPackages`");
 
     # TYPST_PACKAGE_PATH is searched before the download cache, so a freshly added import still downloads in the devShell.
-    packagePath = lib.optionalString (src != null)
-      "${pkgs.typst.passthru.wrapper { packages = _: map resolve (previewImports src); }}/lib/typst/packages";
+    packagePath = lib.optionalString (src != null) (
+      let
+        all = lib.unique (closure src);
+        preview = builtins.filter (i: i.ns == "preview") all;
+      in
+      pkgs.runCommand "typst-packages" { } (''
+        mkdir -p $out/local
+      '' + lib.optionalString (preview != [ ]) ''
+        ln -s ${pkgs.typst.passthru.wrapper { packages = _: map resolve preview; }}/lib/typst/packages/preview $out/preview
+      '' + lib.concatMapStrings
+        (i: ''
+          mkdir -p $out/local/${i.name}
+          ln -s ${(local i).src} $out/local/${i.name}/${i.version}
+        '')
+        (builtins.filter (i: i.ns == "local") all))
+    );
 
     typst = pkgs.symlinkJoin {
       name = "typst-wrapped";

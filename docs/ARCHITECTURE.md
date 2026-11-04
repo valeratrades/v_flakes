@@ -75,7 +75,7 @@ Rust toolchain configuration (config templates in `files/`):
 
 ## langs/typ/
 
-- Given `src`, the module reads every `@preview/<name>:<version>` import in it from the source text and bundles those packages from nixpkgs' `typstPackages` (or `extraPackages`, sources with a typst.toml) into the shipped `typst`, so documents build in the network-less sandbox. The devShell and tinymist get the same package path. They still fall back to downloading, so adding a new import doesn't require reloading the shell
+- Given `src`, the module reads every `@preview/<name>:<version>` import in it from the source text and bundles those packages from nixpkgs' `typstPackages` (or `extraPackages`, sources with a typst.toml) into the shipped `typst`. `@local` imports must come from `extraPackages`; they're linked in as-is and their own imports are bundled too. All this lets documents build in the network-less sandbox. The devShell and tinymist get the same package path. They still fall back to downloading, so adding a new import doesn't require reloading the shell
 - `typst` always has the `html` feature enabled; `document` compiles `main` to PDF (plus HTML with `html = true`)
 
 ## readme_fw/
