@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `github`: the pre-commit tracey step was a no-op: it looked for `.config/tracey/config.kdl` and ran `tracey --check`, neither of which tracey 1.x has. It now runs on `.config/tracey/config.styx`: `tracey pre-commit` (a staged rule whose text changed without a version bump fails the commit), then `tracey query validate`, failing on any error it reports.
+
 - `rs` lints: `stable_features = "allow"` joins the default `[lints.rust]`, so a `#![feature(..)]` the CI nightly has since stabilized is not an error under `-Dwarnings`.
 
 - **`github { skills = { }; }`** writes `skills.yml` for a repo shipping agent skills: `skargo check` on PRs, `skargo publish` (pushes each pending `<name>--v<version>` tag) on main, and `claude plugin validate --strict` when `.claude-plugin/marketplace.json` exists. skargo runs from the EV-Main/skills rev in `pins/skargo.nix`; `skills.skargo` overrides the flake ref (the skills repo passes `"."`). The v_flakes skill is now `v-flakes` in `docs/skill/`, and `readme_fw`'s is `readme-fw`, both versioned and published this way; register them in a `skargo.toml` instead of linking the directories by hand.

@@ -381,7 +381,15 @@ fn main() -> ExitCode {
 		}
 		if cfg.tracey_check {
 			steps.push(Box::new(|log| {
-				!Path::new(".config/tracey/config.kdl").is_file() || log.run(Command::new("tracey").arg("--check"))
+				if !Path::new(".config/tracey/config.styx").is_file() {
+					return true;
+				}
+				let staged_rules_bumped = log.run(Command::new("tracey").arg("pre-commit"));
+				let out = Command::new("tracey").args(["query", "validate"]).output().expect("spawn tracey");
+				let report = String::from_utf8_lossy(&out.stdout);
+				log.0.push_str(&report);
+				log.0.push_str(&String::from_utf8_lossy(&out.stderr));
+				staged_rules_bumped && out.status.success() && !report.contains('✗') // tracey 1.3 `query validate` exits 0 on validation errors
 			}));
 		}
 	}
