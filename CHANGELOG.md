@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `rs { tracey ? false; }`: tracey is opt-in; it was on by default. Migrate: a repo with `.config/tracey/config.styx` sets `tracey = true`.
+- `github`: the pre-commit tracey step was a no-op: it looked for `.config/tracey/config.kdl` and ran `tracey --check`, neither of which tracey 1.x has. It now runs on `.config/tracey/config.styx`: `tracey pre-commit` (a staged rule whose text changed without a version bump fails the commit), then `tracey query validate`, failing on any error it reports.
+
 - **`github { skills = { }; }`** writes `skills.yml` for a repo shipping agent skills: `skargo check` on PRs, `skargo publish` (pushes each pending `<name>--v<version>` tag) on main, and `claude plugin validate --strict` when `.claude-plugin/marketplace.json` exists. skargo runs from the EV-Main/skills rev in `pins/skargo.nix`; `skills.skargo` overrides the flake ref (the skills repo passes `"."`). The v_flakes skill is now `v-flakes` in `docs/skill/`, and `readme_fw`'s is `readme-fw`, both versioned and published this way; register them in a `skargo.toml` instead of linking the directories by hand.
 
 - **`nix run` is `cargo run` in the project's own checkout**: the re-exported `flake-utils` / `flake-parts` give a flake whose `packages.default` is a `buildRustPackage` an `apps.default` (`utils/cargo-run.nix`), unless it defines one. When `cargo metadata` from the current directory lists the package, it `cargo run`s it on the working tree with the `cargo` on `PATH`, sharing `target/` with `cargo run`, uncommitted changes included, dev profile. Anywhere else it runs the nix build, built only then. A checkout of the package at any revision counts as its own, so `nix run github:<owner>/<repo>` from inside a clone runs the clone.
