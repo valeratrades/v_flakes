@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `git` md-embed hook: no longer fails in a repo where no md has an `<!-- embed path -->` line.
+
 - `github`: the pre-commit tracey step was a no-op: it looked for `.config/tracey/config.kdl` and ran `tracey --check`, neither of which tracey 1.x has. It now runs on `.config/tracey/config.styx`: `tracey pre-commit` (a staged rule whose text changed without a version bump fails the commit), then `tracey query validate`, failing on any error it reports.
 
 - `rs` lints: `stable_features = "allow"` joins the default `[lints.rust]`, so a `#![feature(..)]` the CI nightly has since stabilized is not an error under `-Dwarnings`.

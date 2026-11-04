@@ -79,7 +79,7 @@ assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames we
         name = "md-embed";
         runtimeInputs = [ pkgs.gawk pkgs.git ];
         text = ''
-          git grep -l '^<!-- embed ' -- '*.md' | while read -r md; do
+          { git grep -l '^<!-- embed ' -- '*.md' || [ $? = 1 ]; } | while read -r md; do # 1 is "no match"
             gawk -v dir="$(dirname "$md")" -f ${./md_embed.awk} "$md" > "$md.embedded" || { rm "$md.embedded"; exit 1; }
             mv "$md.embedded" "$md"
             git add "$md"
