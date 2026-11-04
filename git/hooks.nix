@@ -68,6 +68,25 @@ assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames we
         '';
       });
     };
+    # Markdown has no include; an `<!-- embed path -->` line becomes a quoted copy of that md, refreshed on every md commit.
+    md-embed = {
+      enable = true;
+      name = "md embeds";
+      files = "\\.md$";
+      pass_filenames = false; # an embedded md changing alone must refresh the mds embedding it
+      require_serial = true; # `git add` takes the index lock
+      entry = lib.getExe (pkgs.writeShellApplication {
+        name = "md-embed";
+        runtimeInputs = [ pkgs.gawk pkgs.git ];
+        text = ''
+          git grep -l '^<!-- embed ' -- '*.md' | while read -r md; do
+            gawk -v dir="$(dirname "$md")" -f ${./md_embed.awk} "$md" > "$md.embedded" || { rm "$md.embedded"; exit 1; }
+            mv "$md.embedded" "$md"
+            git add "$md"
+          done
+        '';
+      });
+    };
     treefmt = {
       enable = true;
       # Override entry to re-stage files after formatting.
