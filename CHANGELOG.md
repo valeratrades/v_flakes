@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs` `cpublish` applies `cargo diet -r` itself and commits `Cargo.toml` (`chore: cargo diet`) when the include changed, instead of refusing. The old gate read diet's text diff, so diet's one-line `include` against the pre-commit `cargo sort`'s multi-line one blocked every release even after `cargo diet -r` was run and committed. The comparison is now made after `cargo sort --grouped`. A `Cargo.toml` with uncommitted changes stops it.
+
 - `git` md-embed hook: no longer fails in a repo where no md has an `<!-- embed path -->` line.
 
 - `github`: the pre-commit tracey step was a no-op: it looked for `.config/tracey/config.kdl` and ran `tracey --check`, neither of which tracey 1.x has. It now runs on `.config/tracey/config.styx`: `tracey pre-commit` (a staged rule whose text changed without a version bump fails the commit), then `tracey query validate`, failing on any error it reports.
