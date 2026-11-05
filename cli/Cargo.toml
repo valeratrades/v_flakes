@@ -43,7 +43,6 @@ toml_edit = "0.25"
 v_fixtures.version = "0.3.4"
 
 [lints.rust]
-stable_features = "allow"
 unused_features = "allow"
 
 [lints.clippy]
