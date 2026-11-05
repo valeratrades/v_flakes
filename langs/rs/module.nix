@@ -149,8 +149,9 @@ if nixpkgs != null && pkgs == null then {
     - `tracey` - spec coverage tool (if tracey = true)
     - `codestyle` - code style linter and formatter (if style.format or style.check is true)
     - `cargo-diet`, `cargo-release`, and `cpublish` — `cargo diet -r`, committing the manifest if
-      its include changed, then `cargo release --no-confirm --execute`. On success it force-moves
-      the `release` branch to the release commit.
+      its include changed (asks first; `-y` / `--yes` accepts), then `cargo release --no-confirm
+      --execute` with the remaining args. On success it force-moves the `release` branch to the
+      release commit.
   '';
 } else
 
