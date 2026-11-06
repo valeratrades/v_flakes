@@ -171,9 +171,6 @@
               ${utils.checkCrateVersion { name = "tracey"; currentVersion = traceyVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "codestyle"; currentVersion = codestyleVersion; bumpScript = "$_bump_script"; }}
               ${utils.checkCrateVersion { name = "ste_checker"; currentVersion = steCheckerVersion; bumpScript = "$_bump_script"; }}
-              # Bootstrap: build our own binaries and put them on PATH for local testing
-              cargo b -q --manifest-path cli/Cargo.toml 2>/dev/null
-              export PATH="$PWD/cli/target/debug:$PATH"
             '';
             env.RUST_BACKTRACE = 1;
           };
