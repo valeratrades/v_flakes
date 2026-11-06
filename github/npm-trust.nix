@@ -1,6 +1,6 @@
 # `npm-trust`: puts every `@<scope>/*` package under <packagesDir> on npm trusted publishing from
 # this repo's release-npm.yml. npm only links an existing package, never a scope, so a package
-# not yet on the registry is published from here first. Every write needs 2FA: the first prompt
+# not yet on the registry is published from here first; a trust naming another repo is replaced. Every write needs 2FA: the first prompt
 # offers to skip it for 5 minutes, which covers the rest of the run.
 { pkgs, scope, packagesDir }:
 pkgs.writeShellApplication {
@@ -45,6 +45,12 @@ pkgs.writeShellApplication {
         (cd "$dir" && npm ci && "''${npm[@]}" publish --access public)
       fi
       echo "npm-trust: $name"
+      # A trust naming another repo (the package moved, or the repo was renamed) would make the
+      # add below answer "already exists" while publishing stays bound to the old repo.
+      # Collected first: the revoke's 2FA prompt needs the terminal as stdin.
+      mapfile -t stale < <("''${npm[@]}" trust list "$name" --json \
+        | jq -rs --arg repo "$repo" '.[] | select(.type == "github" and .repository != $repo) | .id')
+      for id in "''${stale[@]}"; do "''${npm[@]}" trust revoke "$name" --id="$id"; done
       # stderr only: npm asks for 2FA only while stdin and stdout are a terminal
       err=$(mktemp)
       "''${npm[@]}" trust github "$name" --file release-npm.yml --repo "$repo" --allow-publish -y 2> >(tee "$err" >&2) \
