@@ -6,6 +6,8 @@
 #   - outPath: (optional, defaults to "LICENSE") path in the repo where the license will be copied
 #   - license: attrset from files.licenses.* with { name, path }
 #
+# contributing: URL string, or a path inside `rootDir` (rendered as a relative link)
+#
 # logo: optional, auto-discovered from docs/.readme_assets/logo.(md|html)
 #   - must be single line containing an image tag or markdown image
 #   - if no width specified, defaults to `defaultLogoWidth`
@@ -24,6 +26,7 @@ args@{ pkgs
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , branch ? "main"
 , ste ? false
+, contributing ? "https://github.com/EV-Main/.github/blob/main/code/conventions/git"
 ,
 }:
 
@@ -60,6 +63,9 @@ assert builtins.all
 assert !hasDuplicates || throw "licenses have duplicate outPaths: ${builtins.concatStringsSep ", " outPaths}";
 assert builtins.isList badges && badges != [ ];
 assert builtins.all builtins.isString badges;
+assert (builtins.isString contributing && builtins.match "https?://.+" contributing != null)
+  || (builtins.isPath contributing && pkgs.lib.hasPrefix "${toString rootDir}/" (toString contributing))
+  || throw "contributing must be an http(s) URL or a path inside rootDir, got: ${toString contributing}";
 
 let
   licenses = licensesNormalized;
@@ -403,13 +409,15 @@ ${content}
     else
       "";
 
+  contributingHref = if builtins.isPath contributing then "./" + pkgs.lib.removePrefix "${rootStr}/" (toString contributing) else contributing;
+
   best_practices_out = pkgs.runCommand "" { } ''
     		cat > $out <<'EOF'
 
     <br>
 
     <sup>
-    	This repository follows <a href="https://github.com/valeratrades/.github/tree/master/best_practices">my best practices</a> and <a href="https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md">Tiger Style</a> (except "proper capitalization for acronyms": (VsrState, not VSRState) and formatting).${architectureSentence}
+    	This repository follows <a href="https://github.com/valeratrades/.github/tree/master/best_practices">my best practices</a> and <a href="https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md">Tiger Style</a> (except "proper capitalization for acronyms": (VsrState, not VSRState) and formatting). For contributing, see <a href="${contributingHref}">contribution process</a>.${architectureSentence}
     </sup>
   '';
 

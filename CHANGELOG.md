@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `readme_fw`: `contributing` (URL, or a path inside `rootDir`) links the contribution process in the footer, next to best practices. Defaults to <https://github.com/EV-Main/.github/blob/main/code/conventions/git>.
+
 - `rs` `cpublish` applies `cargo diet -r` itself and commits `Cargo.toml` (`chore: cargo diet`) when the include changed, instead of refusing. It shows the manifest diff and asks before committing; `-y` / `--yes` accepts, and a refusal restores `Cargo.toml` and exits. The old gate read diet's text diff, so diet's one-line `include` against the pre-commit `cargo sort`'s multi-line one blocked every release even after `cargo diet -r` was run and committed. The comparison is now made after `cargo sort --grouped`. A `Cargo.toml` with uncommitted changes stops it.
 
 - `git` md-embed hook: no longer fails in a repo where no md has an `<!-- embed path -->` line.

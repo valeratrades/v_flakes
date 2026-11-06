@@ -2,7 +2,7 @@
 name: readme-fw
 description: "How a repo's README.md is produced from docs/.readme_assets/. Read before editing any README.md or any file under docs/.readme_assets/ in a repo that consumes v_flakes' readme-fw."
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # readme_fw
@@ -30,6 +30,10 @@ shell block. Headers in an asset are demoted one level to fit under the section 
 
 Badges, the licence copies, the architecture section (from `docs/ARCHITECTURE.md`) and the
 licence footer are generated. Nothing about them belongs in an asset.
+
+The footer links the contribution process from `contributing` in the readme-fw call: a URL, or a
+path in the repo (`./docs/CONTRIBUTING.md`), rendered relative. Unset, it is EV-Main's
+[git conventions](https://github.com/EV-Main/.github/blob/main/code/conventions/git).
 
 With `ste = true` in the readme-fw call, the dev shell checks `usage` and `installation*`
 against ASD-STE100 — see [ste_checker](https://github.com/valeratrades/ste_checker/blob/main/skill/SKILL.md).
