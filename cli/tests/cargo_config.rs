@@ -200,3 +200,39 @@ fn bare_patch_table_stays_out_of_git() {
 	rustflags = ["--cfg", "tokio_unstable"]
 	"#);
 }
+
+#[test]
+fn generated_array_becomes_generated_string() {
+	let generated = r#"[build]
+rustc-wrapper = "kache"
+
+[profile.rust]
+codegen-backend = "cranelift"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = "--cfg tokio_unstable"
+"#;
+	let on_disk = format!("{GENERATED}\n[patch.crates-io]\na = {{ path = \"../a\" }}\n");
+	insta::assert_snapshot!(check(Some(&on_disk), Some(GENERATED), generated), @r#"
+	[build]
+	rustc-wrapper = "kache"
+
+	[profile.rust]
+	codegen-backend = "cranelift"
+
+	[target.x86_64-unknown-linux-gnu]
+	rustflags = "--cfg tokio_unstable"
+
+	[patch.crates-io]
+	a = { path = "../a" }
+	----- index -----
+	[build]
+	rustc-wrapper = "kache"
+
+	[profile.rust]
+	codegen-backend = "cranelift"
+
+	[target.x86_64-unknown-linux-gnu]
+	rustflags = "--cfg tokio_unstable"
+	"#);
+}

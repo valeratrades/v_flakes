@@ -15,7 +15,7 @@ flake.nix (entry point)
     │
     ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs; the skargo rev skills.yml runs)
     │
-    ├── tools/         (self-pinned binaries: qlty, cargo-machete, cargo-diet, cargo-sort-derives; depend on pins/)
+    ├── tools/         (self-pinned binaries: qlty, cargo-machete, cargo-diet, cargo-sort-derives, kache; depend on pins/)
     │
     ├── langs/         (per-language modules: rs py js tex typ lean go)
     │   └── <lang>/files/  (that language's config templates)
@@ -71,6 +71,8 @@ Rust toolchain configuration (config templates in `files/`):
 - Integrates cargo-deny for dependency auditing
 - Configures tracey for spec coverage
 - Sets up codestyle linting
+- Each checkout keeps its own `target/`; reuse across checkouts comes from kache, a content-addressed compiler cache (`rustc-wrapper`, plus its `cargo` shim on PATH, which seeds new targets). One `target/` shared between checkouts is unsound: cargo keys workspace crates by path relative to the workspace root and judges freshness by mtime, so main would run a worktree's code
+- Generated `rustflags` are one string, not an array: `.claude/worktrees/*` sit inside main's checkout, and cargo concatenates arrays from every `config.toml` up the tree, which would double each flag and hash worktree units apart from main's. Tables still merge, so main's local `[patch.*]` applies in its nested worktrees
 - `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
 
 ## langs/typ/

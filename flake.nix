@@ -122,6 +122,7 @@
           # binary the dev shells get, instead of a divergent upstream build.
           packages.cargo-sort-derives = (import ./langs/rs).sort_derives system;
           packages.cargo-machete = (import ./langs/rs).machete system;
+          packages.kache = (import ./langs/rs).kache system; # ~/nix installs this one, so the shared daemon and every client are the same kache
           packages.v_flakes = (let build_rust = (import ./langs/rs).build_nightly system; in pkgs.makeRustPlatform { cargo = build_rust; rustc = build_rust; }).buildRustPackage {
             inherit pname;
             version = (builtins.fromTOML (builtins.readFile ./cli/Cargo.toml)).package.version;

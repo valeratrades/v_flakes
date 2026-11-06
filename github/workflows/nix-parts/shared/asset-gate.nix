@@ -23,8 +23,8 @@ in
   name = "Asset gate";
   runs-on = "ubuntu-latest";
 } // (if preCi then { needs = "pre_ci"; } else { }) // {
-  # `command` is free to be a cargo invocation, and `.cargo/config.toml` points rustc-wrapper at an
-  # sccache the runner doesn't have. Only Errors/Warnings inherit the rust base env, so unset here.
+  # `command` is free to be a cargo invocation, and `.cargo/config.toml` points rustc-wrapper at a
+  # binary the runner doesn't have. Only Errors/Warnings inherit the rust base env, so unset here.
   env.RUSTC_WRAPPER = "";
   steps =
     [{

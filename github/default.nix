@@ -272,7 +272,7 @@ if nixpkgs != null && pkgs == null then {
     labelArgs = "--labels-json '" + escapeForBash (builtins.toJSON allLabels) + "'";
 
     # Use local cargo, falling back loudly to rustup's nightly if unavailable.
-    # Unset RUSTC_WRAPPER to bypass sccache (its temp dir may not survive backgrounding).
+    # Unset RUSTC_WRAPPER: the backgrounded run must not depend on the wrapper's daemon outliving the shell.
     # NB: `cargo --version` probe catches the case where a rustup shim exists on
     # PATH but dispatches to a broken toolchain (e.g. patchelf'd ELF interpreter
     # GC'd). That should be treated as "no working cargo", not silently retried.

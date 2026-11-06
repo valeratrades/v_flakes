@@ -7,4 +7,5 @@
   machete = import ../../tools/machete.nix;
   cpublish = import ./cpublish.nix;
   diet = import ../../tools/diet.nix;
+  kache = import ../../tools/kache.nix;
 }

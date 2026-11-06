@@ -70,6 +70,7 @@ on an older v_flakes refuses to start (a stale direnv env would otherwise roll t
 
 For local dev against the sibling checkout, add path ref overrides to the untracked `[patch.crates-io]` in `.cargo/config.toml`.
 Manifest names it by version always.
+Cargo merges config tables up the tree, so main's `[patch]` also applies in worktrees nested under `.claude/worktrees/`.
 
 ## Issues
 
