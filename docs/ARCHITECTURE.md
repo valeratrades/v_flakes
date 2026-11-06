@@ -107,6 +107,6 @@ Agents build in `.claude/worktrees/<name>/`. Each one would otherwise compile th
 README generation from `docs/.readme_assets/`:
 
 - Reads `description.md`, `usage.md`, etc.
-- Generates badges (msrv, crates.io, docs.rs, loc, ci)
+- Generates badges (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size). The gist-backed ones (loc, build_time, test_time, size) are shields.io endpoint files that CI jobs already running write as a by-product (`github/workflows/nix-parts/shared/gist-badges.nix`); none runs work of its own
 - Compiles typst (`.typ`) to markdown if present
 - Manages license file copying

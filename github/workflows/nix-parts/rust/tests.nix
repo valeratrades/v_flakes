@@ -1,4 +1,4 @@
-{ lastSupportedVersion ? null, skipPatterns ? [ ] }:
+{ lastSupportedVersion ? null, skipPatterns ? [ ], gistId }:
 let
   rustcVersions =
     if lastSupportedVersion == null then
@@ -62,10 +62,23 @@ in
     #{ run = "cargo check --locked"; }
     { run = "cargo update"; }
     # `--workspace`: a bare invocation covers only `default-members`
+    # timestamps go through `echo`, which install.nix leaves outside nix-shell
+    { run = "echo \"T0=$(date +%s)\" >> $GITHUB_ENV"; }
+    { run = "cargo test --workspace --no-run"; } # before `check`, so it times a build from scratch
+    { run = "echo \"T1=$(date +%s)\" >> $GITHUB_ENV"; }
     { run = "cargo check --workspace --all-targets"; }
+    { run = "echo \"T2=$(date +%s)\" >> $GITHUB_ENV"; }
     { run = "cargo test --workspace${skipArgs}"; }
+    { run = "echo \"T3=$(date +%s)\" >> $GITHUB_ENV"; }
     #TODO: figure this out
     #  if: matrix.os == 'ubuntu' && matrix.rust == 'nightly'
     #- run: cargo run -- expand --manifest-path tests/Cargo.toml > expand.rs && diff tests/lib.expand.rs expand.rs
-  ];
+  ] ++ import ../shared/gist-badges.nix {
+    inherit gistId;
+    condition = "github.ref_name == github.event.repository.default_branch && matrix.rust == 'nightly'";
+    badges = {
+      build = { label = "build"; message = "$(((T1-T0)/60))m $(((T1-T0)%60))s"; };
+      test = { label = "test"; message = "$(((T3-T2)/60))m $(((T3-T2)%60))s"; };
+    };
+  };
 }

@@ -26,6 +26,7 @@
   # the build only proceeds if the condition is true.
   # Example: "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\""
   gate ? null
+, gistId
 , # Legacy params (ignored, kept for backwards compat)
   installConfig ? { }
 , install ? { }
@@ -136,6 +137,13 @@ let
               tar -czvf "''$GITHUB_WORKSPACE/''${PNAME}-${target}.tar.gz" ''$PNAME
             '';
           }])
+          # one target is the size badge's: sizes of the others track it
+          ++ (if target == "x86_64-unknown-linux-gnu" then
+            import ../shared/gist-badges.nix
+              {
+                inherit gistId;
+                badges.size = { label = "size"; message = "$(LC_ALL=C numfmt --to=iec-i --suffix=B --format=%.1f $(stat -c %s target/${target}/release/$PNAME))"; };
+              } else [ ])
           ++ [
             # Resolve the semver tag to attach to.
             # If triggered by a tag push, use that tag.

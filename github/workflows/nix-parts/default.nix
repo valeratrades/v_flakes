@@ -196,7 +196,7 @@ if nixpkgs != null && pkgs == null then {
         # Build the arguments to pass to the imported file
         args =
           if jobName == "rust-tests"
-          then { lastSupportedVersion = lastSupportedVersion; } // jobArgs
+          then { inherit lastSupportedVersion gistId; } // jobArgs
           else if jobName == "loc-badge"
           then { inherit gistId; } // jobArgs
           # These install nix themselves rather than going through load_nix, so they
@@ -351,7 +351,7 @@ if nixpkgs != null && pkgs == null then {
       if releaseEnabled then
         let
           releaseArgs = builtins.removeAttrs release [ "enable" "cargoTomlPath" ];
-          spec = import files.rust-release releaseArgs;
+          spec = import files.rust-release (releaseArgs // { inherit gistId; });
         in
         builtins.mapAttrs
           (name: wf:
