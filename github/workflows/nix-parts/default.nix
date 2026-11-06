@@ -351,7 +351,7 @@ if nixpkgs != null && pkgs == null then {
       if releaseEnabled then
         let
           releaseArgs = builtins.removeAttrs release [ "enable" "cargoTomlPath" ];
-          spec = import files.rust-release (releaseArgs // { inherit gistId; });
+          spec = import files.rust-release (releaseArgs // { inherit gistId; sizeBadge = publishCachix == null; });
         in
         builtins.mapAttrs
           (name: wf:
@@ -396,7 +396,7 @@ if nixpkgs != null && pkgs == null then {
       if publishCachix != null then
         yaml
           (builtins.removeAttrs
-            (import files.cachix (if builtins.isString publishCachix then { name = publishCachix; } else publishCachix)) [ "standalone" ])
+            (import files.cachix ({ inherit gistId; } // (if builtins.isString publishCachix then { name = publishCachix; } else publishCachix))) [ "standalone" ])
       else null;
 
     # Sync fork workflow (rebase over upstream)

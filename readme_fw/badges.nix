@@ -19,7 +19,7 @@ let
 
     docs_rs = ''[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs&style=flat-square" height="20">](https://docs.rs/${pname})'';
 
-    # gist files written by CI: `loc` by loc-badge, `build`/`test` by rust-tests on the default branch, `size` by the x86_64-unknown-linux-gnu release
+    # gist files written by CI: `loc` by loc-badge, `build`/`test` by rust-tests on the default branch, `size` by cachix on x86_64-linux, else the x86_64-unknown-linux-gnu release
     loc = gistBadge "Lines Of Code" "loc";
     build_time = gistBadge "Build time" "build";
     test_time = gistBadge "Test time" "test";

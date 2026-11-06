@@ -7,7 +7,7 @@
 #
 # Distinct from `cache` (github/cache.nix), which only speeds up THIS repo's CI.
 # Requires the CACHIX_AUTH_TOKEN secret. Public cache ⇒ public repos only.
-{ name, systems ? [ "x86_64-linux" "aarch64-linux" ] }:
+{ name, systems ? [ "x86_64-linux" "aarch64-linux" ], gistId }:
 let
   runners = {
     x86_64-linux = "ubuntu-latest";
@@ -52,7 +52,11 @@ in
       }
       { run = "nix build -L '.#packages.\${{ matrix.system }}.default'"; }
       { run = "cachix push ${name} ./result"; } # the action's own push silently no-ops without a token, and `cached` must not move then
-    ];
+    ] ++ import ./gist-badges.nix {
+      inherit gistId;
+      condition = "matrix.system == 'x86_64-linux'";
+      badges.size = { label = "size"; message = "$(LC_ALL=C numfmt --to=iec-i --suffix=B --format=%.1f $(cat result/bin/* | wc -c))"; };
+    };
   };
   jobs.cached = {
     needs = "build";

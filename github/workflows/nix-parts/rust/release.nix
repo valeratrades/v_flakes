@@ -27,6 +27,7 @@
   # Example: "\"$(git show HEAD~1:Cargo.toml | grep '^version' | head -1)\" != \"$(grep '^version' Cargo.toml | head -1)\""
   gate ? null
 , gistId
+, sizeBadge # cachix measures it instead, when it runs: every push rather than every tag
 , # Legacy params (ignored, kept for backwards compat)
   installConfig ? { }
 , install ? { }
@@ -138,7 +139,7 @@ let
             '';
           }])
           # one target is the size badge's: sizes of the others track it
-          ++ (if target == "x86_64-unknown-linux-gnu" then
+          ++ (if sizeBadge && target == "x86_64-unknown-linux-gnu" then
             import ../shared/gist-badges.nix
               {
                 inherit gistId;

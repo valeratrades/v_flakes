@@ -118,7 +118,10 @@ let
   init_loc_gist = pkgs.writeShellScriptBin "init-loc-gist" ''
     exec ${initLocGistScript} --pname "${pname}" --gist-id "${gistId}" "$@"
   '';
-  badges_out = badgeModule.combineBadges badges;
+  # every rust repo's rust-tests writes them; placed before `ci`, which opens a new row
+  timingBadges = builtins.filter (b: !builtins.elem b badges) (pkgs.lib.optionals (builtins.pathExists (rootDir + "/Cargo.toml")) [ "build_time" "test_time" ]);
+  ciAt = pkgs.lib.lists.findFirstIndex (b: b == "ci") (builtins.length badges) badges;
+  badges_out = badgeModule.combineBadges (pkgs.lib.take ciAt badges ++ timingBadges ++ pkgs.lib.drop ciAt badges);
 
   # Helper function to process markdown sections with standardized handling
   #processSection =
