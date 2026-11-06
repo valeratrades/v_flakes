@@ -2,6 +2,9 @@
 # downstream flakes that take this repo as an input substitute the binary instead of
 # rebuilding it (the point of the whole exercise: weak machines — rpi, old laptops).
 #
+# Once every system built, `cached` is moved to the rev, so consumers on `?ref=cached` only
+# ever lock revs that substitute. Runs are serialized, so it never moves backwards.
+#
 # Distinct from `cache` (github/cache.nix), which only speeds up THIS repo's CI.
 # Requires the CACHIX_AUTH_TOKEN secret. Public cache ⇒ public repos only.
 { name, systems ? [ "x86_64-linux" "aarch64-linux" ] }:
@@ -19,6 +22,10 @@ in
   on = {
     push.branches = [ "main" ];
     workflow_dispatch = { };
+  };
+  concurrency = {
+    group = "cachix";
+    cancel-in-progress = false;
   };
   jobs.build = {
     name = "build \${{ matrix.system }}";
@@ -43,6 +50,15 @@ in
         };
       }
       { run = "nix build -L '.#packages.\${{ matrix.system }}.default'"; }
+    ];
+  };
+  jobs.cached = {
+    needs = "build";
+    runs-on = "ubuntu-latest";
+    permissions.contents = "write";
+    steps = [
+      { uses = "actions/checkout@v5"; }
+      { run = "git push --force origin HEAD:refs/heads/cached"; }
     ];
   };
 }
