@@ -78,7 +78,7 @@ The rs module sets kache as `rustc-wrapper` and puts its `cargo` shim on PATH, s
 
 - A repo's Rust package (`buildRustPackage` etc.) sets `RUSTC_WRAPPER = ""`: the sandbox has no kache.
 - `rs { kache = false; }` builds with no wrapper at all.
-- `target.*.rustflags` must never be an array in any cargo config above a repo, `~/.cargo/config.toml` included: cargo errors when it's a string in one file and an array in another.
+- Generated rustflags are strings under `target.'cfg(..)'` keys. No cargo config above a repo, `~/.cargo/config.toml` included, may set those keys or `build.rustflags` as an array: cargo errors when a key is a string in one file and an array in another.
 
 ## Issues
 
