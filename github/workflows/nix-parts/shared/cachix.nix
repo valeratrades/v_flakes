@@ -1,4 +1,4 @@
-# Publishes `packages.<system>.default` to a cachix cache on every push to main, so
+# Publishes `packages.<system>.default` to a cachix cache on every push to main (or `v*` tag, with `tags`), so
 # downstream flakes that take this repo as an input substitute the binary instead of
 # rebuilding it (the point of the whole exercise: weak machines — rpi, old laptops).
 #
@@ -7,7 +7,7 @@
 #
 # Distinct from `cache` (github/cache.nix), which only speeds up THIS repo's CI.
 # Requires the CACHIX_AUTH_TOKEN secret. Public cache ⇒ public repos only.
-{ name, systems ? [ "x86_64-linux" "aarch64-linux" ], gistId }:
+{ name, systems ? [ "x86_64-linux" "aarch64-linux" ], tags ? false, gistId }:
 let
   runners = {
     x86_64-linux = "ubuntu-latest";
@@ -20,7 +20,7 @@ in
 
   name = "cachix";
   on = {
-    push.branches = [ "main" ];
+    push = if tags then { tags = [ "v*" ]; } else { branches = [ "main" ]; };
     workflow_dispatch = { };
   };
   concurrency = {
