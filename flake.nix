@@ -103,7 +103,7 @@
           });
           combined = utils.combine {
             inherit rust;
-            # Its own repo is always written by itself; a stamp of its own `lastModified` would lag every commit.
+            # A `.v_flakes.lock` stamp of its own `lastModified` would lag every commit; the devShell checks HEAD instead.
             generator = null;
             modules = [
               rsModule
@@ -153,6 +153,12 @@
             inherit stdenv;
             packages = with pkgs; [ curl mold rust ] ++ preCommitCheck.enabledPackages ++ combined.enabledPackages;
             shellHook = ''
+              # A cached dev shell is an older self, and nix-direnv never sees langs/ change: refuse when HEAD is newer than this shell's source.
+              if [ "$(git log -1 --format=%ct)" -gt ${toString self.lastModified} ]; then
+                rm -f .direnv/flake-profile-*
+                printf '%s\n' "✘ v_flakes: this shell was built from a commit older than HEAD, and would write its older generated files." "  Dropped the cached dev shell; \`direnv reload\` builds the current one." >&2
+                exit 1
+              fi
               # Before combined: append-custom.rs only patches .git/hooks/pre-commit
               # if it already exists, and this is what writes it.
               ${preCommitCheck.shellHook}
