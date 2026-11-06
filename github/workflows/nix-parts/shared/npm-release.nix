@@ -1,5 +1,5 @@
-# Publishes one package through npm trusted publishing (OIDC): no token, no 2FA. npm accepts it
-# only from the workflow file its trusted-publisher entry names (`release-npm.yml`, this repo).
+# Publishes one package through npm trusted publishing (OIDC), else the `NPM_TOKEN` secret. OIDC is
+# accepted only from the workflow file a package's trusted-publisher entry names (`release-npm.yml`, this repo).
 # Fired by a `@<scope>/<pkg>-v<version>` tag; publishes `<packagesDir>/<pkg>`.
 { scope, packagesDir }:
 {
@@ -65,7 +65,11 @@
       {
         name = "Publish";
         working-directory = "\${{ steps.tag.outputs.dir }}";
-        env.VERSION = "\${{ steps.tag.outputs.version }}";
+        env = {
+          VERSION = "\${{ steps.tag.outputs.version }}";
+          # used only when OIDC is refused: an org-level `NPM_TOKEN` publishes packages not yet linked to this repo
+          NODE_AUTH_TOKEN = "\${{ secrets.NPM_TOKEN }}";
+        };
         run = ''
           test "$(node -p 'require("./package.json").version')" = "$VERSION"
           npm ci
