@@ -36,6 +36,7 @@ jobs:
         with:
           name: modified-cargo-files
       - run: cargo update
+      - uses: Swatinem/rust-cache@v2
       - run: echo "T0=$(date +%s)" >> $GITHUB_ENV
       - run: cargo test --workspace --no-run
       - run: echo "T1=$(date +%s)" >> $GITHUB_ENV

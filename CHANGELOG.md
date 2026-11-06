@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `kache` (`tools/kache.nix`, so every `rs` devShell and `packages.kache`) is upstream's release binary instead of a source build. The source build ran kache's ~2000-test suite on every store miss: ~38 min of each CI job that enters a devShell, and again locally on every pin bump. Same version (2.0.0), same `bin/` + `shims/` layout.
+
+- `github` rust jobs: `Swatinem/rust-cache` in tests, clippy, doc and miri. The tests job's `build` badge now times the workspace build over cached dependencies, not a build from scratch.
+
 - `readme_fw`: `contributing` (URL, or a path inside `rootDir`) links the contribution process in the footer, next to best practices. Defaults to <https://github.com/EV-Main/.github/blob/main/code/conventions/git>.
 
 - `rs` `cpublish` applies `cargo diet -r` itself and commits `Cargo.toml` (`chore: cargo diet`) when the include changed, instead of refusing. It shows the manifest diff and asks before committing; `-y` / `--yes` accepts, and a refusal restores `Cargo.toml` and exits. The old gate read diet's text diff, so diet's one-line `include` against the pre-commit `cargo sort`'s multi-line one blocked every release even after `cargo diet -r` was run and committed. The comparison is now made after `cargo sort --grouped`. A `Cargo.toml` with uncommitted changes stops it.

@@ -29,6 +29,7 @@ in
     }
     { uses = "dtolnay/install@cargo-docs-rs"; }
     { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # local-dev flags (mold linker, `-Z threads`) the runner doesn't have
+    { uses = "Swatinem/rust-cache@v2"; }
     { run = cargoDocsCmd; }
   ];
 }

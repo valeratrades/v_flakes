@@ -12,6 +12,7 @@
       uses = "actions/download-artifact@v7";
       "with".name = "modified-cargo-files";
     }
+    { uses = "Swatinem/rust-cache@v2"; }
     { run = "cargo miri setup"; }
     {
       run = "cargo miri test --lib --bins"; # normally, `--lib` and `--bins` is exactly what's needed in 99% os cases. If ever run into needing different ones, - add optional flag setting with these as default

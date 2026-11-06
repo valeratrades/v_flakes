@@ -61,10 +61,11 @@ in
     # not sure why dtolnay has this
     #{ run = "cargo check --locked"; }
     { run = "cargo update"; }
+    { uses = "Swatinem/rust-cache@v2"; } # after `cargo update`: the key hashes Cargo.lock
     # `--workspace`: a bare invocation covers only `default-members`
     # timestamps go through `echo`, which install.nix leaves outside nix-shell
     { run = "echo \"T0=$(date +%s)\" >> $GITHUB_ENV"; }
-    { run = "cargo test --workspace --no-run"; } # before `check`, so it times a build from scratch
+    { run = "cargo test --workspace --no-run"; } # before `check`, so it times the workspace build over cached deps
     { run = "echo \"T1=$(date +%s)\" >> $GITHUB_ENV"; }
     { run = "cargo check --workspace --all-targets"; }
     { run = "echo \"T2=$(date +%s)\" >> $GITHUB_ENV"; }
