@@ -47,9 +47,11 @@ in
         "with" = {
           inherit name;
           authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
+          skipPush = true;
         };
       }
       { run = "nix build -L '.#packages.\${{ matrix.system }}.default'"; }
+      { run = "cachix push ${name} ./result"; } # the action's own push silently no-ops without a token, and `cached` must not move then
     ];
   };
   jobs.cached = {
