@@ -71,9 +71,31 @@ Rust toolchain configuration (config templates in `files/`):
 - Integrates cargo-deny for dependency auditing
 - Configures tracey for spec coverage
 - Sets up codestyle linting
-- Each checkout keeps its own `target/`; reuse across checkouts comes from kache, a content-addressed compiler cache (`rustc-wrapper`, plus its `cargo` shim on PATH, which seeds new targets). One `target/` shared between checkouts is unsound: cargo keys workspace crates by path relative to the workspace root and judges freshness by mtime, so main would run a worktree's code
-- Generated `rustflags` are one string, not an array: `.claude/worktrees/*` sit inside main's checkout, and cargo concatenates arrays from every `config.toml` up the tree, which would double each flag and hash worktree units apart from main's. Tables still merge, so main's local `[patch.*]` applies in its nested worktrees
 - `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
+
+### Compile reuse across checkouts
+
+Agents build in `.claude/worktrees/<name>/`. Each one would otherwise compile the whole dependency graph from scratch.
+
+```
+ main/                                 main/.claude/worktrees/x/
+ ├ .cargo/config.toml  ◄── cargo reads both ──┤ .cargo/config.toml
+ ├ target/  (own)                             ├ target/  (own)
+ └───────────────┬────────────────────────────┴───────┘
+                 ▼
+   kache: content-addressed store + daemon, ~/.cache/kache
+```
+
+- One `target/` per checkout, plus kache (`tools/kache.nix`, self-pinned; ~/nix installs the same build as the global wrapper). It's set as `rustc-wrapper`. Its `cargo` shim goes on PATH in front of the toolchain: the shim seeds a new `target/` from the store and leases it against cleanup. kache's `cc`/`gcc` shims stay off PATH, since they would sit in front of nix's cc-wrapper; build-script runs, where `cc` work happens, are cached anyway
+- Rejected, all tested:
+  - A shared `target`/`build-dir`. Cargo keys workspace crates by path relative to the workspace root, so `main/lib` and `wt/lib` share a slot, and freshness is mtime: main ran the worktree's code. `-Zchecksum-freshness` fixes `.rs` sources but not build-script output, so binaries embedded the other checkout's git hash (every generated `build.rs` reads git state). `-Zfine-grain-locking` deadlocks here (cargo#17508)
+  - sccache: it doesn't cache proc-macros, build-script runs or incremental crates, and it keys on absolute paths. That gave about 5% hits
+- Generated `rustflags` are one space-joined string, never an array. A nested worktree's cargo loads main's `config.toml` too, and arrays concatenate across files: every flag twice, worktree units hashed apart from main's, 0 hits. A string comes from the closest file only. The generator asserts that no flag contains whitespace, because cargo splits the string on it
+  - Cargo errors on every invocation when a key is a string in one config file and an array in another. This includes the shellHook's own `cargo -Zscript`, so shell entry breaks. So no config up the tree, `~/.cargo/config.toml` included, may set `target.*.rustflags` or `build.rustflags` as an array
+  - Tables still merge, so main's local `[patch.*]` applies in its nested worktrees
+- `kache = false` writes `rustc-wrapper = ""`. That turns off a global wrapper too
+- Nix sandbox builds have no kache: a consumer's package sets `RUSTC_WRAPPER = ""`, which overrides the config
+- Misses: `kache stats --last-build`; `kache config set cache.explain_miss true` then `kache explain <crate>`; or diff the `KACHE_LOG=trace` `[key:<crate>]` lines of two checkouts
 
 ## langs/typ/
 

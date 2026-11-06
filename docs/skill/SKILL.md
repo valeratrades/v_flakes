@@ -72,6 +72,14 @@ For local dev against the sibling checkout, add path ref overrides to the untrac
 Manifest names it by version always.
 Cargo merges config tables up the tree, so main's `[patch]` also applies in worktrees nested under `.claude/worktrees/`.
 
+## Build cache (kache)
+
+The rs module sets kache as `rustc-wrapper` and puts its `cargo` shim on PATH, so a new worktree reuses main's compiled deps. Design: `docs/ARCHITECTURE.md`, "Compile reuse across checkouts".
+
+- A repo's Rust package (`buildRustPackage` etc.) sets `RUSTC_WRAPPER = ""`: the sandbox has no kache.
+- `rs { kache = false; }` builds with no wrapper at all.
+- `target.*.rustflags` must never be an array in any cargo config above a repo, `~/.cargo/config.toml` included: cargo errors when it's a string in one file and an array in another.
+
 ## Issues
 
 Labels are `github/labels.nix`, synced to every consumer; `github/git-ops.rs` lints open issues on commit.
