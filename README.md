@@ -28,7 +28,7 @@ File templates: rustfmt.toml, cargo config, deny.toml, treefmt, gitignore, envrc
 ### readme-fw
 README generation framework from `docs/.readme_assets/` directory.
 - Supports `.md` and `.typ` sources
-- Badge generation (msrv, crates.io, docs.rs, loc, ci)
+- Badge generation (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size)
 - License file management
 <!-- markdownlint-disable -->
 <details>
