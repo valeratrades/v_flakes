@@ -66,12 +66,10 @@ if nixpkgs != null && pkgs == null then {
 
     Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, py-tests, js-tests, tokei, loc-badge, code-duplication, asset-gate, flake-app
 
-    `asset-gate` and `flake-app` take args and so are passed as attrsets:
+    `asset-gate`, `flake-app` and `js-tests` take args and so are passed as attrsets:
       jobsOther = [ { name = "asset-gate"; args = { asset = "docs/x.svg"; command = "nix run .#film"; everySeconds = 86400; }; } ];
       jobsErrors = [ { name = "flake-app"; args.app = "visual"; } ];
-
-    `js-tests` runs `npm test` in every `<packagesDir>/*` package with a `test` script, building its
-    `file:` dependencies first. `packagesDir` comes from `npmRelease`, else pass `args.packagesDir`.
+      jobsErrors = [ { name = "js-tests"; args.packagesDir = "ts"; } ];  # `npm test` in every `ts/*` package with a `test` script, its `file:` deps built first
 
     Standalone workflows:
     - release = { }  # enabled by presence, disabled with `enable = false`
@@ -213,8 +211,6 @@ if nixpkgs != null && pkgs == null then {
           then { inherit cache; preCi = rustRepo; } // jobArgs
           else if jobName == "flake-app"
           then { inherit cache; } // jobArgs
-          else if jobName == "js-tests" && npmRelease != null
-          then { inherit (npmRelease) packagesDir; } // jobArgs
           else jobArgs;
 
         # Import the file
