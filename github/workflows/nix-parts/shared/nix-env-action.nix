@@ -3,17 +3,26 @@
 #   - uses: actions/checkout@v5
 #   - uses: ./.github/actions/nix-env
 #     with: { rust-cache: <shared-key> }  # optional
-#     with: { cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }} }  # required with `cache.cachix`
+#     with: { cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }} }  # optional, `cache.cachix` only: push to the cache
 { cache ? { } }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
+  lean = import ../../../cache.nix { };
   bash = step: if step ? run then { shell = "bash"; } // step else step; # composite `run` steps require it
-  onRustCache = step: step // { "if" = "inputs.rust-cache != ''"; };
-  # a composite action has no `secrets` context, so the caller hands the token in
-  tokenFromInput = step:
-    if step ? uses && builtins.match "cachix/cachix-action@.*" step.uses != null
-    then step // { "with" = step."with" // { authToken = "\${{ inputs.cachix-auth-token }}"; }; }
-    else step;
+  onlyIf = cond: step: step // { "if" = if step ? "if" then "${cond} && (${step."if"})" else cond; };
+  onRustCache = onlyIf "inputs.rust-cache != ''";
+
+  # A composite action has no `secrets` context, so pushing takes the token as an input. Without it, cachix
+  # only substitutes, and what the job builds goes to the lean cache: two post-build-hooks can't coexist.
+  pushing = "inputs.cachix-auth-token != ''";
+  pulling = "inputs.cachix-auth-token == ''";
+  cacheSteps =
+    if cache ? cachix then
+      map (onlyIf pulling) (lean.setupSteps ++ [ lean.installStep ])
+      ++ [ (onlyIf pushing nixCi.installStep) ]
+      ++ map (step: step // { "with" = step."with" // { authToken = "\${{ inputs.cachix-auth-token }}"; }; }) nixCi.cacheSteps
+      ++ map (onlyIf pulling) lean.cacheSteps
+    else nixCi.setupSteps ++ [ nixCi.installStep ] ++ nixCi.cacheSteps;
 in
 {
   name = "nix-env";
@@ -26,13 +35,14 @@ in
     };
   } // (if cache ? cachix then {
     cachix-auth-token = {
-      description = "Cachix auth token, for pushing to the cache";
-      required = true;
+      description = "Cachix auth token: the job pushes what it builds to the cache. Empty pulls only";
+      required = false;
+      default = "";
     };
   } else { });
   runs = {
     using = "composite";
-    steps = map bash (nixCi.setupSteps ++ [ nixCi.installStep ] ++ map tokenFromInput nixCi.cacheSteps ++ map onRustCache [
+    steps = map bash (cacheSteps ++ map onRustCache [
       {
         name = "Toolchain on PATH"; # rust-cache keys on the rustc it finds, else the runner's rustup one
         run = "nix develop --command bash -c 'dirname \"$(command -v rustc)\" >> \"$GITHUB_PATH\"'"; # inside: the shellHook may print to stdout

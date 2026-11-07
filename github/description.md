@@ -137,7 +137,7 @@ steps:
   - uses: ./.github/actions/nix-env
     with:
       rust-cache: uikit  # optional: Swatinem/rust-cache under this shared-key, keyed on the dev shell's rustc, with RUSTC_WRAPPER unset
-      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}  # required with `cache.cachix`: a composite action can't read `secrets`
+      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}  # optional, `cache.cachix` only: push what the job builds. Without it, pull only and keep builds in the lean cache
   - run: nix develop --command cargo test
 ```
 
