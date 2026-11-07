@@ -72,6 +72,9 @@ For local dev against the sibling checkout, add path ref overrides to the untrac
 Manifest names it by version always.
 Cargo merges config tables up the tree, so main's `[patch]` also applies in worktrees nested under `.claude/worktrees/`.
 
+JS: the package's directory goes in the gitignored `_.js-local.json` beside `package.json` (`{"@evinvest/uikit": "/home/v/s/ev/web_std/ts/uikit"}`); `js-local` (in the `js` module's shell, or `v_flakes.js-local { inherit pkgs; }`) copies its `package.json` and built `files` over the installed copy. Copied, not linked: a link resolves `react` from the checkout, a second React.
+`package.json` runs it after every install: `"postinstall": "[ -z \"$IN_NIX_SHELL\" ] || js-local"` (a Nix build has neither the map nor the command). After rebuilding the dep, run `js-local` again. A worktree needs its own copy of the map.
+
 ## Build cache (kache)
 
 The rs module sets kache as `rustc-wrapper` and puts its `cargo` shim on PATH, so a new worktree reuses main's compiled deps. Design: `docs/ARCHITECTURE.md`, "Compile reuse across checkouts".

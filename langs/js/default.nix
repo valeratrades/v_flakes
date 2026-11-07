@@ -36,7 +36,7 @@ if pkgs == null then {
     # so `github` (which reads `js.preCommit.visual`) gets a clear error rather
     # than a silent `null` when a field was omitted.
     preCommit = preCommit';
-    enabledPackages = [ nodejs pkgs.corepack ];
+    enabledPackages = [ nodejs pkgs.corepack (import ./local.nix { inherit pkgs; }) ];
 
     shellHook = utils.mkShellHook ''
       # Provision the pnpm version pinned by each subproject's `packageManager`

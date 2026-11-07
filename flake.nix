@@ -139,7 +139,7 @@
             about = ''
               ${pname} — shared Nix parts. Consumers pin one input:
                 inputs.v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
-              Parts (v_flakes.<attr>):  files github rs py tex typ js readme-fw utils qlty container lean
+              Parts (v_flakes.<attr>):  files github rs py tex typ js js-local readme-fw utils qlty container lean
               Re-exported inputs:       nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
                                         flake-parts process-compose-flake devenv lean4-nix
               v_flakes org sync <ORG>   converge org custom property definitions (cli/org_properties.json)
@@ -265,6 +265,7 @@
       tex = import ./langs/tex;
       typ = import ./langs/typ;
       js = import ./langs/js;
+      js-local = import ./langs/js/local.nix;
       readme-fw = import ./readme_fw;
       inherit utils;
       qlty = import ./tools/qlty.nix;

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`js-local`** (`v_flakes.js-local { inherit pkgs; }`, and in the `js` module's shell): copies each package the gitignored `_.js-local.json` maps to a local checkout over its installed copy, `package.json` and built `files`. The JS counterpart of a path `[patch]`; wired as a guarded `postinstall`. See the skill's "Developing against another repo we own".
+
 - **`rs` shellHook exports `DYLD_FALLBACK_LIBRARY_PATH=<toolchain>/lib` on macOS**, so rust-lld and proc-macro linking find `libLLVM.dylib`. A fallback (not `DYLD_LIBRARY_PATH`) leaves Nix's clang untouched. Consumers can drop their own copy.
 
 - **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset. With `cache.cachix` it pulls only, keeping what the job builds in the lean cache; `cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}` makes it push instead (a composite action has no `secrets` context).
