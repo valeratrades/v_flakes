@@ -5,8 +5,8 @@
     blue_oak = { name = "Blue Oak 1.0.0"; path = ./licenses/blue_oak.md; };
     agpl = { name = "AGPL-3.0"; path = ./licenses/agpl.txt; };
     mit = { name = "MIT"; path = ./licenses/mit.txt; };
-    fsl_mit = { licensor }:
-      assert builtins.isString licensor && licensor != "" || throw "fsl_mit: licensor must be a non-empty string";
+    fsl = { licensor }:
+      assert builtins.isString licensor && licensor != "" || throw "fsl: licensor must be a non-empty string";
       { name = "FSL-1.1-MIT"; path = builtins.toFile "LICENSE" (builtins.replaceStrings [ "\${licensor name}" ] [ licensor ] (builtins.readFile ./licenses/fsl_mit.md)); };
     gl = { name = "GLWTS"; path = ./licenses/glwts.txt; };
   };
