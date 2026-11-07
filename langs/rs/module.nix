@@ -297,7 +297,10 @@ if nixpkgs != null && pkgs == null then {
       # rustup shim in ~/.cargo/bin. Also critical for trybuild tests which
       # spawn cargo subprocesses.
       export PATH="${rust}/bin:$PATH"
-      [ -d ./.cargo ] || mkdir -p ./.cargo
+      ${if pkgs.stdenv.hostPlatform.isDarwin then ''
+      # rust-lld and proc-macro linking look for libLLVM.dylib in bin/../lib; a fallback var leaves Nix's clang alone
+      export DYLD_FALLBACK_LIBRARY_PATH="${rust}/lib''${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
+      '' else ""}[ -d ./.cargo ] || mkdir -p ./.cargo
       _vf_cp ${rustfmtFile} ./rustfmt.toml
       ${cargoConfigHook}
       _vf_cp ${clippyFile} ./.cargo/clippy.toml

@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset. With `cache.cachix`, the caller passes `cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}`: a composite action has no `secrets` context.
+- **`rs` shellHook exports `DYLD_FALLBACK_LIBRARY_PATH=<toolchain>/lib` on macOS**, so rust-lld and proc-macro linking find `libLLVM.dylib`. A fallback (not `DYLD_LIBRARY_PATH`) leaves Nix's clang untouched. Consumers can drop their own copy.
+
+- **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset. With `cache.cachix` it pulls only, keeping what the job builds in the lean cache; `cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}` makes it push instead (a composite action has no `secrets` context).
 
 - **`github { visualBaselines = { dir; render; gate ? null; paths ? null; rustCache ? null; }; }`** writes `visual-baselines.yml`: renders the baselines under `dir` on PRs, uploads them as `visual-snapshots`, and fails when `gate` does (or, with no `gate`, when the render changed anything under `dir`). Contract in `github/description.md`.
 
