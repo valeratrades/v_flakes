@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `files.licenses.mit`: MIT, holder line `Copyright (c) the contributors` (license files are copied verbatim, no per-repo templating).
+
 - `kache` (`tools/kache.nix`, so every `rs` devShell and `packages.kache`) is upstream's release binary instead of a source build. The source build ran kache's ~2000-test suite on every store miss: ~38 min of each CI job that enters a devShell, and again locally on every pin bump. Same version (2.0.0), same `bin/` + `shims/` layout.
 
 - `github` rust jobs: `Swatinem/rust-cache` in tests, clippy, doc and miri. The tests job's `build` badge now times the workspace build over cached dependencies, not a build from scratch.

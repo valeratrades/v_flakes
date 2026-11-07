@@ -4,6 +4,7 @@
   licenses = {
     blue_oak = { name = "Blue Oak 1.0.0"; path = ./licenses/blue_oak.md; };
     agpl = { name = "AGPL-3.0"; path = ./licenses/agpl.txt; };
+    mit = { name = "MIT"; path = ./licenses/mit.txt; };
     gl = { name = "GLWTS"; path = ./licenses/glwts.txt; };
   };
   preCommit = import ../git/hooks.nix;
