@@ -405,21 +405,16 @@ ${content}
 
   contributingHref = if builtins.isPath contributing then "./" + pkgs.lib.removePrefix "${rootStr}/" (toString contributing) else contributing;
 
-  styleLink = "<sup><a href=\"https://github.com/EV-Main/.github/blob/main/code/STYLE.md\">style</a></sup>";
-  archAndStyle =
-    if architectureExists then
-      "- <sup><a href=\"./docs/ARCHITECTURE.md\">architecture</a></sup>\n  - ${styleLink}"
-    else
-      "- ${styleLink}";
+  architectureItem = if architectureExists then "- <sup><a href=\"./docs/ARCHITECTURE.md\">architecture</a></sup>\n" else "";
 
   dev_links_out = ''
 
     <br>
 
     <sup>Links for devs:</sup>
-    ${archAndStyle}
+    ${architectureItem}- <sup><a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a></sup>
     - <sup><a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a></sup>
-      - <sup><a href="${contributingHref}">contributing</a></sup>
+    - <sup><a href="${contributingHref}">contributing</a></sup>
   '';
 
   other_out = processSection {

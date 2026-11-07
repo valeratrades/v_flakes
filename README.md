@@ -103,9 +103,9 @@ Version checks run on shell entry in this repo to detect when updates are needed
 
 <sup>Links for devs:</sup>
 - <sup><a href="./docs/ARCHITECTURE.md">architecture</a></sup>
-  - <sup><a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a></sup>
+- <sup><a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a></sup>
 - <sup><a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a></sup>
-  - <sup><a href="https://github.com/EV-Main/.github/blob/main/code/conventions/git">contributing</a></sup>
+- <sup><a href="https://github.com/EV-Main/.github/blob/main/code/conventions/git">contributing</a></sup>
 
 #### License
 
