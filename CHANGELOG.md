@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `files.licenses.fsl_mit { licensor = "..."; }`: FSL-1.1-MIT (no competing use; each version turns MIT 2 years after release). The notice is `Copyright <licensor>`, without the year.
+
 - `files.licenses.mit`: MIT, holder line `Copyright (c) the contributors` (license files are copied verbatim, no per-repo templating).
 
 - `kache` (`tools/kache.nix`, so every `rs` devShell and `packages.kache`) is upstream's release binary instead of a source build. The source build ran kache's ~2000-test suite on every store miss: ~38 min of each CI job that enters a devShell, and again locally on every pin bump. Same version (2.0.0), same `bin/` + `shims/` layout.
