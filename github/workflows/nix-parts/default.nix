@@ -11,6 +11,10 @@ args@{ pkgs ? null
 , containerRelease ? null
 , # { scope; packagesDir; }: npm trusted publishing of `@<scope>/<pkg>-v<version>` tags. See shared/npm-release.nix.
   npmRelease ? null
+, # { dir; render; gate ? null; paths ? null; rustCache ? null; }: visual-baselines.yml. See shared/visual-baselines.nix.
+  visualBaselines ? null
+, # checkout fetches LFS objects
+  lfs ? false
 , gitlabSync ? null
 , # { skargo; }: skills.yml, `skargo check` / `publish` of a skills repo. See shared/skills.nix.
   skills ? null
@@ -80,6 +84,9 @@ if nixpkgs != null && pkgs == null then {
         release-npm.yml: a pushed `@evinvest/<pkg>-v<version>` tag publishes `ts/<pkg>` through npm
         trusted publishing (OIDC), building its `file:` dependencies first. Each package's trusted
         publisher on npmjs.com must name this repo and `release-npm.yml`: the shell's `npm-trust` sets that up.
+    - visualBaselines = { dir = "tests/__screenshots__"; render = "accept-test"; gate = "test"; paths = [ "frontend/**" ]; }
+        visual-baselines.yml: renders every baseline under `dir` on ubuntu-latest, uploads them as the
+        `visual-snapshots` artifact and fails when they differ from the committed ones. Contract in github/description.md.
     - skills = { skargo = "github:EV-Main/skills/<rev>"; }
         skills.yml: `skargo check` on PRs, `skargo publish` (tags `<name>--v<version>`) on main, and
         `claude plugin validate --strict` when the repo has a marketplace.
@@ -131,19 +138,23 @@ if nixpkgs != null && pkgs == null then {
 
     # every bash `run` must parse, so a broken one fails shell entry instead of CI.
     # Not `pkgs.formats.yaml`: its remarshal folded a long `run` right after a `\\`, which reads back with a space in it.
+    # A `"#"` key becomes the file's leading comment.
     yaml = value:
-      let json = pkgs.writeText "workflow.json" (builtins.toJSON value);
-      in pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ pkgs.yq-go pkgs.bash ]; } ''
+      let
+        json = pkgs.writeText "workflow.json" (builtins.toJSON (builtins.removeAttrs value [ "#" ]));
+        header = pkgs.lib.optionalString (value ? "#") (pkgs.lib.concatMapStrings (l: if l == "" then "#\n" else "# ${l}\n") (pkgs.lib.splitString "\n" (pkgs.lib.removeSuffix "\n" value."#")));
+      in
+      pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ pkgs.yq-go pkgs.bash ]; } ''
         generated=workflow.yml
         yq -p json -o yaml '(.. style="") | (.. | select(tag == "!!str" and test("\t"))) style="double"' ${json} > $generated # yq writes a tab into a block scalar, which no parser reads
         [ "$(yq -p json -o json -I0 'sort_keys(..)' ${json})" = "$(yq -o json -I0 'sort_keys(..)' $generated)" ] \
           || { echo "v_flakes: a generated workflow doesn't read back as what it was generated from" >&2; exit 1; }
-        yq -o json '[.jobs[].steps[]? | select(.run != null and (.shell == null or .shell == "bash")) | .run]' $generated > runs.json
+        yq -o json '[(.jobs[].steps[]?, .runs.steps[]?) | select(.run != null and (.shell == null or .shell == "bash")) | .run]' $generated > runs.json
         for i in $(seq 0 $(($(yq -p json 'length' runs.json) - 1))); do
           yq -p json -r ".[$i]" runs.json > run.sh
           bash -n run.sh || { echo "v_flakes: a generated workflow's \`run\` doesn't parse:"; cat run.sh; exit 1; } >&2
         done
-        cp $generated $out
+        { printf '%s' ${pkgs.lib.escapeShellArg header}; cat $generated; } > $out
       '';
 
     # The jobs that `rm` `.cargo/config.toml`; the rest read the cfg from it.
@@ -388,6 +399,17 @@ if nixpkgs != null && pkgs == null then {
         yaml (builtins.removeAttrs (import ./shared/npm-release.nix { inherit (npmRelease) scope packagesDir; }) [ "standalone" ])
       else null;
 
+    visualBaselinesWorkflow =
+      if visualBaselines != null then
+        assert (
+          let unknown = builtins.removeAttrs visualBaselines [ "dir" "render" "gate" "paths" "rustCache" ]; in
+          unknown == { } || throw "v_flakes visualBaselines: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
+        );
+        yaml (builtins.removeAttrs (import ./shared/visual-baselines.nix (visualBaselines // { inherit lfs; })) [ "standalone" ])
+      else null;
+
+    nixEnvAction = yaml (import ./shared/nix-env-action.nix { inherit cache; });
+
     skillsWorkflow =
       if skills != null then
         assert (
@@ -554,6 +576,11 @@ if nixpkgs != null && pkgs == null then {
         _vf_cp ${npmReleaseWorkflow} ./.github/workflows/release-npm.yml
       '' else "";
 
+    visualBaselinesHook =
+      if visualBaselinesWorkflow != null then ''
+        _vf_cp ${visualBaselinesWorkflow} ./.github/workflows/visual-baselines.yml
+      '' else "";
+
     skillsHook =
       if skillsWorkflow != null then ''
         _vf_cp ${skillsWorkflow} ./.github/workflows/skills.yml
@@ -590,7 +617,7 @@ if nixpkgs != null && pkgs == null then {
       '';
   in
   workflows // {
-    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
+    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow visualBaselinesWorkflow nixEnvAction skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
@@ -600,6 +627,7 @@ if nixpkgs != null && pkgs == null then {
       ${releaseStaleWarningHook}
       ${containerReleaseHook}
       ${npmReleaseHook}
+      ${visualBaselinesHook}
       ${skillsHook}
       ${syncForkHook}
       ${gitlabSyncHook}

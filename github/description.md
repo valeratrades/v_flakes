@@ -85,6 +85,17 @@ github = v-utils.github {
   skills = { };
   skills = { skargo = "."; };  # the skills repo itself checks with its own skargo
 
+  # visual-baselines.yml: on PRs touching `paths` (every PR when null), render the baselines under `dir`
+  # on ubuntu-latest, upload them as the `visual-snapshots` artifact, and fail when they're stale.
+  visualBaselines = {
+    dir = "frontend/tests/__screenshots__";
+    render = "accept-test";  # flake app: writes the current render of every baseline into `dir`
+    gate = "test";           # optional flake app: exits non-zero when the render differs from the committed baselines, by the repo's comparator.
+                             #   null (default): byte-exact, the job fails when `render` changed anything under `dir`
+    paths = [ "frontend/**" "flake.nix" "flake.lock" ];  # optional
+    rustCache = "uikit";     # optional rust-cache shared-key
+  };
+
   # Publish packages.default to a cachix cache on every push to main, so downstream
   # flakes substitute instead of rebuilding. Requires CACHIX_AUTH_TOKEN; public repos only.
   publishCachix = "valeratrades";
@@ -101,6 +112,7 @@ devShells.default = pkgs.mkShell {
 
 The shellHook will:
 - Copy workflow files to .github/workflows/
+- Write `.github/actions/nix-env/action.yml`: the generated workflows' Nix install and `cache`, for hand-written workflows to take in one step
 - Set up git hooks (pre-commit with treefmt integration)
 - Copy gitignore based on specified langs
 - Copy gitattributes when `lfs` is set (true to track via LFS, false to explicitly opt out)
@@ -116,3 +128,23 @@ Label sync also runs todo-sync: every `<comment-leader>TODO<bangs>:` comment in 
 enabledPackages includes:
 - `git_ops` - GitHub operations (sync-github, etc.)
 - `code_duplication` - Run the same duplication detection used in CI locally (requires qlty)
+
+## Hand-written workflows
+
+```yaml
+steps:
+  - uses: actions/checkout@v5
+  - uses: ./.github/actions/nix-env
+    with: { rust-cache: uikit }  # optional: Swatinem/rust-cache under this shared-key, keyed on the dev shell's rustc, with RUSTC_WRAPPER unset
+  - run: nix develop --command cargo test
+```
+
+## visualBaselines
+
+`render` and `gate` run in the dev shell (`nix develop --command nix run .#<app>`), so they can use its toolchain and env without listing them in `runtimeInputs`.
+Refresh the committed baselines from a run's render:
+
+```sh
+rm -f <dir>/**/*.png
+gh run download <run-id> -n visual-snapshots -D <dir>
+```

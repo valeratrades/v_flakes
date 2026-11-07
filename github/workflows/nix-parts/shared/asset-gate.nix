@@ -17,7 +17,7 @@ let
   slug = builtins.replaceStrings [ "/" "." ] [ "-" "-" ] asset;
   stamp = ".asset-gate-stamp";
   key = "\${{ steps.bucket.outputs.key }}";
-  unlessFresh = step: if guarded then step // { "if" = "steps.guard.outputs.cache-hit != 'true'"; } else step;
+  unlessFresh = step: if guarded then step // { "if" = "steps.guard.outputs.cache-hit != 'true'" + (if step ? "if" then " && (${step."if"})" else ""); } else step;
 in
 {
   name = "Asset gate";
@@ -52,7 +52,7 @@ in
         };
       }
     ] else [ ])
-    ++ map unlessFresh (nixCi.setupSteps ++ [ nixCi.installStep nixCi.cacheStep ])
+    ++ map unlessFresh (nixCi.setupSteps ++ [ nixCi.installStep ] ++ nixCi.cacheSteps)
     ++ [
       (unlessFresh {
         name = "Regenerate ${asset} and compare";

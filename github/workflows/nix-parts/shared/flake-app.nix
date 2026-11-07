@@ -18,9 +18,9 @@ in
       uses = "actions/checkout@v5";
     }]
     ++ nixCi.setupSteps
+    ++ [ nixCi.installStep ]
+    ++ nixCi.cacheSteps
     ++ [
-      nixCi.installStep
-      nixCi.cacheStep
       {
         name = "Run ${app}";
         run = "nix run .#${app}";

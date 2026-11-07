@@ -158,7 +158,9 @@ in
       # expensive cold Rust/npm build store across releases — without it every tag
       # recompiles from scratch (~25min on the arm runner).
       nixCi.installStep
-      (if hasLean then nixCi.cacheRestoreStep else nixCi.cacheStep)
+    ]
+    ++ nixCi.cacheSteps
+    ++ [
       {
         name = "Log in to GHCR";
         # The lean `main` seed build just warms the cache.
@@ -211,9 +213,6 @@ in
           done
         '';
       }
-    ]
-    # Persist the lean cache to the default-branch scope — only fires on `main` (its own
-    # `if`); a no-op list entry on tag runs. Empty for non-lean modes.
-    ++ (if hasLean then [ nixCi.cacheSaveStep ] else [ ]);
+    ];
   };
 }

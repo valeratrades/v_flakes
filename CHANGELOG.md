@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset.
+
+- **`github { visualBaselines = { dir; render; gate ? null; paths ? null; rustCache ? null; }; }`** writes `visual-baselines.yml`: renders the baselines under `dir` on PRs, uploads them as `visual-snapshots`, and fails when `gate` does (or, with no `gate`, when the render changed anything under `dir`). Contract in `github/description.md`.
+
+- `cache.nix` lean mode saves on the default branch only; other refs restore its cache. The key is scoped to `hashFiles('flake.lock')`, so a lock bump starts a fresh cache instead of carrying every old toolchain. `cacheStep` / `cacheRestoreStep` / `cacheSaveStep` are one `cacheSteps` list.
+
 - `rs` lints: `[lints.clippy]` (or `[workspace.lints.clippy]`) gets `integer_division = "warn"` and `if_not_else = "warn"`. Unlike `rust`/`cargo`, the table stays the consumer's: a key it already sets, eg `if_not_else = "allow"`, is kept.
 
 - `files.licenses.fsl_mit { licensor = "..."; }`: FSL-1.1-MIT (no competing use; each version turns MIT 2 years after release). The notice is `Copyright <licensor>`, without the year.

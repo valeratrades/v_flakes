@@ -55,6 +55,7 @@ Templates for project files. Each submodule generates a derivation containing th
 GitHub-specific configuration:
 
 - `workflows/` - CI workflow generation (errors.yml, warnings.yml)
+- `cache.nix` - the only Nix install + binary-cache definition. Generated jobs inline it; hand-written workflows reach it through the generated `.github/actions/nix-env` composite action
 - `labels.nix` - GitHub label synchronization
 - `git-ops.rs` - Rust script for git operations; `sync-github` (detached on pre-commit) converges the GitHub repo's state, and records one-time setups (Discussions) in `.v_flakes.lock` next to the generator line
 

@@ -76,53 +76,45 @@ assert (modeCount <= 1) || throw
 
   setupSteps = if hasLean then [ leanSetupStep ] else [ ];
 
-  cacheStep =
-    if hasCachix then {
+  cacheSteps =
+    if hasCachix then [{
       name = "Setup Cachix";
       uses = "cachix/cachix-action@v17";
       "with" = {
         name = cache.cachix;
         authToken = "\${{ secrets.CACHIX_AUTH_TOKEN }}";
       };
-    } else if hasLean then {
-      name = "Lean nix cache (built-only paths)";
-      uses = "actions/cache@v5";
-      "with" = {
-        path = leanDir;
-        key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
-        restore-keys = "nix-lean-\${{ runner.os }}-";
-      };
-    } else {
+    }] else if hasLean then
+      let
+        # Keyed on the lock: a save restores, adds to and saves again, so without it a toolchain the lock dropped is carried forever.
+        prefix = "nix-lean-\${{ runner.os }}-\${{ hashFiles('flake.lock') }}-";
+        cacheWith = {
+          path = leanDir;
+          key = "${prefix}\${{ github.run_id }}";
+          restore-keys = prefix;
+        };
+      in
+      [
+        # GitHub scopes caches per ref and lets every ref read the default branch's: anywhere else, a save would only spend the 10 GB budget.
+        {
+          name = "Restore lean nix cache";
+          "if" = "github.ref_name != github.event.repository.default_branch";
+          uses = "actions/cache/restore@v5";
+          "with" = cacheWith;
+        }
+        {
+          name = "Lean nix cache (built-only paths)";
+          "if" = "github.ref_name == github.event.repository.default_branch"; # its post step saves
+          uses = "actions/cache@v5";
+          "with" = cacheWith;
+        }
+      ]
+    else [{
       name = "Setup Nix cache";
       uses = "nix-community/cache-nix-action@v7";
       "with" = {
         primary-key = "nix-\${{ runner.os }}-\${{ hashFiles('**/flake.lock') }}";
         restore-prefixes-first-match = "nix-\${{ runner.os }}-";
       };
-    };
-
-  # Split restore/save, for tag-triggered workflows: GitHub scopes caches per ref, so a
-  # tag run can't read another tag's cache — only its own ref or the default branch. So
-  # restore always (this picks up the default-branch cache), but save ONLY on `main`
-  # (a tag-scoped save is unshareable and would evict main's). null unless lean.
-  cacheRestoreStep =
-    if hasLean then {
-      name = "Restore lean nix cache";
-      uses = "actions/cache/restore@v5";
-      "with" = {
-        path = leanDir;
-        key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
-        restore-keys = "nix-lean-\${{ runner.os }}-";
-      };
-    } else null;
-  cacheSaveStep =
-    if hasLean then {
-      name = "Save lean nix cache";
-      "if" = "github.ref == 'refs/heads/main'";
-      uses = "actions/cache/save@v5";
-      "with" = {
-        path = leanDir;
-        key = "nix-lean-\${{ runner.os }}-\${{ github.run_id }}";
-      };
-    } else null;
+    }];
 }

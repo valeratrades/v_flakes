@@ -37,6 +37,8 @@ args@{ pkgs ? null
 , containerRelease ? null
 , # { scope; packagesDir; }: release-npm.yml, npm trusted publishing on `@<scope>/<pkg>-v*` tags
   npmRelease ? null
+, # { dir; render; gate ? null; paths ? null; rustCache ? null; }: visual-baselines.yml, contract in description.md
+  visualBaselines ? null
 , # { skargo ? <pins/skargo.nix rev>; }: skills.yml, `skargo check` / `publish` of a repo shipping agent skills
   skills ? null
 , gitlabSync ? null
@@ -53,7 +55,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -241,7 +243,8 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
     } // (if enable then {
-      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease gitlabSync cargoRoot webUnstable;
+      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease visualBaselines gitlabSync cargoRoot webUnstable;
+      lfs = lfs == true;
       skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
@@ -350,6 +353,8 @@ if nixpkgs != null && pkgs == null then {
       ${workflows.shellHook.__vFlakesHook}
       ${if enable then ''
       ${preCommitInstallHook}
+      mkdir -p ./.github/actions/nix-env
+      _vf_cp ${workflows.nixEnvAction} ./.github/actions/nix-env/action.yml
       _vf_cp ${(files.gitignore { inherit pkgs; langs = effectiveLangs; extra = gitignore.extra or "";})} ./.gitignore
       ${"# a consumer's own lines belong in `envrc.extra`; the diff names whatever the rewrite drops"}
       _vf_same ${envrcFile} ./.envrc || { [ -e ./.envrc ] && diff ${envrcFile} ./.envrc | sed -n 's/^> /v_flakes: .envrc rewritten, move into github.envrc.extra: /p' >&2; cp -f ${envrcFile} ./.envrc; }

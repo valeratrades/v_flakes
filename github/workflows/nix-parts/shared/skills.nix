@@ -25,9 +25,9 @@ in
         "with".fetch-depth = 0; # `check` diffs against released tags
       }]
       ++ nixCi.setupSteps
+      ++ [ nixCi.installStep ]
+      ++ nixCi.cacheSteps
       ++ [
-        nixCi.installStep
-        nixCi.cacheStep
         {
           name = "Build skargo";
           # not `nix run`: inside skargo's own checkout, its apps.default is `cargo run` on the runner's toolchain

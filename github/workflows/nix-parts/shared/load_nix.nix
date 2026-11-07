@@ -16,9 +16,7 @@ if !hasPackages then null else
   permissions.contents = "read";
   jobs.load_nix = {
     runs-on = "ubuntu-latest";
-    steps = nixCi.setupSteps ++ [
-      nixCi.installStep
-      nixCi.cacheStep
+    steps = nixCi.setupSteps ++ [ nixCi.installStep ] ++ nixCi.cacheSteps ++ [
       {
         name = "Cache packages";
         run = ''
