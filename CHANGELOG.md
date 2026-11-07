@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs` lints: `[lints.clippy]` (or `[workspace.lints.clippy]`) gets `integer_division = "warn"` and `if_not_else = "warn"`. Unlike `rust`/`cargo`, the table stays the consumer's: a key it already sets, eg `if_not_else = "allow"`, is kept.
+
 - `files.licenses.fsl_mit { licensor = "..."; }`: FSL-1.1-MIT (no competing use; each version turns MIT 2 years after release). The notice is `Copyright <licensor>`, without the year.
 
 - `files.licenses.mit`: MIT, holder line `Copyright (c) the contributors`.

@@ -62,8 +62,23 @@ fn merge(cargo: &str, lints_src: &str) -> String {
 	};
 
 	for (tool, src) in lints_doc.iter() {
+		let src = src.as_table().expect("lints input is tool -> table");
+		if tool == "clippy" {
+			// consumers keep their own [lints.clippy]: ours only fills in the keys they haven't set
+			let lints = lints_table
+				.entry(tool)
+				.or_insert_with(|| Item::Table(Table::new()))
+				.as_table_like_mut()
+				.expect("[lints.clippy] is a table");
+			for (k, v) in src.iter() {
+				if !lints.contains_key(k) {
+					lints.insert(k, v.clone());
+				}
+			}
+			continue;
+		}
 		let mut lints = Table::new(); // fresh, so it doesn't inherit the input doc's position
-		for (k, v) in src.as_table().expect("lints input is tool -> table").iter() {
+		for (k, v) in src.iter() {
 			lints.insert(k, v.clone());
 		}
 		lints.sort_values();

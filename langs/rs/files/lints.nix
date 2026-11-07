@@ -14,6 +14,11 @@ let
     cargo = {
       "non_kebab_case_bins" = "allow";
     };
+    # opt-in clippy lints the org style wants; seeded, a key the consumer already sets wins
+    clippy = {
+      "integer_division" = "warn"; # show intent: `div_floor` / `div_ceil` / `checked_div`, or allow at the site
+      "if_not_else" = "warn"; # state conditions positively
+    };
   };
 in
 (pkgs.formats.toml { }).generate "cargo-lints.toml" tools

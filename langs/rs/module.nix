@@ -64,7 +64,7 @@ if nixpkgs != null && pkgs == null then {
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
       clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see langs/rs/files/clippy.nix)
       sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see langs/rs/files/sort_derives.nix)
-      lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; stable_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix.
+      lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; stable_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix. Also fills `[lints.clippy]` with `integer_division` + `if_not_else` = "warn", only where the manifest doesn't set that key.
       tracey = true;     # Enable tracey spec coverage (default: true)
       cargoRoot = ".";   # Dir holding the Cargo root, relative to the repo root (default: "."). Same meaning as nixpkgs buildRustPackage.cargoRoot
       style = {
@@ -141,7 +141,7 @@ if nixpkgs != null && pkgs == null then {
     - Merge cargo config into ./.cargo/config.toml: only the keys v_flakes generates are overwritten, everything else is kept (a git clean filter keeps local `[patch.*]` out of the index)
     - Copy clippy config to ./.cargo/clippy.toml
     - Copy sort-derives config to <cargoRoot>/.sort-derives.toml
-    - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into <cargoRoot>/Cargo.toml
+    - Merge controlled `[lints.rust]` + `[lints.cargo]` (or `[workspace.lints.*]` if `[workspace]` exists) into <cargoRoot>/Cargo.toml, and seed `[lints.clippy]` keys the manifest doesn't set
     - Copy build.rs to each directory in build.workspace (with write permissions for treefmt)
     - Copy deny.toml to <cargoRoot>/deny.toml (if deny = true)
 
