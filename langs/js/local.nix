@@ -11,10 +11,15 @@ pkgs.writeShellApplication {
       actual=$(jq -r .name "$manifest")
       [ "$actual" = "$name" ] || { echo "js-local: $map: $dir is $actual, not $name" >&2; exit 1; }
       jq -e 'has("files")' "$manifest" >/dev/null || { echo "js-local: $manifest has no \`files\`: what it publishes is unknown" >&2; exit 1; }
-      [ -e "node_modules/$name" ] || { echo "js-local: $name is not installed; install the project first" >&2; exit 1; }
-      # pnpm's is a link into its store, whose files are hard links to every project's: removed, never written through
-      into=$(realpath "node_modules/$name")
-      rm -rf "$into"
+      [ -d node_modules ] || { echo "js-local: no node_modules; install the project first" >&2; exit 1; }
+      if [ -e "node_modules/$name" ]; then
+        # pnpm's is a link into its store, whose files are hard links to every project's: removed, never written through
+        into=$(realpath "node_modules/$name")
+        rm -rf "$into"
+      else
+        # not published yet, or only another of our packages depends on it: the checkout is its only copy
+        into="node_modules/$name"
+      fi
       mkdir -p "$into"
       cp "$manifest" "$into/"
       jq -r '.files[]' "$manifest" | while read -r f; do
