@@ -419,7 +419,7 @@ if nixpkgs != null && pkgs == null then {
           let unknown = builtins.removeAttrs figma [ "folder" ]; in
           unknown == { } || throw "v_flakes figma: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
         );
-        yaml (builtins.removeAttrs (import ./shared/figma.nix (figma // { inherit lfs; cachix = cache ? cachix; })) [ "standalone" ])
+        yaml (builtins.removeAttrs (import ./shared/figma.nix (figma // { inherit lfs cache; })) [ "standalone" ])
       else null;
 
     nixEnvAction = yaml (import ./shared/nix-env-action.nix { inherit cache; });
