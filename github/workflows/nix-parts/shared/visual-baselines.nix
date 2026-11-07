@@ -1,6 +1,6 @@
 # visual-baselines.yml: renders the committed baselines under `dir` on CI's image, uploads them as `visual-snapshots`, fails when they're stale.
 # Contract in github/description.md.
-{ dir, render, gate ? null, paths ? null, rustCache ? null, lfs }:
+{ dir, render, gate ? null, paths ? null, rustCache ? null, lfs, cachix }:
 let
   app = name: "nix develop --command nix run .#${name}";
 in
@@ -24,7 +24,13 @@ in
     runs-on = "ubuntu-latest";
     steps = [
       ({ uses = "actions/checkout@v5"; } // (if lfs then { "with".lfs = true; } else { }))
-      ({ uses = "./.github/actions/nix-env"; } // (if rustCache != null then { "with".rust-cache = rustCache; } else { }))
+      ({ uses = "./.github/actions/nix-env"; } // (
+        let
+          w = (if rustCache != null then { rust-cache = rustCache; } else { })
+            // (if cachix then { cachix-auth-token = "\${{ secrets.CACHIX_AUTH_TOKEN }}"; } else { });
+        in
+        if w != { } then { "with" = w; } else { }
+      ))
     ]
     ++ (if gate != null then [{
       name = "Gate";

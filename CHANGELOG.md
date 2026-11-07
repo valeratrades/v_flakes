@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset.
+- **`github` writes `.github/actions/nix-env/action.yml`** whenever `enable = true`: the generated workflows' Nix install and `cache`, as one composite step for hand-written workflows. `with: { rust-cache: <key> }` adds Swatinem/rust-cache keyed on the dev shell's rustc, with `RUSTC_WRAPPER` unset. With `cache.cachix`, the caller passes `cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}`: a composite action has no `secrets` context.
 
 - **`github { visualBaselines = { dir; render; gate ? null; paths ? null; rustCache ? null; }; }`** writes `visual-baselines.yml`: renders the baselines under `dir` on PRs, uploads them as `visual-snapshots`, and fails when `gate` does (or, with no `gate`, when the render changed anything under `dir`). Contract in `github/description.md`.
 

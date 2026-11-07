@@ -405,7 +405,7 @@ if nixpkgs != null && pkgs == null then {
           let unknown = builtins.removeAttrs visualBaselines [ "dir" "render" "gate" "paths" "rustCache" ]; in
           unknown == { } || throw "v_flakes visualBaselines: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
         );
-        yaml (builtins.removeAttrs (import ./shared/visual-baselines.nix (visualBaselines // { inherit lfs; })) [ "standalone" ])
+        yaml (builtins.removeAttrs (import ./shared/visual-baselines.nix (visualBaselines // { inherit lfs; cachix = cache ? cachix; })) [ "standalone" ])
       else null;
 
     nixEnvAction = yaml (import ./shared/nix-env-action.nix { inherit cache; });

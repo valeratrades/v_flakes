@@ -135,7 +135,9 @@ enabledPackages includes:
 steps:
   - uses: actions/checkout@v5
   - uses: ./.github/actions/nix-env
-    with: { rust-cache: uikit }  # optional: Swatinem/rust-cache under this shared-key, keyed on the dev shell's rustc, with RUSTC_WRAPPER unset
+    with:
+      rust-cache: uikit  # optional: Swatinem/rust-cache under this shared-key, keyed on the dev shell's rustc, with RUSTC_WRAPPER unset
+      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}  # required with `cache.cachix`: a composite action can't read `secrets`
   - run: nix develop --command cargo test
 ```
 
