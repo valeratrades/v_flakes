@@ -96,6 +96,12 @@ github = v-utils.github {
     rustCache = "uikit";     # optional rust-cache shared-key
   };
 
+  # figma.yml: on a `v*` tag, a `[figma]` comment (by an owner, member or collaborator; a PR's renders its head) or
+  # a dispatch, `nix run .#figma -- --folder <folder> --name <repo>`: the file named after the repo in that Figma folder
+  # is created or overwritten. `folder` defaults to the FIGMA_FOLDER variable (set it org-wide).
+  figma = { };
+  figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; };
+
   # Publish packages.default to a cachix cache on every push to main, so downstream
   # flakes substitute instead of rebuilding. Requires CACHIX_AUTH_TOKEN; public repos only.
   publishCachix = "valeratrades";
@@ -150,3 +156,10 @@ Refresh the committed baselines from a run's render:
 rm -f <dir>/**/*.png
 gh run download <run-id> -n visual-snapshots -D <dir>
 ```
+
+## figma
+
+`apps.figma` is `@evinvest/figma-render`'s bin over the repo's suite (sites_tools' `mkLanding` has one) and passes its
+arguments on. It runs as plain `nix run`, outside the dev shell, so the render is of the committed tree. Secrets:
+`FIGMA_OAUTH`, the bin's `oauth.json` from a machine logged in to the account that owns the folder; `FIGMA_TOKEN`, a
+personal access token of that account with `folders:read` (90 days at most, rotate it).

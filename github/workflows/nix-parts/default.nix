@@ -13,6 +13,8 @@ args@{ pkgs ? null
   npmRelease ? null
 , # { dir; render; gate ? null; paths ? null; rustCache ? null; }: visual-baselines.yml. See shared/visual-baselines.nix.
   visualBaselines ? null
+, # { folder ? null; }: figma.yml. See shared/figma.nix.
+  figma ? null
 , # checkout fetches LFS objects
   lfs ? false
 , gitlabSync ? null
@@ -87,6 +89,9 @@ if nixpkgs != null && pkgs == null then {
     - visualBaselines = { dir = "tests/__screenshots__"; render = "accept-test"; gate = "test"; paths = [ "frontend/**" ]; }
         visual-baselines.yml: renders every baseline under `dir` on ubuntu-latest, uploads them as the
         `visual-snapshots` artifact and fails when they differ from the committed ones. Contract in github/description.md.
+    - figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; }
+        figma.yml: on a release tag or a `[figma]` comment, `nix run .#figma` renders into the file named after the repo
+        in the folder (`folder`, else the FIGMA_FOLDER variable). Contract in github/description.md.
     - skills = { skargo = "github:EV-Main/skills/<rev>"; }
         skills.yml: `skargo check` on PRs, `skargo publish` (tags `<name>--v<version>`) on main, and
         `claude plugin validate --strict` when the repo has a marketplace.
@@ -408,6 +413,15 @@ if nixpkgs != null && pkgs == null then {
         yaml (builtins.removeAttrs (import ./shared/visual-baselines.nix (visualBaselines // { inherit lfs; cachix = cache ? cachix; })) [ "standalone" ])
       else null;
 
+    figmaWorkflow =
+      if figma != null then
+        assert (
+          let unknown = builtins.removeAttrs figma [ "folder" ]; in
+          unknown == { } || throw "v_flakes figma: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
+        );
+        yaml (builtins.removeAttrs (import ./shared/figma.nix (figma // { inherit lfs; cachix = cache ? cachix; })) [ "standalone" ])
+      else null;
+
     nixEnvAction = yaml (import ./shared/nix-env-action.nix { inherit cache; });
 
     skillsWorkflow =
@@ -581,6 +595,11 @@ if nixpkgs != null && pkgs == null then {
         _vf_cp ${visualBaselinesWorkflow} ./.github/workflows/visual-baselines.yml
       '' else "";
 
+    figmaHook =
+      if figmaWorkflow != null then ''
+        _vf_cp ${figmaWorkflow} ./.github/workflows/figma.yml
+      '' else "";
+
     skillsHook =
       if skillsWorkflow != null then ''
         _vf_cp ${skillsWorkflow} ./.github/workflows/skills.yml
@@ -617,7 +636,7 @@ if nixpkgs != null && pkgs == null then {
       '';
   in
   workflows // {
-    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow visualBaselinesWorkflow nixEnvAction skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
+    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow visualBaselinesWorkflow figmaWorkflow nixEnvAction skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
@@ -628,6 +647,7 @@ if nixpkgs != null && pkgs == null then {
       ${containerReleaseHook}
       ${npmReleaseHook}
       ${visualBaselinesHook}
+      ${figmaHook}
       ${skillsHook}
       ${syncForkHook}
       ${gitlabSyncHook}
