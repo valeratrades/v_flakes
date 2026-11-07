@@ -403,22 +403,23 @@ ${content}
     else
       builtins.trace "WARNING: docs/ARCHITECTURE.md is missing. Consider adding one, following https://matklad.github.io/2021/02/06/ARCHITECTURE.md.html" false;
 
-  architectureSentence =
-    if architectureExists then
-      " For project's architecture, see <a href=\"./docs/ARCHITECTURE.md\">ARCHITECTURE.md</a>."
-    else
-      "";
-
   contributingHref = if builtins.isPath contributing then "./" + pkgs.lib.removePrefix "${rootStr}/" (toString contributing) else contributing;
 
-  best_practices_out = pkgs.runCommand "" { } ''
-    		cat > $out <<'EOF'
+  styleLink = "<sup><a href=\"https://github.com/EV-Main/.github/blob/main/code/STYLE.md\">style</a></sup>";
+  archAndStyle =
+    if architectureExists then
+      "- <sup><a href=\"./docs/ARCHITECTURE.md\">architecture</a></sup>\n  - ${styleLink}"
+    else
+      "- ${styleLink}";
+
+  dev_links_out = ''
 
     <br>
 
-    <sup>
-    	This repository follows <a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a> and <a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a>. For contributing, see <a href="${contributingHref}">contribution process</a>.${architectureSentence}
-    </sup>
+    <sup>Links for devs:</sup>
+    ${archAndStyle}
+    - <sup><a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a></sup>
+      - <sup><a href="${contributingHref}">contributing</a></sup>
   '';
 
   other_out = processSection {
@@ -486,7 +487,7 @@ ${content}
     ${warning_out}${builtins.readFile badges_out}
     ${description_out}${installation_out}
     ${usage_out}${arch_out}${other_out}
-    ${builtins.readFile best_practices_out}
+    ${dev_links_out}
     ${builtins.readFile licenses_out}
     README_EOF
   '');

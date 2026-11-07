@@ -101,9 +101,11 @@ Version checks run on shell entry in this repo to detect when updates are needed
 
 <br>
 
-<sup>
-	This repository follows <a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a> and <a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a>. For contributing, see <a href="https://github.com/EV-Main/.github/blob/main/code/conventions/git">contribution process</a>. For project's architecture, see <a href="./docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.
-</sup>
+<sup>Links for devs:</sup>
+- <sup><a href="./docs/ARCHITECTURE.md">architecture</a></sup>
+  - <sup><a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a></sup>
+- <sup><a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a></sup>
+  - <sup><a href="https://github.com/EV-Main/.github/blob/main/code/conventions/git">contributing</a></sup>
 
 #### License
 
