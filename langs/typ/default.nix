@@ -149,6 +149,7 @@ if nixpkgs != null && pkgs == null then {
     shellHook = utils.mkShellHook ''
       typstyle-fmt() { typstyle ${typstyleFlags} "$@"; }
       export TYPST_FEATURES=html
+      export TYPST_ROOT="$PWD" # combined shellHook runs at the repo root; lets docs in subdirs import across the repo
       ${lib.optionalString (src != null) "export TYPST_PACKAGE_PATH=${packagePath}"}
     '';
   } // lib.optionalAttrs (main != null) {
