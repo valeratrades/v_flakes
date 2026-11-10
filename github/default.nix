@@ -39,6 +39,8 @@ args@{ pkgs ? null
   npmRelease ? null
 , # { dir; render; gate ? null; paths ? null; rustCache ? null; }: visual-baselines.yml, contract in description.md
   visualBaselines ? null
+, # typ module with `main`: release-typst.yml, its document on release tags (+ GitHub Pages with `html`); contract in description.md
+  typ ? null
 , # { folder ? null; }: figma.yml, the repo's pages into a Figma folder on a release tag or a `[figma]` comment; contract in description.md
   figma ? null
 , # { skargo ? <pins/skargo.nix rev>; }: skills.yml, `skargo check` / `publish` of a repo shipping agent skills
@@ -57,7 +59,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "typ" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -245,6 +247,9 @@ if nixpkgs != null && pkgs == null then {
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
     } // (if enable then {
+      typstRelease = if typ == null then null else
+        assert typ ? document || throw "v_flakes.github: `typ` is only taken for its document; set `main` on the typ module";
+        { inherit (typ) html; };
       inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease visualBaselines figma gitlabSync cargoRoot webUnstable;
       lfs = lfs == true;
       skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
@@ -268,11 +273,10 @@ if nixpkgs != null && pkgs == null then {
     extraLabels = labelsConfig.extra or [ ];
     allLabels = (if useDefaults then defaultLabels else [ ]) ++ extraLabels;
 
-    # Generate label args for git commands
     # These are interpolated directly into a bash script (no eval), so we just need to escape
     # single quotes for the bash 'literal string' context.
     escapeForBash = s: builtins.replaceStrings [ "'" ] [ "'\\''" ] s;
-    labelArgs = "--labels-json '" + escapeForBash (builtins.toJSON allLabels) + "'";
+    syncArgs = "--labels-json '" + escapeForBash (builtins.toJSON allLabels) + "'" + pkgs.lib.optionalString (typ != null && typ.html) " --pages";
 
     # Use local cargo, falling back loudly to rustup's nightly if unavailable.
     # Unset RUSTC_WRAPPER: the backgrounded run must not depend on the wrapper's daemon outliving the shell.
@@ -292,7 +296,7 @@ if nixpkgs != null && pkgs == null then {
       fi
     '';
 
-    git_ops = import ./git.nix { inherit pkgs labelArgs cargoNightly; gitOpsScript = ./git-ops.rs; };
+    git_ops = import ./git.nix { inherit pkgs syncArgs cargoNightly; gitOpsScript = ./git-ops.rs; };
     code_duplication = import ./code_duplication.nix { inherit pkgs cargoNightly; script = ./workflows/code-duplication.rs; };
 
     # Process preCommit config

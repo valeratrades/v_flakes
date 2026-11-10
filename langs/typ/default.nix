@@ -152,6 +152,7 @@ if nixpkgs != null && pkgs == null then {
       ${lib.optionalString (src != null) "export TYPST_PACKAGE_PATH=${packagePath}"}
     '';
   } // lib.optionalAttrs (main != null) {
+    inherit html;
     document = pkgs.stdenvNoCC.mkDerivation {
       name = "typst-document";
       inherit src;

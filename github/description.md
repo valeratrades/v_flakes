@@ -102,6 +102,11 @@ github = v-utils.github {
   figma = { };
   figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; };
 
+  # release-typst.yml: on a `v*` tag, `nix build .#default` (must be `typ.document`); each `output.<ext>` goes on the
+  # Release as `<repo>.<ext>`. With the typ module's `html`, output.html is deployed to GitHub Pages as index.html,
+  # and sync-github switches Pages to the Actions source once (the site is public even for a private repo).
+  inherit typ;
+
   # Publish packages.default to a cachix cache on every push to main, so downstream
   # flakes substitute instead of rebuilding. Requires CACHIX_AUTH_TOKEN; public repos only.
   publishCachix = "valeratrades";

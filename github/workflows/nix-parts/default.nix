@@ -15,6 +15,8 @@ args@{ pkgs ? null
   visualBaselines ? null
 , # { folder ? null; }: figma.yml. See shared/figma.nix.
   figma ? null
+, # { html; }: release-typst.yml, the typ module's document on release tags. See shared/release-typst.nix.
+  typstRelease ? null
 , # checkout fetches LFS objects
   lfs ? false
 , gitlabSync ? null
@@ -92,6 +94,9 @@ if nixpkgs != null && pkgs == null then {
     - figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; }
         figma.yml: on a release tag or a `[figma]` comment, `nix run .#figma` renders into the file named after the repo
         in the folder (`folder`, else the FIGMA_FOLDER variable). Contract in github/description.md.
+    - typstRelease = { html = true; }  # set by `github { typ = ...; }` from a typ module with `main`
+        release-typst.yml: on a release tag, `nix build .#default` and attach each `output.<ext>` to the Release as
+        `<repo>.<ext>`; with `html`, also deploy output.html to GitHub Pages.
     - skills = { skargo = "github:EV-Main/skills/<rev>"; }
         skills.yml: `skargo check` on PRs, `skargo publish` (tags `<name>--v<version>`) on main, and
         `claude plugin validate --strict` when the repo has a marketplace.
@@ -422,6 +427,11 @@ if nixpkgs != null && pkgs == null then {
         yaml (builtins.removeAttrs (import ./shared/figma.nix (figma // { inherit lfs cache; })) [ "standalone" ])
       else null;
 
+    typstReleaseWorkflow =
+      if typstRelease != null then
+        yaml (builtins.removeAttrs (import ./shared/release-typst.nix { inherit (typstRelease) html; inherit lfs cache; }) [ "standalone" ])
+      else null;
+
     nixEnvAction = yaml (import ./shared/nix-env-action.nix { inherit cache; });
 
     skillsWorkflow =
@@ -535,7 +545,8 @@ if nixpkgs != null && pkgs == null then {
 
     releaseExpectedFiles = map (name: "release-${name}.yml") (builtins.attrNames releaseWorkflows)
       ++ pkgs.lib.optional (containerReleaseWorkflow != null) "release-container.yml"
-      ++ pkgs.lib.optional (npmReleaseWorkflow != null) "release-npm.yml";
+      ++ pkgs.lib.optional (npmReleaseWorkflow != null) "release-npm.yml"
+      ++ pkgs.lib.optional (typstReleaseWorkflow != null) "release-typst.yml";
 
     releaseHook =
       if releaseWorkflows != { } then
@@ -600,6 +611,11 @@ if nixpkgs != null && pkgs == null then {
         _vf_cp ${figmaWorkflow} ./.github/workflows/figma.yml
       '' else "";
 
+    typstReleaseHook =
+      if typstReleaseWorkflow != null then ''
+        _vf_cp ${typstReleaseWorkflow} ./.github/workflows/release-typst.yml
+      '' else "";
+
     skillsHook =
       if skillsWorkflow != null then ''
         _vf_cp ${skillsWorkflow} ./.github/workflows/skills.yml
@@ -636,7 +652,7 @@ if nixpkgs != null && pkgs == null then {
       '';
   in
   workflows // {
-    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow visualBaselinesWorkflow figmaWorkflow nixEnvAction skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
+    inherit releaseWorkflows containerReleaseWorkflow npmReleaseWorkflow visualBaselinesWorkflow figmaWorkflow typstReleaseWorkflow nixEnvAction skillsWorkflow gitlabSyncWorkflow syncForkWorkflow claudeWorkflow claudeReviewWorkflow cachixWorkflow;
     shellHook = utils.mkShellHook ''
       [ -d ./.github/workflows ] || mkdir -p ./.github/workflows
       ${jobsHook "errors"}
@@ -648,6 +664,7 @@ if nixpkgs != null && pkgs == null then {
       ${npmReleaseHook}
       ${visualBaselinesHook}
       ${figmaHook}
+      ${typstReleaseHook}
       ${skillsHook}
       ${syncForkHook}
       ${gitlabSyncHook}

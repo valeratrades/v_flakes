@@ -34,7 +34,7 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-	/// Converge the GitHub repo to local configuration: labels, Discussions, issues from TODOs
+	/// Converge the GitHub repo to local configuration: labels, Discussions, Pages, issues from TODOs
 	SyncGithub {
 		/// JSON array of {name, color, description?} (leading # in color optional)
 		#[arg(long)]
@@ -43,6 +43,10 @@ enum Commands {
 		/// Check for duplicate or too-similar colors
 		#[arg(long)]
 		check_duplicate_colors: bool,
+
+		/// Serve GitHub Pages from Actions (release-typst.yml deploys there)
+		#[arg(long)]
+		pages: bool,
 	},
 	/// Copy convention files from the owner's profile repo (github.com/<owner>/<owner>)
 	/// or org defaults repo (github.com/<owner>/.github); a file must live in only one
@@ -771,7 +775,7 @@ fn remove_todo_comments(repo_root: &str, removals: &[(&Todo, u64)]) {
 	}
 }
 
-fn sync_github(local_labels: Vec<LabelSpec>, check_colors: bool) {
+fn sync_github(local_labels: Vec<LabelSpec>, check_colors: bool, pages: bool) {
 	let repo_root = get_repo_root().expect("not in a git repository");
 
 	// Concurrent shell-start runs must not race: `gh issue create` is not
@@ -797,7 +801,10 @@ fn sync_github(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	}
 
 	follow_rename();
-	ensure_discussions(&repo_root);
+	ensure_stamped(&repo_root, "discussions enabled", ensure_discussions);
+	if pages {
+		ensure_stamped(&repo_root, "pages enabled", ensure_pages);
+	}
 	let mut open_issues = fetch_open_issues();
 
 	// Fingerprint gates only the label block (not an early return): on a fresh repo
@@ -834,28 +841,44 @@ fn sync_github(local_labels: Vec<LabelSpec>, check_colors: bool) {
 	flush_report();
 }
 
-const DISCUSSIONS_STAMP: &str = "discussions enabled";
-
-/// Enabled through the API, Discussions gets GitHub's default categories at once, so no setup page precedes the first post.
-fn ensure_discussions(repo_root: &str) {
+/// One-time repo setups, recorded in `.v_flakes.lock` so later shells skip the API round-trip.
+fn ensure_stamped(repo_root: &str, stamp: &'static str, converge: fn() -> Result<(), String>) {
 	let lock = PathBuf::from(repo_root).join(".v_flakes.lock");
 	let text = match fs::read_to_string(&lock) {
 		Ok(t) => t,
 		Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
-		Err(e) => return report!("discussions", "can't read {}: {e}", lock.display()),
+		Err(e) => return report!(stamp, "can't read {}: {e}", lock.display()),
 	};
-	if text.lines().any(|l| l == DISCUSSIONS_STAMP) {
+	if text.lines().any(|l| l == stamp) {
 		return;
 	}
-	let gh = |args: &[&str]| -> Result<String, String> {
-		let out = run_gh(args).map_err(|e| format!("running gh: {e}"))?;
-		if !out.status.success() {
-			return Err(format!("gh {} failed: {}", args[..2].join(" "), String::from_utf8_lossy(&out.stderr).trim()));
-		}
-		Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
-	};
+	if let Err(e) = converge() {
+		return report!(stamp, "{e}");
+	}
+	let sep = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
+	// append, not rewrite: the shellHook may be restamping the generator line concurrently
+	let written = fs::OpenOptions::new()
+		.create(true)
+		.append(true)
+		.open(&lock)
+		.and_then(|mut f| f.write_all(format!("{sep}{stamp}\n").as_bytes()));
+	if let Err(e) = written {
+		report!(stamp, "can't write {}: {e}", lock.display());
+	}
+}
+
+fn gh_checked(args: &[&str]) -> Result<String, String> {
+	let out = run_gh(args).map_err(|e| format!("running gh: {e}"))?;
+	if !out.status.success() {
+		return Err(format!("gh {} failed: {}", args[..2].join(" "), String::from_utf8_lossy(&out.stderr).trim()));
+	}
+	Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+/// Enabled through the API, Discussions gets GitHub's default categories at once, so no setup page precedes the first post.
+fn ensure_discussions() -> Result<(), String> {
 	let ready = || -> Result<bool, String> {
-		match gh(&[
+		match gh_checked(&[
 			"api",
 			"graphql",
 			"-F",
@@ -874,29 +897,44 @@ fn ensure_discussions(repo_root: &str) {
 			other => Err(format!("unexpected discussions state `{other}`")),
 		}
 	};
-	let converged = ready().and_then(|r| {
-		if r {
-			return Ok(true);
-		}
-		gh(&["api", "--method", "PATCH", "repos/{owner}/{repo}", "-F", "has_discussions=true", "--silent"])?;
-		ready()
-	});
-	match converged {
-		Ok(true) => {
-			let sep = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
-			// append, not rewrite: the shellHook may be restamping the generator line concurrently
-			let written = fs::OpenOptions::new()
-				.create(true)
-				.append(true)
-				.open(&lock)
-				.and_then(|mut f| f.write_all(format!("{sep}{DISCUSSIONS_STAMP}\n").as_bytes()));
-			if let Err(e) = written {
-				report!("discussions", "can't write {}: {e}", lock.display());
-			}
-		}
-		Ok(false) => report!("discussions", "enabled, but GitHub lists no categories, so the tab opens on its setup page"),
-		Err(e) => report!("discussions", "{e}"),
+	if ready()? {
+		return Ok(());
 	}
+	gh_checked(&["api", "--method", "PATCH", "repos/{owner}/{repo}", "-F", "has_discussions=true", "--silent"])?;
+	match ready()? {
+		true => Ok(()),
+		false => Err("enabled, but GitHub lists no categories, so the tab opens on its setup page".into()),
+	}
+}
+
+/// GITHUB_TOKEN can't create a Pages site, and the `github-pages` environment it makes admits only the default branch.
+fn ensure_pages() -> Result<(), String> {
+	let build_type = match gh_checked(&["api", "repos/{owner}/{repo}/pages", "--jq", ".build_type"]) {
+		Ok(t) => Some(t),
+		Err(e) if e.contains("HTTP 404") => None,
+		Err(e) => return Err(e),
+	};
+	match build_type.as_deref() {
+		Some("workflow") => {}
+		Some(_) => drop(gh_checked(&["api", "--method", "PUT", "repos/{owner}/{repo}/pages", "-f", "build_type=workflow", "--silent"])?),
+		None => drop(gh_checked(&["api", "--method", "POST", "repos/{owner}/{repo}/pages", "-f", "build_type=workflow", "--silent"])?),
+	}
+	gh_checked(&[
+		"api",
+		"--method",
+		"PUT",
+		"repos/{owner}/{repo}/environments/github-pages",
+		"-F",
+		"deployment_branch_policy[protected_branches]=false",
+		"-F",
+		"deployment_branch_policy[custom_branch_policies]=true",
+		"--silent",
+	])?;
+	let policies = "repos/{owner}/{repo}/environments/github-pages/deployment-branch-policies";
+	if gh_checked(&["api", policies, "--jq", r#"any(.branch_policies[]; .type == "tag" and .name == "v*")"#])? != "true" {
+		gh_checked(&["api", "--method", "POST", policies, "-f", "name=v*", "-f", "type=tag", "--silent"])?;
+	}
+	Ok(())
 }
 
 fn fetch_remote_labels() -> HashMap<String, (String, Option<String>)> {
@@ -1266,6 +1304,7 @@ fn main() {
 		Commands::SyncGithub {
 			labels_json,
 			check_duplicate_colors,
+			pages,
 		} => {
 			let labels = match parse_labels_json(&labels_json) {
 				Ok(l) if !l.is_empty() => l,
@@ -1278,7 +1317,7 @@ fn main() {
 					std::process::exit(1);
 				}
 			};
-			sync_github(labels, check_duplicate_colors);
+			sync_github(labels, check_duplicate_colors, pages);
 		}
 		Commands::SyncConventions { version_key, file } => {
 			if file.is_empty() {
