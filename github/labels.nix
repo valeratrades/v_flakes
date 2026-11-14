@@ -24,6 +24,11 @@
   #{ name = "severity:medium"; color = "#f8dcb0"; description = "Bug: degrades a feature"; }
   #{ name = "severity:high"; color = "#f5b2b3"; description = "Bug: data loss, or a feature is unusable"; }
 
+  # Stage pins: what GitHub can't tell about where an issue sits. No pin is Triage; review and closed stages are derived (tedi).
+  { name = "s:icebox"; color = "#c5def5"; description = "Parked: not now, not dropped"; }
+  { name = "s:selected"; color = "#fef2c0"; description = "Taken: next up for its assignee"; }
+  { name = "s:wip"; color = "#f9d0c4"; description = "Being worked on, no draft PR yet"; }
+
   # Importance (0 = trivial, 9 = critical)
   { name = "i:0"; color = "#0e8a16"; }
   { name = "i:1"; color = "#3d9712"; }
