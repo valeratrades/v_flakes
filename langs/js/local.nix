@@ -26,6 +26,11 @@ pkgs.writeShellApplication {
         [ -e "$dir/$f" ] || { echo "js-local: $name: $dir/$f is not built (or \`files\` holds a glob)" >&2; exit 1; }
         cp -r "$dir/$f" "$into/$f"
       done
+      # what npm would have linked: a package nothing installed yet has no `.bin` entries
+      jq -r --arg n "''${name##*/}" 'if (.bin | type) == "string" then "\($n)\t\(.bin)" else (.bin // {} | to_entries[] | "\(.key)\t\(.value)") end' "$manifest" | while IFS=$'\t' read -r bin path; do
+        mkdir -p node_modules/.bin
+        ln -sfn "../$name/$path" "node_modules/.bin/$bin"
+      done
       echo "js-local: $name@$(jq -r .version "$manifest") from $dir"
     done
   '';
