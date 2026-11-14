@@ -91,6 +91,8 @@ if nixpkgs != null && pkgs == null then {
         - "git_version": Embed GIT_HASH at compile time
         - "log_directives": Embed LOG_DIRECTIVES from .cargo/log_directives
         - "deprecate": Deprecation enforcement (see below)
+        - "api_docs": The handlers' `///` into OUT_DIR for ev_lib's `api_docs!()` (build-dependency
+          `ev_lib` with feature `api_docs`)
         - { lightweight_charts = { version; sha256; }; }: Fetch lightweight-charts (see below)
 
       lightweight_charts module:

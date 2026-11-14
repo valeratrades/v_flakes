@@ -32,6 +32,7 @@ let
   lwcConfig = getLwcConfig;
   has_git_version = hasModule "git_version";
   has_log_directives = hasModule "log_directives";
+  has_api_docs = hasModule "api_docs";
   has_deprecate = deprecateConfig != null;
   has_lightweight_charts = lwcConfig != null;
 
@@ -88,6 +89,7 @@ let
   # Collect function calls for main()
   module_calls = (if has_git_version then [ "git_version();" ] else [ ])
     ++ (if has_log_directives then [ "log_directives();" ] else [ ])
+    ++ (if has_api_docs then [ "ev_lib::api::docs::write();" ] else [ ])
     ++ (if has_lightweight_charts then [ "lightweight_charts();" ] else [ ])
     ++ (if has_deprecate then [ "deprecate();" ] else [ ]);
 
