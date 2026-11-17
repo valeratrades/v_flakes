@@ -104,7 +104,7 @@ in
     program = program "code-duplication" [ qlty scriptRust ] ''
       cd "$(git rev-parse --show-toplevel)"
       qlty init --no --no-upgrade-check >/dev/null
-      RUSTC_WRAPPER= cargo -Zscript -q ${../workflows/code-duplication.rs}
+      RUSTC_WRAPPER="" cargo -Zscript -q ${../workflows/code-duplication.rs}
     '';
   };
 

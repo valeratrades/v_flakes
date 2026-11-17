@@ -54,7 +54,12 @@ Templates for project files. Each submodule generates a derivation containing th
 
 GitHub-specific configuration:
 
-- `workflows/` - CI workflow generation (errors.yml, warnings.yml)
+- `particles/` - a repo's checks, one registry: `jobs.errors` / `jobs.warnings` list them, the list their severity. Each one is in all three of
+  - `nix run .#test` (`runner.sh`; `apps.test` added by v_flakes' flake-utils / flake-parts, which find the runner in the devShell): parallel locally, per-particle status and seconds; non-zero iff an error particle fails, or with `--severity`, any it ran
+  - its section's workflow: a particle with a `ci` body is a job of its own, the rest one `particles` job running `nix run .#test -- --severity <s> --serial` after a single nix install
+  - its section's README badge, written by the workflow's `report` job on the default branch: failed count and the sum of the particles' own seconds (no install or cache restore, so it compares with a serial local run)
+  - Programs and prepares are carried as `.drv` paths, built when selected: the CI job of one section never builds another's closure
+- `workflows/` - CI workflow generation (errors.yml and warnings.yml from particles; other.yml; the standalone ones)
 - `cache.nix` - the only Nix install + binary-cache definition. Generated jobs inline it; hand-written workflows reach it through the generated `.github/actions/nix-env` composite action
 - `labels.nix` - GitHub label synchronization
 - `git-ops.rs` - Rust script for git operations; `sync-github` (detached on pre-commit) converges the GitHub repo's state, and records one-time setups (Discussions) in `.v_flakes.lock` next to the generator line
@@ -109,6 +114,6 @@ Agents build in `.claude/worktrees/<name>/`. Each one would otherwise compile th
 README generation from `docs/.readme_assets/`:
 
 - Reads `description.md`, `usage.md`, etc.
-- Generates badges (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size). The gist-backed ones (loc, build_time, test_time, size) are shields.io endpoint files that CI jobs already running write as a by-product (`github/workflows/nix-parts/shared/gist-badges.nix`); none runs work of its own. `build_time`/`test_time` are added to every repo with a root `Cargo.toml`
+- Generates badges (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size). The gist-backed ones (loc, ci, build_time, test_time, size) are shields.io endpoint files that CI jobs already running write as a by-product (`github/workflows/nix-parts/shared/gist-badges.nix`); none runs work of its own. `build_time`/`test_time` are added to every repo with a root `Cargo.toml`
 - Compiles typst (`.typ`) to markdown if present
 - Manages license file copying

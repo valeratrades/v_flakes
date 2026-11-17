@@ -14,29 +14,37 @@ github = v-utils.github {
   # Per-section install overrides this.
   install = { packages = [ "mold" "pkg-config" ]; };
 
-  # Jobs configuration - new interface
+  # Checks ("particles", github/particles): listed in `jobs.errors` or `jobs.warnings`, that list their
+  # severity. `nix run .#test` runs them all (v_flakes' flake-utils / flake-parts add `apps.test`);
+  # errors.yml / warnings.yml run that section's, and write its README badge (readme_fw `ci`).
   jobs = {
-    default = true;  # Enable defaults for all sections (based on langs)
+    default = true;  # the languages' default particles in every section (rs, py, js modules passed above)
 
-    # Or configure each section individually:
     errors = {
-      default = true;        # Enable default error jobs for langs
-      augment = [ "rust-miri" ];  # Add extra jobs
-      exclude = [ "rust-doc" ];   # Remove from defaults
-      install = { packages = [ "wayland" "libxkbcommon" ]; };  # Per-section override
+      default = true;
+      augment = [
+        "rust-miri"                                       # one v_flakes ships (github/particles/catalog.nix)
+        { name = "rust-tests"; args.skipPatterns = [ "slow" ]; }
+        { name = "e2e"; program = e2eApp; }               # the repo's own: an executable derivation
+        { name = "checks"; builds = checks; }             # building derivations is the work
+        (js.playwright { name = "e2e"; package = "frontend"; config = "tests/e2e"; })
+      ];
+      exclude = [ "rust-doc" ];   # a default's name; one that names no default throws
+      install = { packages = [ "wayland" "libxkbcommon" ]; };  # nixpkgs attrs: CI jobs' nix-shell, v_flakes' particles' PATH
       # hooks: override the `on` triggers for this workflow (default: push)
       # workflow_dispatch is always appended automatically unless you set it explicitly.
       hooks = { push = { branches = [ "main" ]; }; pull_request = { }; };
     };
-    warnings = {
-      default = true;
-      augment = [ { name = "rust-clippy"; args.extra = "--all-features"; } ];
-    };
-    other = {
-      default = true;
-      augment = [ "loc-badge" ];
-    };
+    warnings.augment = [ { name = "rust-doc"; args.package = "my_crate"; } ];
+    other.augment = [ "loc-badge" ];  # not checks: loc-badge, asset-gate
   };
+
+  # A particle: { name; program | builds; prepare ? null; ci ? null; ciCache ? null; }
+  #   program  runs at the repo root, bringing its own runtimeInputs (no `nix develop`)
+  #   prepare  setup left out of its time (the js module's `npm ci` where node_modules is absent)
+  #   ci       { job; work; post ? [ ]; timedIf ? null; }: its own CI job, for what CI needs that the local
+  #            run doesn't (the rust ones: toolchain matrix, pre_ci, rust-cache). The rest share one job.
+  #   ciCache  { paths; hashFiles; } the shared job keeps between runs
 
   labels = {
     enable = true;    # Auto-sync labels on every commit, from the pre-commit hook (default: true)
@@ -53,7 +61,7 @@ github = v-utils.github {
   # subsequent rebuilds are no-ops until v_flakes itself is bumped. Default: false.
   conventions = true;
   # Style settings are inherited from rs module automatically.
-  # Rust jobs (with their hookPre steps) and rust pre-commit steps run in `rs.cargoRoot`.
+  # Rust particles and rust pre-commit steps run in `rs.cargoRoot`.
   # Override with style = { ... } or traceyCheck = ... if needed.
 
   # Binary releases — one workflow per target (release-{shortName}.yml)

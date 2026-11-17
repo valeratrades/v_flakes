@@ -1,4 +1,4 @@
-# Shared by release-npm.yml and js-tests: both run inside a package dir under `packagesDir`.
+# release-npm.yml's, run inside a package dir under `packagesDir`.
 {
   nodeVersion = "24";
   # a `file:` dependency ships whatever `dist/` its directory holds

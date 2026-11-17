@@ -38,7 +38,8 @@ logs=$(mktemp -d "${TMPDIR:-/tmp}/particles.XXXXXX")
 mapfile -t drvs < <(jq -r '[.[] | .program, .prepare | select(. != null)] | unique[]' <<<"$selected")
 # --keep-going: a particle that doesn't build fails alone, below
 nix build --no-link --keep-going "${drvs[@]/%/^out}" || true
-out() { [ -e "$(nix-store --query --outputs "$1")" ] && nix-store --query --outputs "$1"; }
+# valid, not merely present: a failed build can leave its output on disk
+out() { local o; o=$(nix-store --query --outputs "$1") && nix-store --check-validity "$o" 2>/dev/null && echo "$o"; }
 
 declare -A status secs prepared
 fail() { status[$1]=failed && printf '%s\n' "$2" >>"$logs/$1.log" && echo "✗ $1"; }
