@@ -105,7 +105,9 @@ if pkgs == null then {
       warnings = map (d: script d "lint") roots;
     };
 
-    playwright = { name, package, config, env ? { }, run ? ''exec playwright test -c ${lib.escapeShellArg config} "$@"'', runtimeInputs ? [ ] }: {
+    playwright = { name, package, config, env ? { }, run ? ''exec playwright test -c ${lib.escapeShellArg config} "$@"'', runtimeInputs ? [ ] }:
+      assert !(builtins.elem (lib.removeSuffix "/" config) [ "." "" ]) || throw "v_flakes.js.playwright `${name}`: `config` is where nixpkgs' @playwright/test is linked as node_modules, so a dir below the package, never the package itself";
+      {
       inherit name;
       prepare = prepare package;
       ciCache = ciCache package;
