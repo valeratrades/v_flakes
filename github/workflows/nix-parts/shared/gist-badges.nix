@@ -1,5 +1,5 @@
 # Steps writing shields.io endpoint files `<repo>-<key>.json` into the badge gist, which readme_fw's badges read.
-# `badges.<key> = { label; message; }`, `message` a bash expression.
+# `badges.<key> = { label; message; color ? "lightblue"; labelColor ? null; }`, `message` and `color` bash expressions.
 { gistId, badges, condition ? null }:
 let utils = import ../../../../utils;
 in map (step: if condition == null then step else step // { "if" = condition; }) [
@@ -17,7 +17,7 @@ in map (step: if condition == null then step else step // { "if" = condition; })
       PNAME="''${GITHUB_REPOSITORY##*/}"
       gh api -X PATCH gists/${gistId} --silent \
     '' + builtins.concatStringsSep " \\\n" (builtins.attrValues (builtins.mapAttrs
-      (key: { label, message }: ''  -f "files[$PNAME-${key}.json][content]={\"schemaVersion\": 1, \"label\": \"${label}\", \"message\": \"${message}\", \"color\": \"lightblue\"}"'')
+      (key: { label, message, color ? "lightblue", labelColor ? null }: ''  -f "files[$PNAME-${key}.json][content]={\"schemaVersion\": 1, \"label\": \"${label}\", \"message\": \"${message}\", \"color\": \"${color}\"${if labelColor == null then "" else ", \\\"labelColor\\\": \\\"${labelColor}\\\""}}"'')
       badges)) + "\n";
   }
 ]

@@ -1,7 +1,7 @@
 # v_flakes
 <br>
-[<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/errors.yml?branch=main&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amain) <!--NB: Won't find it if repo is private-->
-[<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/valeratrades/v_flakes/warnings.yml?branch=main&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/valeratrades/v_flakes/actions?query=branch%3Amain) <!--NB: Won't find it if repo is private-->
+[![errors](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/valeratrades/b48e6f02c61942200e7d1e3eeabf9bcb/raw/v_flakes-errors.json)](https://github.com/valeratrades/v_flakes/actions/workflows/errors.yml?query=branch%3Amain)
+[![warnings](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/valeratrades/b48e6f02c61942200e7d1e3eeabf9bcb/raw/v_flakes-warnings.json)](https://github.com/valeratrades/v_flakes/actions/workflows/warnings.yml?query=branch%3Amain)
 
 Collection of reusable Nix components for project configuration.
 

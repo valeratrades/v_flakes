@@ -1,35 +1,24 @@
-{ package ? null }:
-let
-  # `cargo docs-rs` refuses to guess a member, so drive it once per workspace member. It also
-  # errors out on a member with no lib target, which a workspace's binary crate is, so ask
-  # metadata which members have something to document rather than assuming every member does.
-  cargoDocsCmd =
-    if package != null
-    then "cargo docs-rs -p ${package}"
-    else ''
-      for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | .name'); do
-        cargo docs-rs -p "$p"
-      done
-    '';
-in
+{ cargoDocsCmd }:
 {
-  name = "Documentation";
-  needs = "pre_ci";
-  "if" = "needs.pre_ci.outputs.continue";
-  runs-on = "ubuntu-latest";
-  timeout-minutes = 45;
-  env.RUSTDOCFLAGS = "-Dwarnings";
-  steps = [
-    { uses = "actions/checkout@v5"; }
-    { uses = "dtolnay/rust-toolchain@nightly"; }
-    {
-      name = "Download modified by pre-ci Cargo.toml files";
-      uses = "actions/download-artifact@v7";
-      "with".name = "modified-cargo-files";
-    }
-    { uses = "dtolnay/install@cargo-docs-rs"; }
-    { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # local-dev flags (mold linker, `-Z threads`) the runner doesn't have
-    { uses = "Swatinem/rust-cache@v2"; }
-    { run = cargoDocsCmd; }
-  ];
+  job = {
+    name = "Documentation";
+    needs = "pre_ci";
+    "if" = "needs.pre_ci.outputs.continue";
+    runs-on = "ubuntu-latest";
+    timeout-minutes = 45;
+    env.RUSTDOCFLAGS = "-Dwarnings";
+    steps = [
+      { uses = "actions/checkout@v5"; }
+      { uses = "dtolnay/rust-toolchain@nightly"; }
+      {
+        name = "Download modified by pre-ci Cargo.toml files";
+        uses = "actions/download-artifact@v7";
+        "with".name = "modified-cargo-files";
+      }
+      { uses = "dtolnay/install@cargo-docs-rs"; }
+      { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # local-dev flags (mold linker, `-Z threads`) the runner doesn't have
+      { uses = "Swatinem/rust-cache@v2"; }
+    ];
+  };
+  work = [{ run = cargoDocsCmd; }];
 }

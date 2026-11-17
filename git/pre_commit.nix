@@ -10,9 +10,6 @@
   codestyleLazyInstall ? ""
 , # List of directory paths (relative to repo root) to exclude from sort-derives and codestyle, e.g. ["libs/nautilus_trader"]
   excludeDirs ? [ ]
-, # Run `pnpm test:visual` (playwright) in the hook. Driven by the js module's
-  # `preCommit.visual`. Runs outside the Cargo.toml guard — it is not rust-gated.
-  jsVisual ? false
 , # `git_ops` package whose `sync-github` the hook starts detached; null when labels are off
   gitOps ? null
 , # rs.cargoRoot: where the rust steps run
@@ -34,7 +31,6 @@ let
     ++ flag actualStyleAssert "--style-assert"
     ++ (if moduleFlags != "" then [ "--module-flags" moduleFlags ] else [ ])
     ++ builtins.concatMap (d: [ "--exclude-dir" d ]) excludeDirs
-    ++ flag jsVisual "--js-visual"
     ++ (if gitOps != null then [ "--git-ops" "${gitOps}/bin/git_ops" ] else [ ])
     ++ (if codestyleLazyInstall != "" then [ "--codestyle-install" codestyleLazyInstall ] else [ ]);
 in

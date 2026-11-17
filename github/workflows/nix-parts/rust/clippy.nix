@@ -1,18 +1,21 @@
+{ cmd }:
 {
-  name = "Clippy";
-  needs = "pre_ci";
-  runs-on = "ubuntu-latest";
-  timeout-minutes = 45;
-  steps = [
-    { uses = "actions/checkout@v5"; }
-    { uses = "dtolnay/rust-toolchain@clippy"; }
-    {
-      name = "Download modified by pre-ci Cargo.toml files";
-      uses = "actions/download-artifact@v7";
-      "with".name = "modified-cargo-files";
-    }
-    { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # it can have eg `threads=8`; which could lead to races when reasoning about macros
-    { uses = "Swatinem/rust-cache@v2"; }
-    { run = "cargo clippy --workspace --all-targets -- -Dwarnings"; } #-Dclippy::all #-Dclippy::pedantic
-  ];
+  job = {
+    name = "Clippy";
+    needs = "pre_ci";
+    runs-on = "ubuntu-latest";
+    timeout-minutes = 45;
+    steps = [
+      { uses = "actions/checkout@v5"; }
+      { uses = "dtolnay/rust-toolchain@clippy"; }
+      {
+        name = "Download modified by pre-ci Cargo.toml files";
+        uses = "actions/download-artifact@v7";
+        "with".name = "modified-cargo-files";
+      }
+      { run = "rm -f \"$GITHUB_WORKSPACE/.cargo/config.toml\" \"$GITHUB_WORKSPACE/.cargo/config\""; } # it can have eg `threads=8`; which could lead to races when reasoning about macros
+      { uses = "Swatinem/rust-cache@v2"; }
+    ];
+  };
+  work = [{ run = cmd; }];
 }

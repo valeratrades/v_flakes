@@ -3,7 +3,6 @@ args@{ pkgs ? null
 , pname ? null
 , lastSupportedVersion ? null
 , jobs ? { }
-, hookPre ? { }
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , langs ? null
 , gitignore ? { }
@@ -59,7 +58,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "hookPre" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "typ" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "lastSupportedVersion" "jobs" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "typ" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -126,9 +125,6 @@ let
     if moduleFlags != null then moduleFlags
     else if computedModuleFlags != "" then computedModuleFlags
     else rsModuleFlags;
-  # Visual-regression pre-commit step, driven by the js module's required
-  # `preCommit.visual`. Reading it forces js's requiredness asserts.
-  actualJsVisual = if js != null then js.preCommit.visual else false;
 in
 
 # If called with just nixpkgs (for flake description), return description attribute
@@ -140,80 +136,38 @@ if nixpkgs != null && pkgs == null then {
     utils = import ../utils;
     files = import ../files;
 
-    # Shared defaults across all languages
-    sharedWarnings = [ "tokei" "code-duplication" ]; #TEST: if code-duplication works for other languages
-    sharedOther = [ "loc-badge" ];
-
-    # Default jobs per language
-    defaultJobsByLang = {
+    # Default particles per language; a string names one of particles/catalog.nix
+    defaultsByLang = {
       rs = {
         errors = [ "rust-tests" ];
-        warnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" ]; #WAIT: until "rust-unused-features" finally gets --edition 2024 support
+        warnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "rust-sorted-derives" "tokei" ]; #WAIT: until "rust-unused-features" finally gets --edition 2024 support
       };
       go = {
         errors = [ "go-tests" ];
         warnings = [ "go-gocritic" "go-security-audit" ];
       };
-      py = {
-        errors = [ "py-tests" ];
-        warnings = [ ];
-      };
-      tex = {
-        errors = [ ];
-        warnings = [ ];
-      };
-      js = {
-        errors = [ ];
-        warnings = [ ];
-      };
+      py.errors = [ "py-tests" ];
+      js = if js != null then js.particles else { };
     };
+    sharedDefaults.warnings = [ "code-duplication" ]; #TEST: if code-duplication works for other languages
+    sharedDefaults.other = [ "loc-badge" ];
 
-    # Compute defaults based on langs
     computeDefaultsForLangs = category:
-      let
-        langJobs = builtins.concatLists (map
-          (lang:
-            (defaultJobsByLang.${lang}.${category} or [ ])
-          )
-          effectiveLangs);
-        shared =
-          if category == "warnings" then sharedWarnings
-          else if category == "other" then sharedOther
-          else [ ];
-      in
-      langJobs ++ shared;
+      builtins.concatLists (map (lang: defaultsByLang.${lang}.${category} or [ ]) effectiveLangs)
+      ++ (sharedDefaults.${category} or [ ]);
 
-    # Process a jobs section (errors, warnings, or other)
-    # Takes: { default? = bool; defaults? = bool; augment? = [...]; exclude? = [...]; } or just a list (legacy)
-    # Accepts both `default` and `defaults` as aliases via optionalDefaults
+    # A section: { default? = bool; defaults? = bool; augment? = [...]; exclude? = [...]; } or just a list (legacy)
     processJobsSection = category: sectionConfig: topDefault:
       let
-        # Handle legacy list format
-        isLegacyList = builtins.isList sectionConfig;
-        sectionRaw = if isLegacyList then { augment = sectionConfig; } else sectionConfig;
+        sectionRaw = if builtins.isList sectionConfig then { augment = sectionConfig; } else sectionConfig;
         section = utils.optionalDefaults sectionRaw;
-
-        # Determine if defaults should be enabled for this section
-        sectionDefault = section.default or topDefault;
-
-        # Get base jobs from defaults if enabled
-        baseJobs = if sectionDefault then computeDefaultsForLangs category else [ ];
-
-        # Get augment and exclude lists
-        augmentJobs = section.augment or [ ];
-        excludeJobs = section.exclude or [ ];
-
-        # Helper to get job name from spec (handles both string and attrset)
+        baseJobs = if section.default or topDefault then computeDefaultsForLangs category else [ ];
         getJobName = spec: if builtins.isString spec then spec else spec.name;
-
-        # Filter out excluded jobs
-        filteredBase = builtins.filter
-          (job:
-            !(builtins.elem (getJobName job) excludeJobs)
-          )
-          baseJobs;
+        excludeJobs = section.exclude or [ ];
+        unexcludable = builtins.filter (n: !(builtins.elem n (map getJobName baseJobs))) excludeJobs;
       in
-      filteredBase ++ augmentJobs;
+      assert unexcludable == [ ] || throw "v_flakes.github: jobs.${category}.exclude names no default of it: ${toString unexcludable}";
+      builtins.filter (job: !(builtins.elem (getJobName job) excludeJobs)) baseJobs ++ (section.augment or [ ]);
 
     # Get top-level default setting (accepts both `default` and `defaults`)
     jobsNormalized = utils.optionalDefaults jobs;
@@ -243,6 +197,17 @@ if nixpkgs != null && pkgs == null then {
     # sync_fork: can be set via jobs.sync_fork or top-level syncFork param
     effectiveSyncFork = syncFork || (jobs.sync_fork or false);
 
+    # A section's `install.packages` are nixpkgs attribute paths its CI jobs get; v_flakes' own particles get them locally too
+    catalogFor = installConfig: import ./particles/catalog.nix {
+      inherit pkgs rust rs cargoRoot webUnstable lastSupportedVersion gistId;
+      runtimeInputs = map (n: pkgs.lib.getAttrFromPath (pkgs.lib.splitString "." n) pkgs) (installConfig.packages or [ ]);
+    };
+    particles = import ./particles {
+      inherit pkgs;
+      catalogs = { errors = catalogFor installErrors; warnings = catalogFor installWarnings; };
+      sections = { errors = jobsErrors; warnings = jobsWarnings; };
+    };
+
     workflows = import ./workflows/nix-parts ({
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
@@ -250,17 +215,16 @@ if nixpkgs != null && pkgs == null then {
       typstRelease = if typ == null then null else
         assert typ ? document || throw "v_flakes.github: `typ` is only taken for its document; set `main` on the typ module";
         { inherit (typ) html; };
-      inherit pname lastSupportedVersion jobsErrors jobsWarnings jobsOther hookPre release containerRelease npmRelease visualBaselines figma gitlabSync cargoRoot webUnstable;
+      inherit pname lastSupportedVersion jobsOther release containerRelease npmRelease visualBaselines figma gitlabSync cargoRoot webUnstable;
       lfs = lfs == true;
       skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
       rustRepo = rust != null;
       inherit installErrors installWarnings installOther;
       inherit hooksErrors hooksWarnings hooksOther;
       inherit claude;
-    } else {
-      jobsErrors = [ ];
-      jobsWarnings = [ ];
-    }));
+      particlesErrors = particles.errors;
+      particlesWarnings = particles.warnings;
+    } else { }));
 
     # --- Everything below is only computed when `enable = true` ---
 
@@ -318,7 +282,7 @@ if nixpkgs != null && pkgs == null then {
     # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
     # module is what says one is owed; a repo that passes none (typst, docs) takes
     # the rest of the hook without it. Forced only through the `enable` branch.
-    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; jsVisual = actualJsVisual; };
+    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
         assert (rust != null) || throw
@@ -383,8 +347,9 @@ if nixpkgs != null && pkgs == null then {
     enabledPackages =
       if enable then
         [ git_ops code_duplication pkgs.treefmt ]
+          ++ pkgs.lib.optional (particles.errors ++ particles.warnings != [ ]) particles.runner
           ++ (if semverChecks then [ pkgs.cargo-semver-checks ] else [ ])
           ++ (if npmRelease != null then [ (import ./npm-trust.nix { inherit pkgs; inherit (npmRelease) scope packagesDir; }) ] else [ ])
       else [ ];
-  } // (if enable then { inherit git_ops code_duplication; } else { }))
+  } // (if enable then { inherit git_ops code_duplication; test = particles.runner; } else { }))
 

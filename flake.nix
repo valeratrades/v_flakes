@@ -39,6 +39,16 @@
     let
       pname = "v_flakes";
       isRust = packages: (builtins.tryEval (packages ? default && packages.default ? cargoDeps)).value; # a packages.default that fails to evaluate gets no apps.default
+      # the github module's runner, which `combine` puts in the devShell; a devShell that fails to evaluate gets no apps.test
+      particleRunner = shell:
+        let found = builtins.tryEval (nixpkgs.lib.findFirst (p: p ? vFlakesParticles) null (shell.nativeBuildInputs or [ ])); in
+        if shell == null || !found.success then null else found.value;
+      testApp = apps: shell:
+        let runner = particleRunner shell; in
+        if runner == null then { }
+        else
+          assert !(apps ? test) || throw "v_flakes: `apps.test` is the particle runner; declare the check as a particle of `jobs.errors` / `jobs.warnings` (github/particles)";
+          { test = { type = "app"; program = nixpkgs.lib.getExe runner; meta.description = runner.meta.description; }; };
 
       # `combine` stamps every repo it generates into with this v_flakes, and refuses to run
       # under an older one than the stamp; see `utils.combine`.
@@ -134,12 +144,13 @@
             doCheck = false; # tests/ is outside the fileset
           };
 
+          apps.test = { type = "app"; program = pkgs.lib.getExe github.test; meta.description = github.test.meta.description; };
           apps.help = utils.help {
             inherit pkgs self system;
             about = ''
               ${pname} — shared Nix parts. Consumers pin one input:
                 inputs.v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
-              Parts (v_flakes.<attr>):  files github rs py tex typ js js-local readme-fw utils qlty container lean
+              Parts (v_flakes.<attr>):  files github rs py tex typ js readme-fw utils qlty container lean
               Re-exported inputs:       nixpkgs default_nixpkgs flake-utils rust-overlay pre-commit-hooks
                                         flake-parts process-compose-flake devenv lean4-nix
               v_flakes org sync <ORG>   converge org custom property definitions (cli/org_properties.json)
@@ -209,7 +220,8 @@
       # is the same rev as a bare source tree, for `import`.
       inherit nixpkgs rust-overlay pre-commit-hooks process-compose-flake devenv lean4-nix;
       # Wrapped to give every flake built through them an `apps.help`, unless it defines its own `help`,
-      # and a rust `packages.default` an `apps.default` (utils/cargo-run.nix), unless it defines its own.
+      # a rust `packages.default` an `apps.default` (utils/cargo-run.nix), unless it defines its own,
+      # and `apps.test`, the particle runner its devShell carries (github/particles).
       flake-utils =
         let
           withApps = f: system:
@@ -218,7 +230,7 @@
               pkgs = nixpkgs.legacyPackages.${system};
               apps = (out.apps or { }) // nixpkgs.lib.optionalAttrs (!(out ? apps.default) && isRust (out.packages or { })) {
                 default = import ./utils/cargo-run.nix { inherit pkgs; package = out.packages.default; };
-              };
+              } // testApp (out.apps or { }) (out.devShells.default or null);
             in
             out // {
               apps = apps // nixpkgs.lib.optionalAttrs (!(out ? apps.help || out ? packages.help)) {
@@ -251,6 +263,7 @@
                     pkgs = nixpkgs.legacyPackages.${system};
                     package = config.packages.default;
                   }));
+                  apps.test = lib.mkIf (particleRunner (config.devShells.default or null) != null) (testApp { } config.devShells.default).test;
                 };
               }
             ];
@@ -265,7 +278,6 @@
       tex = import ./langs/tex;
       typ = import ./langs/typ;
       js = import ./langs/js;
-      js-local = import ./langs/js/local.nix;
       readme-fw = import ./readme_fw;
       inherit utils;
       qlty = import ./tools/qlty.nix;
@@ -278,7 +290,6 @@
         treefmt = import ./files/treefmt.nix;
         preCommit = import ./git/pre_commit.nix;
       };
-      workflows = import ./github/workflows/nix-parts;
       ci = import ./github;
     };
 }

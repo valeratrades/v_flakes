@@ -2,10 +2,10 @@ args@{ pkgs ? null
 , nixpkgs ? null
 , pname ? null
 , lastSupportedVersion ? null
-, jobsErrors
-, jobsWarnings
+, # resolved particles (github/particles), one workflow per section
+  particlesErrors ? [ ]
+, particlesWarnings ? [ ]
 , jobsOther ? [ ]
-, hookPre ? { }
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , release ? null
 , containerRelease ? null
@@ -58,26 +58,12 @@ if nixpkgs != null && pkgs == null then {
     Note: This module is typically used via github/default.nix which provides
     a higher-level interface with default job selection based on langs.
 
-    Direct usage (low-level):
-    ```nix
-    workflows = import ./github/workflows/nix-parts {
-      inherit pkgs;
-      lastSupportedVersion = "nightly-1.86";
-      jobsErrors = [ "rust-tests" "rust-doc" ];
-      # Or with args: { name = "rust-tests"; args.skipPatterns = [ "pattern1" "pattern2" ]; }
-      jobsWarnings = [ "rust-clippy" "rust-machete" ];
-      jobsOther = [ "loc-badge" ];
-      # Per-section `on` triggers (default: push; workflow_dispatch always appended):
-      # hooksErrors = { push = { branches = [ "main" ]; }; pull_request = {}; };
-    };
-    ```
+    Errors and Warnings run the particles of `jobs.errors` / `jobs.warnings` (github/particles): those
+    with a `ci` body as a job each, the rest in one `particles` job (`nix run .#test -- --severity <s> --serial <names>`),
+    then a `report` job writing the section's badge (`<repo>-errors.json` / `-warnings.json` in the badge gist).
 
-    Available jobs: rust-tests, rust-doc, rust-miri, rust-clippy, rust-machete, rust-sorted, rust-sorted-derives, rust-unused-features, rust-leptosfmt, go-tests, go-gocritic, go-security-audit, py-tests, js-tests, tokei, loc-badge, code-duplication, asset-gate, flake-app
-
-    `asset-gate`, `flake-app` and `js-tests` take args and so are passed as attrsets:
+    Other jobs: loc-badge, asset-gate (`jobs.other`), the latter with args:
       jobsOther = [ { name = "asset-gate"; args = { asset = "docs/x.svg"; command = "nix run .#film"; everySeconds = 86400; }; } ];
-      jobsErrors = [ { name = "flake-app"; args.app = "visual"; } ];
-      jobsErrors = [ { name = "js-tests"; args.packagesDir = "ts"; } ];  # `npm test` in every `ts/*` package with a `test` script, its `file:` deps built first
 
     Standalone workflows:
     - release = { }  # enabled by presence, disabled with `enable = false`
@@ -130,17 +116,6 @@ if nixpkgs != null && pkgs == null then {
     # Check if section has nix packages
     hasNixPackages = installConfig: (installConfig.packages or [ ]) != [ ];
 
-    # Generate nix-shell prefix for wrapping commands (sets up PKG_CONFIG_PATH etc)
-    # We need to also set LD_LIBRARY_PATH for runtime library loading
-    nixShellPrefix = installConfig:
-      let
-        packages = installConfig.packages or [ ];
-        pkgList = builtins.concatStringsSep " " packages;
-      in
-      if packages == [ ] then ""
-      # Use --command with bash to set LD_LIBRARY_PATH from buildInputs before running
-      else "nix-shell -p ${pkgList} --command ";
-
     # job-level, not workflow-level: the shared jobs alongside need the repo root
     inCargoRoot = job:
       if cargoRoot == "." then job
@@ -175,123 +150,44 @@ if nixpkgs != null && pkgs == null then {
     files = {
       # shared {{{
       base = ./shared/base.nix;
-      tokei = ./shared/tokei.nix;
       loc-badge = ./shared/loc-badge.nix;
       sync-gitlab = ./shared/sync-gitlab.nix;
       cachix = ./shared/cachix.nix;
-      code-duplication = ./shared/code-duplication.nix;
       asset-gate = ./shared/asset-gate.nix;
-      flake-app = ./shared/flake-app.nix;
       #,}}}
 
-      # rust {{{
-      rust-base = ./rust/base.nix;
-      rust-tests = ./rust/tests.nix;
-      rust-doc = ./rust/doc.nix;
-      rust-miri = ./rust/miri.nix;
-      rust-clippy = ./rust/clippy.nix;
-      rust-machete = ./rust/machete.nix;
-      rust-sorted = ./rust/sorted.nix;
-      rust-sorted-derives = ./rust/sorted_derives.nix;
-      rust-unused-features = ./rust/unused_features.nix;
-      rust-release = ./rust/release.nix;
       container-release = ../../container/workflow.nix;
-      #,}}}
-
-      # go {{{
-      go-tests = ./go/tests.nix;
-      go-gocritic = ./go/gocritic.nix;
-      go-security-audit = ./go/security_audit.nix;
-      #,}}}
-
-      # py {{{
-      py-tests = ./py/tests.nix;
-      #,}}}
-
-      # js {{{
-      js-tests = ./js/tests.nix;
-      #,}}}
+      rust-release = ./rust/release.nix;
+      rust-base = ./rust/base.nix;
     };
 
-    importFile = installConfig: jobSpec:
+    # A section's `install`: its nix packages around every `run` (nix-shell), apt ones installed first
+    withInstall = installConfig: baseValue:
       let
-        # Support both string and attrset (for passing args)
-        jobName = if builtins.isString jobSpec then jobSpec else jobSpec.name;
-        jobArgs = if builtins.isString jobSpec then { } else (jobSpec.args or { });
-
-        # Build the arguments to pass to the imported file
-        args =
-          if jobName == "rust-tests"
-          then { inherit lastSupportedVersion gistId; } // jobArgs
-          else if jobName == "loc-badge"
-          then { inherit gistId; } // jobArgs
-          # These install nix themselves rather than going through load_nix, so they
-          # need the repo's cache mode — without this they silently fall back to the
-          # module default and the repo's `cache` setting does nothing.
-          else if jobName == "asset-gate"
-          then { inherit cache; preCi = rustRepo; } // jobArgs
-          else if jobName == "flake-app"
-          then { inherit cache; } // jobArgs
-          else jobArgs;
-
-        # Import the file
-        imported = import (builtins.getAttr jobName files);
-
-        # Check if it's a function (needs to be called) or already a value (attrset)
-        baseValue =
-          if builtins.isFunction imported
-          then imported args
-          else imported;
-
-        # Generate install steps from section-level install config
         installSteps = makeInstallSteps installConfig;
         needsNix = hasNixPackages installConfig;
 
-        # Apply hookPre if specified for this job
-        valueWithHookPre =
-          if builtins.hasAttr jobName hookPre
-          then
-            let
-              # Get the list of pre-hook commands for this job
-              preHookCmds = builtins.getAttr jobName hookPre;
-
-              # Convert each string command to a step attrset
-              preHookSteps = map (cmd: { run = cmd; }) preHookCmds;
-
-              # Prepend pre-hook steps to existing steps
-              modifiedSteps = preHookSteps ++ baseValue.steps;
-            in
-            baseValue // { steps = modifiedSteps; }
-          else baseValue;
-
-        # Apply install steps (after checkout, before other steps)
-        # Find checkout step and insert install steps after it
+        # after checkout, before other steps
         valueWithInstall =
           if installSteps != [ ] then
             let
-              steps = valueWithHookPre.steps;
-              # Find index of checkout step (usually first)
+              steps = baseValue.steps;
               checkoutIdx = pkgs.lib.lists.findFirstIndex
-                (s: (s.uses or "") == "actions/checkout@v4")
+                (s: pkgs.lib.hasPrefix "actions/checkout@" (s.uses or ""))
                 0
                 steps;
-              # Split steps: before+checkout, then rest
               beforeAndCheckout = pkgs.lib.lists.take (checkoutIdx + 1) steps;
               afterCheckout = pkgs.lib.lists.drop (checkoutIdx + 1) steps;
             in
-            valueWithHookPre // { steps = beforeAndCheckout ++ installSteps ++ afterCheckout; }
-          else valueWithHookPre;
+            baseValue // { steps = beforeAndCheckout ++ installSteps ++ afterCheckout; }
+          else baseValue;
 
-        # Wrap run commands in nix-shell if packages are specified
-        # Also set LD_LIBRARY_PATH for runtime library loading (needed on non-NixOS systems like GHA Ubuntu)
-        shellPrefix = nixShellPrefix installConfig;
+        # LD_LIBRARY_PATH too: runtime libraries aren't in the default search paths on non-NixOS runners
         packages = installConfig.packages or [ ];
         # Always include openssl.out (runtime libs), openssl.dev (headers), and pkg-config (so openssl-sys finds nix headers, not system ones)
         allPackages = packages ++ [ "pkg-config" "openssl.out" "openssl.dev" ]; #Q: should that include "mold"?
         # git: cargo shells out to it, and the runner's own git can't load under a nix LD_LIBRARY_PATH (nix glibc libs vs system libc)
         pkgList = builtins.concatStringsSep " " (allPackages ++ [ "git" ]);
-        # Build LD_LIBRARY_PATH setup using nix-build to get exact store paths
-        # This is needed on non-NixOS systems (like GHA Ubuntu) where runtime libraries aren't in default search paths
         ldLibPathSetup = builtins.concatStringsSep "" (map
           (pkg:
             "export LD_LIBRARY_PATH=\\\"\\$(nix-build '<nixpkgs>' -A ${pkg} --no-out-link)/lib\\\${LD_LIBRARY_PATH:+:}\\$LD_LIBRARY_PATH\\\" && "
@@ -309,10 +205,9 @@ if nixpkgs != null && pkgs == null then {
           builtins.replaceStrings [ "__GHA_EXPR__" ] [ "\${{" ] escaped;
         setupSteps = (import ../../cache.nix { inherit cache; }).setupSteps;
         wrapStep = step:
-          if shellPrefix == "" then step
-          else if builtins.elem step setupSteps then step # runs before Nix is installed
+          if builtins.elem step setupSteps then step # runs before Nix is installed
           else if step ? run then
-          # Wrap the run command in nix-shell, but skip if it's already a nix command or echo
+          # skip what is already a nix command, and `echo`s (the timing steps among them)
             if builtins.substring 0 4 step.run == "nix " then step
             else if builtins.substring 0 9 step.run == "nix-shell" then step
             else if builtins.substring 0 5 step.run == "echo " then step
@@ -323,7 +218,6 @@ if nixpkgs != null && pkgs == null then {
             valueWithInstall // { steps = map wrapStep valueWithInstall.steps; }
           else valueWithInstall;
 
-        # Add load_nix to needs if nix packages are required
         existingNeeds = valueWithWrappedRuns.needs or null;
         newNeeds =
           if needsNix then
@@ -331,20 +225,27 @@ if nixpkgs != null && pkgs == null then {
             else if builtins.isList existingNeeds then [ "load_nix" ] ++ existingNeeds
             else [ "load_nix" existingNeeds ]
           else existingNeeds;
+      in
+      if newNeeds != null
+      then valueWithWrappedRuns // { needs = newNeeds; }
+      else valueWithWrappedRuns;
 
-        valueWithNeeds =
-          if newNeeds != null
-          then valueWithWrappedRuns // { needs = newNeeds; }
-          else valueWithWrappedRuns;
-
-        value =
-          if pkgs.lib.hasPrefix "rust-" jobName
-          then inCargoRoot (if builtins.elem jobName [ "rust-clippy" "rust-doc" ] then withWebCfg valueWithNeeds else valueWithNeeds)
-          else valueWithNeeds;
+    importFile = installConfig: jobSpec:
+      let
+        jobName = if builtins.isString jobSpec then jobSpec else jobSpec.name;
+        jobArgs = if builtins.isString jobSpec then { } else (jobSpec.args or { });
+        args =
+          if jobName == "loc-badge"
+          then { inherit gistId; } // jobArgs
+          # installs nix itself rather than going through load_nix, so it needs the repo's cache mode
+          else if jobName == "asset-gate"
+          then { inherit cache; preCi = rustRepo; } // jobArgs
+          else jobArgs;
+        imported = import (builtins.getAttr jobName files);
       in
       {
         name = jobName;
-        inherit value;
+        value = withInstall installConfig (if builtins.isFunction imported then imported args else imported);
       };
 
     constructJobs = installConfig: paths:
@@ -490,38 +391,115 @@ if nixpkgs != null && pkgs == null then {
       in
       if wf != null then wf.jobs else { };
 
-    workflows = {
-      #TODO!!!!: construct all of this procedurally, as opposed to hardcoding `jobs` and `env` base to `rust-base`
-      #Q: Potentially standardize each file providing a set of outs, like `jobs`, `env`, etc, then manually join on them?
-      errors =
-        if jobsErrors != [ ] then
-          yaml
-            (
-              pkgs.lib.recursiveUpdate base {
-                name = "Errors";
-                "on" = makeOn hooksErrors;
-                permissions = (import files.base).permissions;
-                env = (import files.rust-base).env;
-                jobs = pkgs.lib.recursiveUpdate
-                  (pkgs.lib.recursiveUpdate (import files.rust-base).jobs (loadNixJob installErrors))
-                  (constructJobs installErrors jobsErrors);
-              }
-            ) else null;
+    # A section's particles: one job per particle with a `ci` body, one `particles` job running the rest
+    # serially through `nix run .#test`, and on the default branch a `report` job writing the section's
+    # badge from their outcomes and their own run seconds (setup, nix install and cache restore left out).
+    particleWorkflow = { title, severity, particles, installConfig, hooks }:
+      let
+        lib = pkgs.lib;
+        nixCi = import ../../cache.nix { inherit cache; };
+        bespoke = builtins.filter (p: p.ci != null) particles;
+        generic = builtins.filter (p: p.ci == null) particles;
+        names = map (p: p.name) generic;
 
-      warnings =
-        if jobsWarnings != [ ] then
-          yaml
-            (
-              pkgs.lib.recursiveUpdate base {
-                name = "Warnings";
-                "on" = makeOn hooksWarnings;
-                permissions = (import files.base).permissions;
-                env = (import files.rust-base).env;
-                jobs = pkgs.lib.recursiveUpdate
-                  (pkgs.lib.recursiveUpdate (import files.rust-base).jobs (loadNixJob installWarnings))
-                  (constructJobs installWarnings jobsWarnings);
-              }
-            ) else null;
+        bespokeJob = p: withInstall installConfig (p.ci.job // {
+          outputs = (p.ci.job.outputs or { }) // { seconds = "\${{ steps.particle.outputs.seconds }}"; };
+          steps = p.ci.job.steps
+            ++ [{ run = "echo \"T_PARTICLE=$(date +%s)\" >> \"$GITHUB_ENV\""; }]
+            ++ p.ci.work
+            ++ [{
+            id = "particle";
+            "if" = if p.ci.timedIf or null == null then "always()" else "always() && (${p.ci.timedIf})";
+            run = "echo \"seconds=$((T_PARTICLE ? $(date +%s) - T_PARTICLE : 0))\" >> \"$GITHUB_OUTPUT\""; # unset when setup failed first
+          }]
+            ++ (p.ci.post or [ ]);
+        });
+
+        caches = builtins.filter (c: c != null) (map (p: p.ciCache) generic);
+        cachePrefix = "particles-${severity}-\${{ runner.os }}-";
+        cacheWith = {
+          path = lib.concatStringsSep "\n" (lib.unique (lib.concatMap (c: c.paths) caches));
+          key = "${cachePrefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") (lib.unique (lib.concatMap (c: c.hashFiles) caches))}) }}";
+          restore-keys = cachePrefix;
+        };
+        # as cache.nix's lean cache: every ref reads the default branch's, so only it saves
+        cacheSteps = lib.optionals (caches != [ ]) [
+          { name = "Restore particles' cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
+          { name = "Particles' cache"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
+        ];
+        genericJob = {
+          name = "Particles";
+          runs-on = "ubuntu-latest";
+          timeout-minutes = 90;
+          outputs = builtins.listToAttrs (lib.concatMap
+            (n: map (o: { name = "${n}_${o}"; value = "\${{ steps.run.outputs['${n}_${o}'] }}"; }) [ "seconds" "status" ])
+            names);
+          steps = [ ({ uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; }) ]
+            ++ nixCi.setupSteps
+            ++ [ nixCi.installStep ]
+            ++ nixCi.cacheSteps
+            ++ cacheSteps
+            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} --serial ${lib.escapeShellArgs names}"; }];
+        };
+
+        jobs = builtins.listToAttrs (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke)
+          // lib.optionalAttrs (generic != [ ]) { particles = genericJob; };
+        needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues jobs);
+
+        report = {
+          name = "Report";
+          needs = builtins.attrNames jobs;
+          "if" = "always() && github.ref_name == github.event.repository.default_branch";
+          runs-on = "ubuntu-latest";
+          steps = [{
+            name = "Tally the particles";
+            env = {
+              NEEDS = "\${{ toJSON(needs) }}";
+              PARTICLES = builtins.toJSON (map (p: { inherit (p) name; generic = p.ci == null; }) particles);
+            };
+            run = ''
+              read -r failed total seconds incomplete < <(jq -rn --argjson needs "$NEEDS" --argjson spec "$PARTICLES" '
+                def secs: if . == null or . == "" then 0 else tonumber end;
+                [ $spec[] | . as $p
+                  | if $p.generic
+                    then $needs.particles as $j | { ok: ($j.outputs[$p.name + "_status"] == "ok"), t: ($j.outputs[$p.name + "_seconds"] | secs), r: $j.result }
+                    else $needs[$p.name] as $j | { ok: ($j.result == "success"), t: ($j.outputs.seconds | secs), r: $j.result } end ]
+                | "\(map(select(.ok | not)) | length) \(length) \(map(.t) | add) \(map(select(.r == "skipped" or .r == "cancelled")) | length)"')
+              if [ "$incomplete" != 0 ]; then
+                echo "::notice::a particle's job was skipped or cancelled: the badge keeps its last complete run"
+                exit 0
+              fi
+              time="$((seconds / 60))m $((seconds % 60))s"
+              if [ "$failed" = 0 ]; then msg="✓ $time" color=brightgreen; else msg="✗ $failed/$total · $time" color=red; fi
+              { echo "BADGE_MESSAGE=$msg"; echo "BADGE_COLOR=$color"; } >> "$GITHUB_ENV"
+            '';
+          }] ++ import ./shared/gist-badges.nix {
+            inherit gistId;
+            condition = "env.BADGE_MESSAGE != ''";
+            badges.${severity} = {
+              label = severity;
+              message = "$BADGE_MESSAGE";
+              color = "$BADGE_COLOR";
+              labelColor = { errors = "420d09"; warnings = "d16002"; }.${severity};
+            };
+          };
+        };
+      in
+      if particles == [ ] then null else
+      yaml {
+        name = title;
+        "on" = makeOn hooks;
+        permissions = (import files.base).permissions;
+        env = (import files.rust-base).env;
+        jobs = lib.optionalAttrs needsPreCi { inherit ((import files.rust-base).jobs) pre_ci; }
+          // lib.optionalAttrs (bespoke != [ ]) (loadNixJob installConfig)
+          // jobs
+          // { inherit report; };
+      };
+
+    workflows = {
+      errors = particleWorkflow { title = "Errors"; severity = "errors"; particles = particlesErrors; installConfig = installErrors; hooks = hooksErrors; };
+      warnings = particleWorkflow { title = "Warnings"; severity = "warnings"; particles = particlesWarnings; installConfig = installWarnings; hooks = hooksWarnings; };
 
       other =
         if jobsOther != [ ] then

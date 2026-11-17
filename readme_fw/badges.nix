@@ -25,10 +25,10 @@ let
     test_time = gistBadge "Test time" "test";
     size = gistBadge "Release binary size" "size";
 
-    # note that it is possible to remove all references to the default branch and have it automatically use the current branch. But that would require running them on `on.push.branches: [**]`.
+    # gist files written by errors.yml / warnings.yml's `report` job on the default branch: they render for private repos too
     ci = ''      <br>
-      [<img alt="ci errors" src="https://img.shields.io/github/actions/workflow/status/${repo}/errors.yml?branch=${branch}&style=for-the-badge&style=flat-square&label=errors&labelColor=420d09" height="20">](https://github.com/${repo}/actions?query=branch%3A${branch}) <!--NB: Won't find it if repo is private-->
-      [<img alt="ci warnings" src="https://img.shields.io/github/actions/workflow/status/${repo}/warnings.yml?branch=${branch}&style=for-the-badge&style=flat-square&label=warnings&labelColor=d16002" height="20">](https://github.com/${repo}/actions?query=branch%3A${branch}) <!--NB: Won't find it if repo is private-->'';
+      [${gistBadge "errors" "errors"}](https://github.com/${repo}/actions/workflows/errors.yml?query=branch%3A${branch})
+      [${gistBadge "warnings" "warnings"}](https://github.com/${repo}/actions/workflows/warnings.yml?query=branch%3A${branch})'';
   };
   combineBadges = names:
     let

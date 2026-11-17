@@ -34,7 +34,6 @@ struct Config {
 	style: Option<Style>,
 	module_flags: Vec<String>,
 	exclude_dirs: Vec<String>,
-	js_visual: bool,
 	git_ops: Option<String>,
 	codestyle_install: Option<String>,
 }
@@ -42,7 +41,7 @@ struct Config {
 impl Config {
 	fn from_args() -> Self {
 		let (mut pname, mut cargo_root) = (None, None);
-		let (mut semver_checks, mut tracey_check, mut js_visual) = (false, false, false);
+		let (mut semver_checks, mut tracey_check) = (false, false);
 		let (mut style_format, mut style_assert) = (false, false);
 		let (mut module_flags, mut exclude_dirs) = (Vec::new(), Vec::new());
 		let (mut git_ops, mut codestyle_install) = (None, None);
@@ -62,7 +61,6 @@ impl Config {
 				"--style-assert" => style_assert = true,
 				"--module-flags" => module_flags = value().split_whitespace().map(String::from).collect(),
 				"--exclude-dir" => exclude_dirs.push(value()),
-				"--js-visual" => js_visual = true,
 				"--git-ops" => git_ops = Some(value()),
 				"--codestyle-install" => codestyle_install = Some(value()),
 				_ => panic!("unknown argument: {arg}"),
@@ -82,7 +80,6 @@ impl Config {
 			style,
 			module_flags,
 			exclude_dirs,
-			js_visual,
 			git_ops,
 			codestyle_install,
 		}
@@ -345,22 +342,6 @@ fn codestyle(cfg: &Config, style: Style, path: &std::ffi::OsStr) -> bool {
 	}
 }
 
-fn js_visual(log: &mut Log) -> bool {
-	let Some(dir) = [".", "frontend"]
-		.into_iter()
-		.find(|d| fs::read_to_string(Path::new(d).join("package.json")).is_ok_and(|s| s.contains("\"test:visual\"")))
-	else {
-		log.line("js.preCommit.visual: no package.json with a \"test:visual\" script found (looked in ./ and ./frontend)");
-		return false;
-	};
-	log.line(format!("Running: pnpm test:visual ({dir})"));
-	if !log.run(Command::new("pnpm").arg("test:visual").current_dir(dir)) {
-		log.line("pnpm test:visual failed");
-		return false;
-	}
-	true
-}
-
 fn main() -> ExitCode {
 	let cfg = Config::from_args();
 
@@ -440,14 +421,7 @@ fn main() -> ExitCode {
 			}));
 		}
 	}
-	if cfg.js_visual {
-		steps.push(Box::new(js_visual));
-	}
 	phase(steps);
-	// snapshot diffs the visual run produced are re-staged, mirroring the rust steps' staged-only contract
-	if cfg.js_visual {
-		assert!(Command::new("git").args(["add", "-u"]).status().expect("spawn git add").success(), "staging visual snapshots");
-	}
 
 	// commit message text file, if one was left
 	if let Err(e) = fs::remove_file("commit")
