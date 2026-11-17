@@ -278,7 +278,7 @@ if nixpkgs != null && pkgs == null then {
     # toolchain — and what it runs is guarded by a Cargo.toml anyway. A language
     # module is what says one is owed; a repo that passes none (typst, docs) takes
     # the rest of the hook without it. Forced only through the `enable` branch.
-    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; };
+    customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; autoinherit = if rs != null then (import ../tools/cargo_autoinherit.nix) pkgs.stdenv.hostPlatform.system else null; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
         ''

@@ -36,6 +36,7 @@ struct Config {
 	exclude_dirs: Vec<String>,
 	git_ops: Option<String>,
 	codestyle_install: Option<String>,
+	autoinherit: Option<String>,
 }
 
 impl Config {
@@ -44,7 +45,7 @@ impl Config {
 		let (mut semver_checks, mut tracey_check) = (false, false);
 		let (mut style_format, mut style_assert) = (false, false);
 		let (mut module_flags, mut exclude_dirs) = (Vec::new(), Vec::new());
-		let (mut git_ops, mut codestyle_install) = (None, None);
+		let (mut git_ops, mut codestyle_install, mut autoinherit) = (None, None, None);
 		let mut args = env::args().skip(1);
 		while let Some(arg) = args.next() {
 			let mut value = || args.next().unwrap_or_else(|| panic!("{arg} takes a value"));
@@ -63,6 +64,7 @@ impl Config {
 				"--exclude-dir" => exclude_dirs.push(value()),
 				"--git-ops" => git_ops = Some(value()),
 				"--codestyle-install" => codestyle_install = Some(value()),
+				"--autoinherit" => autoinherit = Some(value()),
 				_ => panic!("unknown argument: {arg}"),
 			}
 		}
@@ -82,6 +84,7 @@ impl Config {
 			exclude_dirs,
 			git_ops,
 			codestyle_install,
+			autoinherit,
 		}
 	}
 
@@ -225,8 +228,8 @@ fn sort_manifests(cfg: &Config, log: &mut Log) -> bool {
 		.expect("guarded by Cargo.toml existing")
 		.lines()
 		.any(|l| l.starts_with("[workspace]"));
-	if workspace && log.require_tool("cargo-autoinherit", "cargo install cargo-autoinherit") {
-		return log.run(Command::new("cargo").arg("autoinherit").current_dir(&cfg.cargo_root));
+	if workspace && let Some(autoinherit) = &cfg.autoinherit {
+		return log.run(Command::new(autoinherit).arg("autoinherit").current_dir(&cfg.cargo_root));
 	}
 	true
 }

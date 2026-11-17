@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- pre-commit: `cargo autoinherit` is a patched build passed in by store path (`tools/cargo_autoinherit.nix`), no longer whatever is on PATH. Upstream merged a member's `default-features = false` into a workspace entry that keeps the defaults and rewrote the member to `workspace = true`, silently turning the defaults back on; such a dep is now left as the member wrote it.
+
 - `code-duplication` takes `args.excludePatterns` (qlty globs): files alike by nature, as a translation of another. Its run starts from a fresh `qlty init`, as CI's does, rather than from whatever `.qlty/qlty.toml` a checkout kept.
 
 - **Particles: one registry of checks** (`github/particles`). A check is a particle by being listed in `jobs.errors` or `jobs.warnings`; that makes it part of `nix run .#test` (added to every flake built through v_flakes' flake-utils / flake-parts), a job of that section's workflow, and a count in its README badge. Custom ones are `{ name; program; }` or `{ name; builds = <derivations>; }`; v_flakes' own keep their names (`rust-tests`, `{ name = "rust-doc"; args.package = …; }`). Non-Rust-toolchain particles share one CI job per section (`nix run .#test -- --severity <s> --serial …`); the rust ones keep their jobs (matrix, pre_ci, rust-cache). Each section's `report` job writes `<repo>-errors.json` / `-warnings.json` to the badge gist on the default branch: `✓ 3m 12s` or `✗ 2/7 · 3m 12s`, time the sum of the particles' own seconds.

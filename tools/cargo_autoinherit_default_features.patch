@@ -1,0 +1,127 @@
+diff --git a/src/dedup.rs b/src/dedup.rs
+index e7bb57a..f4eed4c 100644
+--- a/src/dedup.rs
++++ b/src/dedup.rs
+@@ -1,7 +1,7 @@
+ use crate::{DependencySource, SharedDependency};
+ use semver::{Comparator, Op, Prerelease, VersionReq};
+ use std::cmp::Ordering;
+-use std::collections::HashMap;
++use std::collections::HashSet;
+ 
+ /// For a given package, this struct keeps track of the versions that have been seen.
+ /// It actively tries to minimize the number of versions that are kept.
+@@ -10,53 +10,44 @@ use std::collections::HashMap;
+ ///
+ /// - If the same version requirement appears more than once, only one instance is kept.
+ /// - If different version requirements appear, all instances are kept.
+-/// - If the same version requirement appears more than once, with default features enabled in one
+-///   case and disabled in another, only the disabled instance is kept.
++/// - Requirements with different `default-features` are never merged: a member that inherits
++///   cannot override the workspace entry's `default-features`, so either side would change
++///   the other's resolved features.
+ #[derive(Default)]
+ pub(crate) struct MinimalVersionSet {
+-    seen: HashMap<DependencySource, bool>,
++    seen: HashSet<SharedDependency>,
+ }
+ 
+ impl MinimalVersionSet {
+     pub(crate) fn insert(&mut self, dep: SharedDependency) {
+-        if let Some(default_features) = self.seen.get_mut(&dep.source) {
+-            *default_features &= dep.default_features;
++        if self.seen.contains(&dep) {
+             return;
+         }
+ 
+         if let DependencySource::Version(version_req) = &dep.source {
+-            let mut swap = None;
+-            for (source, default_features) in self.seen.iter() {
+-                let DependencySource::Version(other_version_req) = source else {
+-                    continue;
+-                };
+-                if let Some(merged) = try_merge(version_req, other_version_req) {
+-                    swap = Some((
+-                        source.clone(),
+-                        merged,
+-                        *default_features && dep.default_features,
+-                    ));
+-                    break;
++            let merge = self.seen.iter().find_map(|other| match &other.source {
++                DependencySource::Version(other_version_req)
++                    if other.default_features == dep.default_features =>
++                {
++                    try_merge(version_req, other_version_req).map(|merged| (other.clone(), merged))
+                 }
+-            }
+-            if let Some((source, merged, default_features)) = swap {
+-                self.seen.remove(&source);
+-                self.seen
+-                    .insert(DependencySource::Version(merged), default_features);
++                _ => None,
++            });
++            if let Some((other, merged)) = merge {
++                self.seen.remove(&other);
++                self.seen.insert(SharedDependency {
++                    default_features: dep.default_features,
++                    source: DependencySource::Version(merged),
++                });
+                 return;
+             }
+         }
+ 
+-        self.seen.insert(dep.source, dep.default_features);
++        self.seen.insert(dep);
+     }
+ 
+     pub(crate) fn into_iter(self) -> impl Iterator<Item = SharedDependency> {
+-        self.seen
+-            .into_iter()
+-            .map(|(source, default_features)| SharedDependency {
+-                default_features,
+-                source,
+-            })
++        self.seen.into_iter()
+     }
+ 
+     pub(crate) fn len(&self) -> usize {
+@@ -153,3 +144,25 @@ fn as_simple_caret(req: &VersionReq) -> Option<&Comparator> {
+     }
+     Some(comp)
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn dep(req: &str, default_features: bool) -> SharedDependency {
++        SharedDependency {
++            default_features,
++            source: DependencySource::Version(VersionReq::parse(req).unwrap()),
++        }
++    }
++
++    #[test]
++    fn differing_default_features_are_not_merged() {
++        for (a, b) in [("0.9.0", "0.9.0"), ("0.9.0", "0.9.1")] {
++            let mut set = MinimalVersionSet::default();
++            set.insert(dep(a, true));
++            set.insert(dep(b, false));
++            assert_eq!(set.len(), 2, "{a} with defaults and {b} without");
++        }
++    }
++}
+diff --git a/src/lib.rs b/src/lib.rs
+index b4a6b89..126d7c5 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -200,7 +200,8 @@ pub fn auto_inherit(conf: AutoInheritConf) -> Result<(), anyhow::Error> {
+         if specs.len() > 1 {
+             eprintln!("`{package_name}` won't be auto-inherited because there are multiple sources for it:");
+             for spec in specs.into_iter() {
+-                eprintln!("  - {}", spec.source);
++                let no_defaults = if spec.default_features { "" } else { ", default-features = false" };
++                eprintln!("  - {}{no_defaults}", spec.source);
+             }
+             continue 'outer;
+         }

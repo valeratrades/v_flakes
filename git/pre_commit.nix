@@ -12,6 +12,8 @@
   excludeDirs ? [ ]
 , # `git_ops` package whose `sync-github` the hook starts detached; null when labels are off
   gitOps ? null
+, # patched cargo-autoinherit (tools/cargo_autoinherit.nix); null when the repo has no rs module
+  autoinherit ? null
 , # rs.cargoRoot: where the rust steps run
   cargoRoot
 , # backwards compat
@@ -32,6 +34,7 @@ let
     ++ (if moduleFlags != "" then [ "--module-flags" moduleFlags ] else [ ])
     ++ builtins.concatMap (d: [ "--exclude-dir" d ]) excludeDirs
     ++ (if gitOps != null then [ "--git-ops" "${gitOps}/bin/git_ops" ] else [ ])
+    ++ (if autoinherit != null then [ "--autoinherit" "${autoinherit}/bin/cargo-autoinherit" ] else [ ])
     ++ (if codestyleLazyInstall != "" then [ "--codestyle-install" codestyleLazyInstall ] else [ ]);
 in
 pkgs.writeText "pre-commit-hook.sh" ''
