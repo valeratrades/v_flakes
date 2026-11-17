@@ -17,6 +17,9 @@ use toml_edit::{DocumentMut, Item, Table};
 struct Cli {
 	cargo_path: PathBuf,
 	lints_path: PathBuf,
+	/// `https://github.com/<owner>/<repo>`, from `origin`; without it `repository` is left as is
+	#[arg(long)]
+	repository: Option<String>,
 }
 
 fn main() {
@@ -27,17 +30,34 @@ fn main() {
 	}
 	let existing = std::fs::read_to_string(&args.cargo_path).expect("reading Cargo.toml");
 	let lints_src = std::fs::read_to_string(&args.lints_path).expect("reading lints input");
-	let merged = merge(&existing, &lints_src);
+	let merged = merge(&existing, &lints_src, args.repository.as_deref());
 	if merged != existing {
 		std::fs::write(&args.cargo_path, &merged).expect("writing Cargo.toml");
 	}
 }
 
-fn merge(cargo: &str, lints_src: &str) -> String {
+fn merge(cargo: &str, lints_src: &str, repository: Option<&str>) -> String {
 	let mut doc = cargo.parse::<DocumentMut>().expect("valid Cargo.toml");
 	let lints_doc = lints_src.parse::<DocumentMut>().expect("valid lints TOML");
 
 	let is_workspace = doc.get("workspace").is_some();
+
+	if let Some(url) = repository {
+		if is_workspace {
+			let package = doc["workspace"]
+				.as_table_mut()
+				.expect("[workspace] is a table")
+				.entry("package")
+				.or_insert_with(|| Item::Table(Table::new()));
+			package["repository"] = toml_edit::value(url);
+		}
+		if let Some(package) = doc.get_mut("package").and_then(Item::as_table_like_mut) {
+			let inherits = package.get("repository").and_then(|r| r.get("workspace")).is_some();
+			if !(is_workspace && inherits) {
+				package.insert("repository", toml_edit::value(url));
+			}
+		}
+	}
 
 	let lints_table: &mut Table = if is_workspace {
 		let workspace = doc.entry("workspace").or_insert_with(|| Item::Table(Table::new())).as_table_mut().expect("inserted above");

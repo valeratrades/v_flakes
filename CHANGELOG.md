@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs`: `repository` in the root `Cargo.toml` is written from `origin` on shell entry, as README links are: `[package]`, and `[workspace.package]` for a workspace (a root `repository.workspace = true` is kept). No GitHub `origin`, no change. Members still opt in with `repository.workspace = true`.
+
 - pre-commit: a commit that adds a second integration test binary to a crate (`tests/*.rs`, `tests/<dir>/main.rs`) fails; crates already split get a warning. Each is its own executable, relinked on every change to the crate: move them into `tests/it/main.rs` with a `mod` per file. `autotests = false` opts a crate out.
 
 - pre-commit: the file walks behind `sort-derives` and the manifest checks skip `target/` and dot-dirs, so main's hook no longer rewrites sources in `.claude/worktrees/` checkouts or in `target/`.

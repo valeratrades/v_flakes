@@ -213,8 +213,15 @@ if nixpkgs != null && pkgs == null then {
     lintsHook =
       if lintsEnabled then ''
         export CARGO_UNSTABLE_CARGO_LINTS=true # pinned nightly ignores [lints.cargo] without it
-        if [ -f ${manifest} ] && ! _vf_fresh cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest}; then
-          cargo -Zscript -q ${./cargo-merge.rs} ${manifest} ${lintsFile} && _vf_stamp cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest}
+        # `repository` comes from `origin`, as README links do; with none it is left alone
+        if [ -f ${manifest} ] && ! _vf_fresh cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest} "$_vf_gitconfig"; then
+          _vf_slug="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#\.git$##')"
+          case "$_vf_slug" in
+            */*) _vf_repo=(--repository "https://github.com/$_vf_slug") ;;
+            *) _vf_repo=() ;;
+          esac
+          cargo -Zscript -q ${./cargo-merge.rs} ${manifest} ${lintsFile} "''${_vf_repo[@]}" && _vf_stamp cargo-lints "${./cargo-merge.rs} ${lintsFile}" ${manifest} "$_vf_gitconfig"
+          unset _vf_slug _vf_repo
         fi
       '' else "";
 
