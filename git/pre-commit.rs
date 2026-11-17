@@ -302,6 +302,84 @@ fn test_binaries(cfg: &Config, log: &mut Log) -> bool {
 	ok
 }
 
+/// The hermetic build vendors from crates.io only, so a locked crate living outside the repo (a
+/// `[patch.crates-io]` path override) is committed with crates.io's source and checksum, or not at all.
+fn lock_sources(cfg: &Config, log: &mut Log) -> bool {
+	let lock_path = cfg.cargo_root.join("Cargo.lock");
+	let lock = fs::read_to_string(&lock_path).expect("staged, so on disk");
+	let root = env::current_dir().expect("hooks run in the repo root");
+	let mut ok = true;
+	let mut blocks: Vec<String> = Vec::new();
+	for (i, block) in lock.split("\n[[package]]\n").enumerate() {
+		let field = |key: &str| block.lines().find_map(|l| l.strip_prefix(&format!("{key} = \""))?.strip_suffix('"'));
+		if i == 0 || field("source").is_some() {
+			blocks.push(block.to_owned());
+			continue;
+		}
+		let (name, version) = (field("name").expect("every package is named"), field("version").expect("every package is versioned"));
+		let pkgid = Command::new("cargo")
+			.args(["pkgid", &format!("{name}@{version}")])
+			.current_dir(&cfg.cargo_root)
+			.output()
+			.expect("spawn cargo pkgid");
+		assert!(pkgid.status.success(), "cargo pkgid {name}@{version}: {}", String::from_utf8_lossy(&pkgid.stderr));
+		let pkgid = String::from_utf8(pkgid.stdout).expect("pkgid is utf-8");
+		let dir = pkgid
+			.strip_prefix("path+file://")
+			.and_then(|p| p.split('#').next())
+			.unwrap_or_else(|| panic!("a sourceless package is a path one: {pkgid}"));
+		if Path::new(dir).starts_with(&root) {
+			blocks.push(block.to_owned());
+			continue;
+		}
+		let n = name.to_ascii_lowercase();
+		let prefix = match n.len() {
+			1 => "1".to_owned(),
+			2 => "2".to_owned(),
+			3 => format!("3/{}", &n[..1]),
+			_ => format!("{}/{}", &n[..2], &n[2..4]),
+		};
+		let index = Command::new("curl")
+			.args(["-sf", "-A", "v_flakes pre-commit (https://github.com/valeratrades/v_flakes)"])
+			.arg(format!("https://index.crates.io/{prefix}/{n}"))
+			.output()
+			.expect("spawn curl");
+		let cksum = match index.status.code() {
+			Some(0) => String::from_utf8_lossy(&index.stdout)
+				.lines()
+				.find(|l| l.contains(&format!("\"vers\":\"{version}\"")))
+				.map(|l| l.split("\"cksum\":\"").nth(1).expect("an index entry has a cksum")[..64].to_owned()),
+			Some(22) => None, // curl -f: an HTTP error, here the crate's 404
+			_ => {
+				log.line(format!("Cargo.lock: index.crates.io unreachable for {name}: {}", String::from_utf8_lossy(&index.stderr)));
+				ok = false;
+				blocks.push(block.to_owned());
+				continue;
+			}
+		};
+		let Some(cksum) = cksum else {
+			log.line(format!(
+				"Cargo.lock: {name} {version} is locked from {dir}, and crates.io has no {name} {version}: publish it before committing a lock on it"
+			));
+			ok = false;
+			blocks.push(block.to_owned());
+			continue;
+		};
+		log.line(format!("Cargo.lock: {name} {version} committed from crates.io, not from {dir}"));
+		blocks.push(block.replacen(
+			&format!("version = \"{version}\""),
+			&format!("version = \"{version}\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"{cksum}\""),
+			1,
+		));
+	}
+	let fixed = blocks.join("\n[[package]]\n");
+	if fixed != lock {
+		fs::write(&lock_path, fixed).expect("write Cargo.lock");
+		ok &= log.run(Command::new("git").arg("add").arg(&lock_path));
+	}
+	ok
+}
+
 fn patched_manifests(cfg: &Config) {
 	let mut manifests = Vec::new();
 	walk(Path::new("."), cfg, &mut manifests, &|p| {
@@ -402,6 +480,9 @@ fn main() -> ExitCode {
 			return ExitCode::FAILURE;
 		}
 		steps.push(Box::new(|log| test_binaries(&cfg, log)));
+		if staged.iter().any(|s| Path::new(".").join(s) == cfg.cargo_root.join("Cargo.lock")) {
+			steps.push(Box::new(|log| lock_sources(&cfg, log)));
+		}
 		if cfg.semver_checks {
 			steps.push(Box::new(|log| {
 				!log.require_tool("cargo-semver-checks", "cargo install cargo-semver-checks") || log.run(Command::new("cargo").arg("semver-checks").current_dir(&cfg.cargo_root))

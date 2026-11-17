@@ -71,6 +71,7 @@ on an older v_flakes refuses to start (a stale direnv env would otherwise roll t
 For local dev against the sibling checkout, add path ref overrides to the untracked `[patch.crates-io]` in `.cargo/config.toml`.
 Manifest names it by version always.
 Cargo merges config tables up the tree, so main's `[patch]` also applies in worktrees nested under `.claude/worktrees/`.
+The lock cargo writes under the override names those crates by path, which a Nix build cannot vendor: on a commit staging `Cargo.lock`, the pre-commit hook gives them crates.io's source and checksum, and stops the commit when crates.io has no such version. Publish the dependency before committing a manifest that asks for its new version.
 
 JS: the package's directory goes in the gitignored `_.js-local.json` beside `package.json` (`{"@evinvest/uikit": "/home/v/s/ev/web_std/ts/uikit"}`); `js-local` (in the `js` module's shell) copies its `package.json` and built `files` over the installed copy, or into `node_modules` when nothing installed it (not published yet, or reached only through another of our packages, as `@evinvest/keymap` through uikit). Copied, not linked: a link resolves `react` from the checkout, a second React.
 `package.json` runs it after every install: `"postinstall": "[ -z \"$IN_NIX_SHELL\" ] || js-local"` (a Nix build has neither the map nor the command). After rebuilding the dep, run `js-local` again. A worktree needs its own copy of the map.
