@@ -152,7 +152,9 @@ fn phase(steps: Vec<Step<'_>>) {
 fn walk(dir: &Path, cfg: &Config, out: &mut Vec<PathBuf>, keep: &dyn Fn(&Path) -> bool) {
 	for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display())) {
 		let path = entry.expect("dir entry readable").path();
-		if cfg.is_excluded(&path) {
+		let name = path.file_name().expect("read_dir entries have names").to_string_lossy();
+		// `target/` holds generated sources; dot-dirs include `.claude/worktrees/`, other agents' checkouts
+		if cfg.is_excluded(&path) || (path.is_dir() && (name == "target" || name.starts_with('.'))) {
 			continue;
 		}
 		if path.is_dir() {
@@ -259,10 +261,54 @@ fn sort_derives(cfg: &Config, log: &mut Log) -> bool {
 	})
 }
 
+/// Every `tests/*.rs` (and `tests/<dir>/main.rs`) is its own executable, relinked on each change to the crate. `autotests = false` opts a crate out.
+/// Fails only on a commit that adds one to a crate that has another, so crates already split don't block unrelated commits.
+fn test_binaries(cfg: &Config, log: &mut Log) -> bool {
+	let out = Command::new("git").args(["diff", "--name-only", "--cached", "--diff-filter=A"]).output().expect("spawn git diff");
+	assert!(out.status.success(), "git diff --cached: {}", String::from_utf8_lossy(&out.stderr));
+	let added: Vec<PathBuf> = String::from_utf8(out.stdout).expect("git paths are utf-8").lines().map(|l| Path::new(".").join(l)).collect();
+	let mut manifests = Vec::new();
+	walk(&cfg.cargo_root, cfg, &mut manifests, &|p| p.file_name().is_some_and(|n| n == "Cargo.toml"));
+	let mut ok = true;
+	for manifest in manifests {
+		let tests = manifest.with_file_name("tests");
+		let Ok(entries) = fs::read_dir(&tests) else { continue };
+		if fs::read_to_string(&manifest)
+			.expect("walked manifest readable")
+			.lines()
+			.any(|l| l.replace(' ', "") == "autotests=false")
+		{
+			continue;
+		}
+		let mut targets: Vec<PathBuf> = entries
+			.map(|e| e.expect("dir entry readable").path())
+			.filter_map(|p| match p.extension().is_some_and(|e| e == "rs") {
+				true => Some(p),
+				false => Some(p.join("main.rs")).filter(|m| m.is_file()),
+			})
+			.collect();
+		if targets.len() < 2 {
+			continue;
+		}
+		targets.sort();
+		let new = targets.iter().any(|t| added.contains(t));
+		let names: Vec<_> = targets.iter().map(|t| t.strip_prefix(&tests).expect("listed from tests/").display().to_string()).collect();
+		log.line(format!(
+			"{}{}: {} integration test binaries ({}). Move them into one, `tests/it/main.rs` declaring `mod <name>;` per file: https://matklad.github.io/2021/02/27/delete-cargo-integration-tests.html",
+			if new { "" } else { "WARNING: " },
+			tests.display(),
+			targets.len(),
+			names.join(", ")
+		));
+		ok &= !new;
+	}
+	ok
+}
+
 fn patched_manifests(cfg: &Config) {
 	let mut manifests = Vec::new();
 	walk(Path::new("."), cfg, &mut manifests, &|p| {
-		p.file_name().is_some_and(|n| n == "Cargo.toml") && !p.starts_with("./target") && fs::read_to_string(p).is_ok_and(|s| s.lines().any(|l| l.starts_with("[patch.crates-io]")))
+		p.file_name().is_some_and(|n| n == "Cargo.toml") && fs::read_to_string(p).is_ok_and(|s| s.lines().any(|l| l.starts_with("[patch.crates-io]")))
 	});
 	if !manifests.is_empty() {
 		println!("WARNING: [patch.crates-io] section present in:");
@@ -374,6 +420,7 @@ fn main() -> ExitCode {
 		{
 			return ExitCode::FAILURE;
 		}
+		steps.push(Box::new(|log| test_binaries(&cfg, log)));
 		if cfg.semver_checks {
 			steps.push(Box::new(|log| {
 				!log.require_tool("cargo-semver-checks", "cargo install cargo-semver-checks") || log.run(Command::new("cargo").arg("semver-checks").current_dir(&cfg.cargo_root))
