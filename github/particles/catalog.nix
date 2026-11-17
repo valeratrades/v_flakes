@@ -11,9 +11,12 @@ let
     inherit name text;
     runtimeInputs = inputs ++ runtimeInputs ++ [ pkgs.git ];
   };
-  # every rust particle runs in the cargo root, with the shell's toolchain and wrapper
+  # every rust particle runs in the cargo root, with the shell's toolchain and wrapper, and what CI's
+  # nix-shell gives every rust job (install.nix): a linker, pkg-config, openssl, the section's packages' .pc files
+  pkgConfigPath = lib.concatMapStringsSep ":" (p: "${p.dev or p}/lib/pkgconfig") ([ pkgs.openssl ] ++ runtimeInputs);
   cargo = name: inputs: text: assert rs != null || throw "v_flakes.github: `${name}` needs the `rs` module";
-    program name ([ rust ] ++ rs.enabledPackages ++ inputs) ''
+    program name ([ rust pkgs.stdenv.cc pkgs.mold pkgs.pkg-config ] ++ rs.enabledPackages ++ inputs) ''
+      export PKG_CONFIG_PATH="${pkgConfigPath}''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
       cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
       ${text}
     '';
