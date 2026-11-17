@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `kache` 2.1.1: shares entries across terminal and piped builds, `dev`-derived profiles (`test`) and more worktree layouts; follows linked-worktree Git paths in build-script keys.
+
+- `rs` build.rs `git_version` reruns on this checkout's `HEAD` and `logs/HEAD`, not on the shared `refs/`: a commit in one worktree no longer reruns every other checkout's build script and rebuilds its package.
+
+- `rs` `.cargo/config.toml`: `[profile.dev] split-debuginfo = "unpacked"`, so DWARF stays in per-crate `.dwo` files instead of being copied into every test binary.
+
 - **`js-local`** (`v_flakes.js-local { inherit pkgs; }`, and in the `js` module's shell): copies each package the gitignored `_.js-local.json` maps to a local checkout over its installed copy, `package.json` and built `files`. The JS counterpart of a path `[patch]`; wired as a guarded `postinstall`. See the skill's "Developing against another repo we own".
 
 - **`rs` shellHook exports `DYLD_FALLBACK_LIBRARY_PATH=<toolchain>/lib` on macOS**, so rust-lld and proc-macro linking find `libLLVM.dylib`. A fallback (not `DYLD_LIBRARY_PATH`) leaves Nix's clang untouched. Consumers can drop their own copy.

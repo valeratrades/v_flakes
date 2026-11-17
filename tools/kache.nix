@@ -5,12 +5,12 @@
 system:
 let
   pkgs = import (import ../pins/nixpkgs.nix) { inherit system; };
-  version = "2.0.0";
+  version = "2.1.1";
   release = {
-    x86_64-linux = { triple = "x86_64-unknown-linux-musl"; hash = "sha256-bFlmX68bFNCUQ5Hm8qG1EBlea+ksYwYKnRdw7QBnaCQ="; };
-    aarch64-linux = { triple = "aarch64-unknown-linux-musl"; hash = "sha256-jFyk0dS2/GblF1yKEVDh2qhQmQgGRjIgWNkIPHKYa7o="; };
-    x86_64-darwin = { triple = "x86_64-apple-darwin"; hash = "sha256-Criyn2WdFZ3nj3A3bG/6dzCHnxj83jl1Z7aDeW61/XM="; };
-    aarch64-darwin = { triple = "aarch64-apple-darwin"; hash = "sha256-tGE599QolcYpYkUIht019FVMF1MSCeppstsFPSoUK8s="; };
+    x86_64-linux = { triple = "x86_64-unknown-linux-musl"; hash = "sha256-dgMCLueLSKmv3pBVsN8n5cLO8TUaVPot5rT94PN64iw="; };
+    aarch64-linux = { triple = "aarch64-unknown-linux-musl"; hash = "sha256-Rm8K70iF9SkTWbPBvAyZdoJGNBlMW2fhzuKk/jA1FVo="; };
+    x86_64-darwin = { triple = "x86_64-apple-darwin"; hash = "sha256-aWJ8/sMBeqUh0GqEr8bF50c0RoZ4vWZZ2Sr9V9mk9Fc="; };
+    aarch64-darwin = { triple = "aarch64-apple-darwin"; hash = "sha256-1FM7qjxXvlHV8jkLcFUcqdbCqDoZMyZvoKVwU3dOCPY="; };
   }.${system} or (throw "kache: no upstream release binary for ${system}");
 in
 pkgs.stdenvNoCC.mkDerivation {
