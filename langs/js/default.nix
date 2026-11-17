@@ -49,6 +49,16 @@ if pkgs == null then {
       lib.concatMap expand packages;
     prefix = dir: if dir == "." then "js" else builtins.replaceStrings [ "/" ] [ "-" ] dir;
     cdInto = dir: ''cd "$(git rev-parse --show-toplevel)/${dir}"'';
+    # an npm workspace member installs at its workspace root, the nearest dir up with the lockfile
+    install = redirect: ''
+      (
+        while [ ! -e package-lock.json ]; do
+          [ "$PWD" != "$(git rev-parse --show-toplevel)" ] || { echo "no package-lock.json from $OLDPWD up to the repo root" >&2; exit 1; }
+          cd ..
+        done
+        [ -d node_modules ] || npm ci${redirect}
+      )
+    '';
 
     # never wipes an installed node_modules: `js-local` copies live there
     prepare = dir: pkgs.writeShellApplication {
@@ -65,10 +75,10 @@ if pkgs == null then {
         ' | while read -r dep; do
           [ -d "$dep/node_modules" ] || (cd "$dep" && npm ci --ignore-scripts && npm run build)
         done
-        [ -d node_modules ] || npm ci
+        ${install ""}
       '';
     };
-    ciCache = dir: { paths = [ "~/.npm" ]; hashFiles = [ "${dir}/package-lock.json" ]; };
+    ciCache = dir: { paths = [ "~/.npm" ]; hashFiles = [ "**/package-lock.json" ]; }; # a workspace member's lockfile is its root's
 
     script = dir: s: {
       name = "${prefix dir}-${s}";
@@ -104,7 +114,7 @@ if pkgs == null then {
         # the specs import `@playwright/test`, which node resolves by walking up node_modules, never NODE_PATH
         text = cdInto package + ''
 
-          [ -d node_modules ] || npm ci >&2
+          ${install " >&2"}
           ln -sfn ${pkgs.playwright-test}/lib/node_modules ${lib.escapeShellArg config}/node_modules
           ${run}
         '';

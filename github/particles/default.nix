@@ -27,6 +27,7 @@ let
     in
     assert lib.subtractLists fields (builtins.attrNames s) == [ ] || throw "v_flakes.github: particle `${s.name}` has unknown keys ${toString (lib.subtractLists fields (builtins.attrNames s))}";
     assert !(own && s ? args) || throw "v_flakes.github: `args` are for v_flakes' own particles; `${s.name}` brings its program";
+    assert own || builtins.attrNames (removeAttrs s [ "name" "args" ]) == [ ] || throw "v_flakes.github: `${s.name}` is v_flakes' own: it takes only `args`";
     assert builtins.match "[A-Za-z_][A-Za-z0-9_-]*" s.name != null || throw "v_flakes.github: particle name `${s.name}` isn't a GitHub output id";
     assert !(builtins.elem s.name reserved) || throw "v_flakes.github: `${s.name}` is a workflow job id; name the particle otherwise";
     {
