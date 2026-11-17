@@ -80,11 +80,7 @@ let
       builtins.trace "DEPRECATED [v_flakes.github]: `langs` is deprecated. Pass language modules directly instead (e.g. `inherit rs py tex;`)" langs
     else inferredLangs;
 
-  # Extract rust toolchain from rs module. Required by whoever passes a language
-  # module — the hook install runs append-custom.rs via cargo, and `combine`
-  # (which provisions cargo on PATH) likewise demands `rust`. The assert lives in
-  # `preCommitInstallHook` below (not on this binding — nothing forces `rust`
-  # there anymore, so a lazy assert would never fire).
+  # the hook install's cargo is `combine`'s, which requires `rust`; this one is the rust particles'
   rust = if rs != null then (rs.rust or null) else null;
 
   # Extract from rs if provided
@@ -285,8 +281,6 @@ if nixpkgs != null && pkgs == null then {
     customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
-        assert (rust != null) || throw
-          "v_flakes.github: `enable = true` with a language module requires the rust toolchain — pass the `rs` module (which provides `rs.rust`).";
         ''
           ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
           ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
