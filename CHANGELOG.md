@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CI: the badge gist write is `continue-on-error`. A rate-limited gist API failed the release job before its binary upload.
+
 - pre-commit: `cargo autoinherit` is a patched build passed in by store path (`tools/cargo_autoinherit.nix`), no longer whatever is on PATH. Upstream merged a member's `default-features = false` into a workspace entry that keeps the defaults and rewrote the member to `workspace = true`, silently turning the defaults back on; such a dep is now left as the member wrote it.
 
 - `code-duplication` takes `args.excludePatterns` (qlty globs): files alike by nature, as a translation of another. Its run starts from a fresh `qlty init`, as CI's does, rather than from whatever `.qlty/qlty.toml` a checkout kept.

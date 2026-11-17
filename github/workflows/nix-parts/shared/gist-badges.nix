@@ -12,6 +12,7 @@ in map (step: if condition == null then step else step // { "if" = condition; })
   })
   {
     name = "Update badge gist";
+    "continue-on-error" = true; # cosmetic: a rate-limited gist write must not fail the job it rides on, e.g. a release before its upload
     env.GH_TOKEN = "\${{ secrets.loc_gist_token }}";
     run = ''
       PNAME="''${GITHUB_REPOSITORY##*/}"
