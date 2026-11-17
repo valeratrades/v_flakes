@@ -55,8 +55,20 @@ in
         '';
     in
     {
-      # cargo-docs-rs isn't in nixpkgs: `cargo doc` with the warnings denied, which docs.rs' flags don't change
-      program = cargo "rust-doc" [ ] ''RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps ${if package != null then "-p ${package}" else "--workspace"}'';
+      # cargo-docs-rs isn't in nixpkgs: `cargo doc` per documented member, as its `[package.metadata.docs.rs]` asks docs.rs (`--cfg docsrs` for rustdoc only)
+      program = cargo "rust-doc" [ pkgs.jq ] ''
+        cargo metadata --no-deps --format-version 1 | jq -r --arg only ${lib.escapeShellArg (if package == null then "" else package)} '
+          .packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | select($only == "" or .name == $only)
+          | (.metadata.docs.rs // {}) as $d
+          | [.name,
+             ([if $d["all-features"] then "--all-features" else empty end, if $d["no-default-features"] then "--no-default-features" else empty end]
+               + (if ($d.features // []) != [] then ["--features", ($d.features | join(","))] else [] end) | join(" ")),
+             (($d["rustdoc-args"] // []) | join(" "))]
+          | @tsv' | while IFS=$'\t' read -r p flags rustdoc; do
+          # shellcheck disable=SC2086 # flags are cargo's words
+          RUSTDOCFLAGS="-Dwarnings --cfg docsrs $rustdoc" cargo doc --no-deps -p "$p" $flags
+        done
+      '';
       ci = rustCi { web = true; } (import (parts + "/rust/doc.nix") { inherit cargoDocsCmd; });
     };
 
