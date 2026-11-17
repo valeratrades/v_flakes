@@ -41,7 +41,7 @@ nix build --no-link --keep-going "${drvs[@]/%/^out}" || true
 # valid, not merely present: a failed build can leave its output on disk
 out() { local o; o=$(nix-store --query --outputs "$1") && nix-store --check-validity "$o" 2>/dev/null && echo "$o"; }
 
-declare -A status secs prepared
+declare -A status=() secs=() prepared=()
 fail() { status[$1]=failed && printf '%s\n' "$2" >>"$logs/$1.log" && echo "✗ $1"; }
 
 mapfile -t prepares < <(jq -r '[.[] | select(.prepare != null) | .prepare] | unique[]' <<<"$selected")
@@ -69,7 +69,7 @@ finish() {
 	printf '%s %s %d.%ds\n' "$mark" "$1" $((secs[$1] / 1000000)) $((secs[$1] / 100000 % 10))
 }
 
-declare -A pids
+declare -A pids=()
 mapfile -t order < <(jq -r '.[].name' <<<"$selected")
 while IFS=$'\t' read -r name program prepare bin; do
 	secs[$name]=0
