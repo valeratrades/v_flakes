@@ -24,6 +24,7 @@ if pkgs == null then {
       warnings: <p>-lint (`npm run lint`)
     A missing script fails its particle: `jobs.<section>.exclude` it instead. CI keeps `~/.npm` by the lockfiles.
 
+    `js.script <package> <script>`: another of a package's scripts as a particle (`frontend-lint-css` for `lint:css`).
     `js.playwright { name; package; config; env ? { }; run ? "exec playwright test -c <config> \"$@\""; runtimeInputs ? [ ]; }`:
     a particle running playwright from nixpkgs (its browsers pinned with it) in `package`, `config`'s
     `node_modules` linked to nixpkgs' `@playwright/test`. Its `program` serves as an app too.
@@ -80,19 +81,23 @@ if pkgs == null then {
     };
     ciCache = dir: { paths = [ "~/.npm" ]; hashFiles = [ "**/package-lock.json" ]; }; # a workspace member's lockfile is its root's
 
-    script = dir: s: {
-      name = "${prefix dir}-${s}";
-      prepare = prepare dir;
-      ciCache = ciCache dir;
-      program = pkgs.writeShellApplication {
-        name = "${prefix dir}-${s}";
-        runtimeInputs = [ nodejs pkgs.git ];
-        text = cdInto dir + "\nexec npm run ${s}\n";
+    script = dir: s:
+      let name = "${prefix dir}-${builtins.replaceStrings [ ":" ] [ "-" ] s}"; in
+      {
+        inherit name;
+        prepare = prepare dir;
+        ciCache = ciCache dir;
+        program = pkgs.writeShellApplication {
+          inherit name;
+          runtimeInputs = [ nodejs pkgs.git ];
+          text = cdInto dir + "\nexec npm run ${lib.escapeShellArg s}\n";
+        };
       };
-    };
   in
   {
     inherit nodejs;
+    # a package's other script as a particle, `:` as `-` in its name: `js.script "frontend" "lint:css"` is `frontend-lint-css`
+    inherit script;
     enabledPackages = [ nodejs jsLocal ];
 
     particles = {
