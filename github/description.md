@@ -35,7 +35,13 @@ github = v-utils.github {
       # workflow_dispatch is always appended automatically unless you set it explicitly.
       hooks = { push = { branches = [ "main" ]; }; pull_request = { }; };
     };
-    warnings.augment = [ { name = "rust-doc"; args.package = "my_crate"; } ];
+    warnings = {
+      exclude = [ "code-duplication" ];  # the default, replaced by the one below
+      augment = [
+        { name = "rust-doc"; args.package = "my_crate"; }
+        { name = "code-duplication"; args.excludePatterns = [ "src/i18n/*.ts" ]; }  # qlty globs, alike by nature
+      ];
+    };
     other.augment = [ "loc-badge" ];  # not checks: loc-badge, asset-gate
   };
 

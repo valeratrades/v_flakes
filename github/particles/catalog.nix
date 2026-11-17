@@ -103,10 +103,16 @@ in
     '';
   };
 
-  code-duplication = {}: {
+  # `excludePatterns`: qlty globs of files whose likeness is by nature (a translation of another, say)
+  code-duplication = { excludePatterns ? [ ] }: {
     program = program "code-duplication" [ qlty scriptRust ] ''
       cd "$(git rev-parse --show-toplevel)"
+      rm -f .qlty/qlty.toml # `qlty init` keeps an existing one: CI's, from scratch, is what runs
       qlty init --no --no-upgrade-check >/dev/null
+      ${lib.optionalString (excludePatterns != [ ]) ''
+        grep -qx 'exclude_patterns = \[' .qlty/qlty.toml
+        sed -i 's|^exclude_patterns = \[$|&${lib.concatMapStrings (p: "\\n  ${builtins.toJSON p},") excludePatterns}|' .qlty/qlty.toml
+      ''}
       RUSTC_WRAPPER="" cargo -Zscript -q ${../workflows/code-duplication.rs}
     '';
   };
