@@ -13,6 +13,9 @@ let
 
   base = {
     build.rustc-wrapper = if kache then "kache" else ""; # "" also turns off the global wrapper ~/.cargo/config.toml sets
+    profile = {
+      dev.split-debuginfo = "unpacked"; # DWARF stays in per-crate .dwo, not copied into every test binary
+    } // (if cranelift then { rust.codegen-backend = "cranelift"; } else { });
     target = {
       "x86_64-unknown-linux-gnu".rustflags = [
         "-C"
@@ -26,13 +29,7 @@ let
         #"--cfg" "procmacro2_semver_exempt"
       ] ++ webCfg;
     } // (if webUnstable then { "wasm32-unknown-unknown".rustflags = webCfg; } else { });
-  } // (if cranelift then {
-    profile = {
-      rust = {
-        codegen-backend = "cranelift";
-      };
-    };
-  } else { });
+  };
 
   # A worktree in `.claude/worktrees/` is nested in main's checkout, and cargo concatenates arrays
   # across every config.toml up the tree: worktrees would build with each flag twice, hashing apart
