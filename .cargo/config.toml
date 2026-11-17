@@ -1,9 +1,6 @@
 [build]
 rustc-wrapper = "kache"
 
-[profile.rust]
-codegen-backend = "cranelift"
-
 [profile.dev]
 split-debuginfo = "unpacked"
 

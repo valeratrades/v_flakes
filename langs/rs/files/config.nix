@@ -1,5 +1,4 @@
 { pkgs
-, cranelift ? true
 , webUnstable ? false
 , kache ? true
 , extend ? { }
@@ -13,9 +12,7 @@ let
 
   base = {
     build.rustc-wrapper = if kache then "kache" else ""; # "" also turns off the global wrapper ~/.cargo/config.toml sets
-    profile = {
-      dev.split-debuginfo = "unpacked"; # DWARF stays in per-crate .dwo, not copied into every test binary
-    } // (if cranelift then { rust.codegen-backend = "cranelift"; } else { });
+    profile.dev.split-debuginfo = "unpacked"; # DWARF stays in per-crate .dwo, not copied into every test binary
     target = {
       "x86_64-unknown-linux-gnu".rustflags = [
         "-C"

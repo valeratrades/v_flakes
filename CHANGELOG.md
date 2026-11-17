@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `rs { cranelift = true; }` (the default) now does something: the shell exports `RUSTC_WORKSPACE_WRAPPER` (`langs/rs/cranelift-wrapper.sh`), which compiles workspace members with cranelift for the host target at opt-level 0. Deps, wasm32 and optimized builds stay on LLVM; a toolchain without the component passes through. On site_conductor a workspace rebuild after an edit went 205-475s → 50-140s; its 257 tests pass on it. The unused `[profile.rust] codegen-backend = "cranelift"` is gone.
+
+- `rs`: the devshell uses the machine's `kache` (the daemon's) when one is on PATH, and the pinned `tools/kache.nix` only where none is. A devshell pinning its own split versions on every kache bump: 2.0.0 clients against a 2.1.1 daemon failed requests and held the index locked.
+
 - `rs`: `repository` in the root `Cargo.toml` is written from `origin` on shell entry, as README links are: `[package]`, and `[workspace.package]` for a workspace (a root `repository.workspace = true` is kept). No GitHub `origin`, no change. Members still opt in with `repository.workspace = true`.
 
 - pre-commit: a commit that adds a second integration test binary to a crate (`tests/*.rs`, `tests/<dir>/main.rs`) fails; crates already split get a warning. Each is its own executable, relinked on every change to the crate: move them into `tests/it/main.rs` with a `mod` per file. `autotests = false` opts a crate out.

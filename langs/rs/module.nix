@@ -58,7 +58,7 @@ if nixpkgs != null && pkgs == null then {
     ```nix
     rs = v-utils.rs {
       inherit pkgs rust;  # rust is the nix toolchain package
-      cranelift = true;  # Enable cranelift backend (default: true)
+      cranelift = true;  # Workspace members compile with cranelift when unoptimized and for the host target; deps, wasm and release stay LLVM (default: true)
       kache = true;      # kache as rustc-wrapper, its cargo shim on PATH (default: true). `false` sets no wrapper, overriding a global one
       webUnstable = false; # Build against web-sys' unstable APIs (`--cfg web_sys_unstable_apis`), native + wasm + CI. Apps only: a library built so compiles against an API its dependents don't get (default: false)
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
@@ -169,7 +169,7 @@ if nixpkgs != null && pkgs == null then {
     diet = (import ../../tools/diet.nix) pkgs.stdenv.hostPlatform.system;
     kachePkg = (import ../../tools/kache.nix) pkgs.stdenv.hostPlatform.system;
     # Only the cargo shim: kache's cc/gcc ones would sit in front of nix's cc-wrapper. The marker makes kache skip this dir when looking for the real cargo.
-    kacheCargoShim = pkgs.runCommand "kache-cargo-shim" { } "mkdir $out && ln -s ${kachePkg}/bin/kache $out/cargo && touch $out/.kache-shims";
+    craneliftWrapper = pkgs.writeShellScript "cranelift-wrapper" (builtins.readFile ./cranelift-wrapper.sh);
 
     cargoRootNormalized =
       let
@@ -199,7 +199,7 @@ if nixpkgs != null && pkgs == null then {
     targetsExtend = if targets != { } then { target.augment = targets; } else { };
     configExtend = assert !(config ? patch) || throw "v_flakes.rs: `config.patch` would be stripped from git by the `.cargo/config.toml` clean filter; put it in Cargo.toml"; core.mergeConfig targetsExtend config;
     configFile = import ./files/config.nix {
-      inherit pkgs cranelift webUnstable kache;
+      inherit pkgs webUnstable kache;
       extend = configExtend;
     };
     denyExtend = if builtins.isAttrs deny then deny else { };
@@ -318,10 +318,21 @@ if nixpkgs != null && pkgs == null then {
       ${buildHook}
       ${denyHook}
       ${binstallHook}
-      ${if kache then ''export PATH="${kacheCargoShim}:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it'' else ""}
+      ${if cranelift then ''export RUSTC_WORKSPACE_WRAPPER=${craneliftWrapper} # env, not config: a nix sandbox build reads the committed config.toml'' else ""}
+      ${if kache then ''
+        # the machine's kache, which runs the daemon: a devshell pinning its own splits versions on every kache bump until each repo's lock follows
+        _vf_kache=$(command -v kache) || { _vf_kache=${kachePkg}/bin/kache; export PATH="${kachePkg}/bin:$PATH"; }
+        # only the cargo shim: kache's cc/gcc ones would sit in front of nix's cc-wrapper. The marker makes kache skip this dir when looking for the real cargo
+        _vf_shim=$_vf_stamps/kache-shim
+        if ! [ "$_vf_shim/cargo" -ef "$_vf_kache" ]; then
+          mkdir -p "$_vf_shim" && ln -sfn "$_vf_kache" "$_vf_shim/cargo" && : > "$_vf_shim/.kache-shims"
+        fi
+        export PATH="$_vf_shim:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it
+        unset _vf_kache _vf_shim
+      '' else ""}
     '';
 
     # cargo-binstall for tracey and codestyle
-    enabledPackages = pkgs.lib.optional kache kachePkg ++ [ pkgs.cargo-binstall diet pkgs.cargo-release ((import ./cpublish.nix) pkgs diet cargoRootNormalized) ];
+    enabledPackages = [ pkgs.cargo-binstall diet pkgs.cargo-release ((import ./cpublish.nix) pkgs diet cargoRootNormalized) ];
     traceyCheck = tracey;
   }
