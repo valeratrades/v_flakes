@@ -162,6 +162,8 @@ jobs:
           name: modified-cargo-files
       - run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: echo "T_PARTICLE=$(date +%s)" >> "$GITHUB_ENV"
       - run: cargo clippy --workspace --all-targets -- -Dwarnings
       - id: particle
@@ -190,6 +192,8 @@ jobs:
       - uses: dtolnay/install@cargo-docs-rs
       - run: rm -f "$GITHUB_WORKSPACE/.cargo/config.toml" "$GITHUB_WORKSPACE/.cargo/config"
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: echo "T_PARTICLE=$(date +%s)" >> "$GITHUB_ENV"
       - run: |
           for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | .name'); do

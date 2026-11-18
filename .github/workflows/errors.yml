@@ -121,6 +121,8 @@ jobs:
           name: modified-cargo-files
       - run: cargo update
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: echo "T_PARTICLE=$(date +%s)" >> "$GITHUB_ENV"
       - env:
           TIMED: ${{ matrix.rust == 'nightly' }}
