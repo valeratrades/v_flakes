@@ -42,6 +42,10 @@ fn main() {
 	for (path, _) in previous.iter().filter(|(p, _)| !generated.iter().any(|(g, _)| g == p)) {
 		remove(doc.as_table_mut(), path);
 	}
+	// written before `previous` was recorded, so nothing retracted it; cargo joins it with the cfg key, doubling every flag and splitting kache keys from repos without it
+	for triple in ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"] {
+		remove(doc.as_table_mut(), &["target".to_owned(), triple.to_owned(), "rustflags".to_owned()]);
+	}
 	for (path, item) in generated {
 		set(doc.as_table_mut(), &path, item);
 	}
