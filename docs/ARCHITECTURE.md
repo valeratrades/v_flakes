@@ -55,9 +55,10 @@ Templates for project files. Each submodule generates a derivation containing th
 GitHub-specific configuration:
 
 - `particles/` - a repo's checks, one registry: `jobs.errors` / `jobs.warnings` list them, the list their severity. Each one is in all three of
-  - `nix run .#test` (`runner.sh`; `apps.test` added by v_flakes' flake-utils / flake-parts, which find the runner in the devShell): parallel locally, per-particle status and seconds; non-zero iff an error particle fails, or with `--severity`, any it ran
+  - `nix run .#test` (`runner.sh`; `apps.test` added by v_flakes' flake-utils / flake-parts, which find the runner in the devShell): parallel locally, per-particle status, prepare seconds and run seconds; non-zero iff an error particle fails, or with `--severity`, any it ran
   - its section's workflow: a particle with a `ci` body is a job of its own, the rest one `particles` job running `nix run .#test -- --severity <s> --serial` after a single nix install
   - its section's README badge, written by the workflow's `report` job on the default branch: failed count and the sum of the particles' own seconds (no install or cache restore, so it compares with a serial local run)
+  - `prepare` is timed apart from `program`: `<name>_prepare_seconds` beside `<name>_seconds` (the program alone), shared prepares reporting once per dependent. `rust-tests` prepares its warm build (`cargo test --no-run`); its bespoke job exposes both durations as job outputs, and the `report` job writes the `build` / `test` gist badges from them, only for a succeeded job. Nothing else writes those keys
   - Programs and prepares are carried as `.drv` paths, built when selected: the CI job of one section never builds another's closure
 - `workflows/` - CI workflow generation (errors.yml and warnings.yml from particles; other.yml; the standalone ones)
 - `cache.nix` - the only Nix install + binary-cache definition. Generated jobs inline it; hand-written workflows reach it through the generated `.github/actions/nix-env` composite action
@@ -114,6 +115,6 @@ Agents build in `.claude/worktrees/<name>/`. Each one would otherwise compile th
 README generation from `docs/.readme_assets/`:
 
 - Reads `description.md`, `usage.md`, etc.
-- Generates badges (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size). The gist-backed ones (loc, ci, build_time, test_time, size) are shields.io endpoint files that CI jobs already running write as a by-product (`github/workflows/nix-parts/shared/gist-badges.nix`); none runs work of its own. `build_time`/`test_time` are added to every repo with a root `Cargo.toml`
+- Generates badges (msrv, crates.io, docs.rs, loc, ci, build_time, test_time, size). The gist-backed ones (loc, ci, build_time, test_time, size) are shields.io endpoint files that CI jobs already running write as a by-product (`github/workflows/nix-parts/shared/gist-badges.nix`); none runs work of its own. `build_time`/`test_time` are added to every repo with a root `Cargo.toml`; the `report` job writes them (prepare and run seconds of `rust-tests`)
 - Compiles typst (`.typ`) to markdown if present
 - Manages license file copying

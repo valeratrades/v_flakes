@@ -1,4 +1,4 @@
-{ lastSupportedVersion ? null, skipArgs, gistId }:
+{ lastSupportedVersion ? null, skipArgs }:
 let
   rustcVersions =
     if lastSupportedVersion == null then
@@ -10,10 +10,25 @@ let
         "${lastSupportedVersion}"
       ];
   nightly = "matrix.rust == 'nightly'";
+  # `seconds` is written on the `timedIf` leg only: the legs share job outputs, last writer wins
+  timed = id: cmd: {
+    inherit id;
+    env.TIMED = "\${{ ${nightly} }}";
+    run = ''
+      start=$(date +%s)
+      ${cmd}
+      if [ "$TIMED" = true ]; then echo "seconds=$(($(date +%s) - start))" >> "$GITHUB_OUTPUT"; fi
+    '';
+  };
 in
 {
   timedIf = nightly; # the run a local one compares with
+  badges = { build = "prepare_seconds"; test = "run_seconds"; };
   job = {
+    outputs = {
+      prepare_seconds = "\${{ steps.prepare.outputs.seconds }}";
+      run_seconds = "\${{ steps.tests.outputs.seconds }}";
+    };
     name = "Rust \${{matrix.rust}}";
     needs = "pre_ci";
     "if" = "needs.pre_ci.outputs.continue";
@@ -62,22 +77,9 @@ in
     ];
   };
   # `--workspace`: a bare invocation covers only `default-members`
-  # timestamps go through `echo`, which install.nix leaves outside nix-shell
   work = [
-    { run = "echo \"T0=$(date +%s)\" >> $GITHUB_ENV"; }
-    { run = "cargo test --workspace --no-run"; } # before `check`, so it times the workspace build over cached deps
-    { run = "echo \"T1=$(date +%s)\" >> $GITHUB_ENV"; }
+    (timed "prepare" "cargo test --workspace --no-run") # before `check`, so it times the workspace build over cached deps
     { run = "cargo check --workspace --all-targets"; }
-    { run = "echo \"T2=$(date +%s)\" >> $GITHUB_ENV"; }
-    { run = "cargo test --workspace${skipArgs}"; }
-    { run = "echo \"T3=$(date +%s)\" >> $GITHUB_ENV"; }
+    (timed "tests" "cargo test --workspace${skipArgs}")
   ];
-  post = import ../shared/gist-badges.nix {
-    inherit gistId;
-    condition = "github.ref_name == github.event.repository.default_branch && ${nightly}";
-    badges = {
-      build = { label = "build"; message = "$(((T1-T0)/60))m $(((T1-T0)%60))s"; };
-      test = { label = "test"; message = "$(((T3-T2)/60))m $(((T3-T2)%60))s"; };
-    };
-  };
 }

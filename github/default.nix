@@ -195,7 +195,7 @@ if nixpkgs != null && pkgs == null then {
 
     # A section's `install.packages` are nixpkgs attribute paths its CI jobs get; v_flakes' own particles get them locally too
     catalogFor = installConfig: import ./particles/catalog.nix {
-      inherit pkgs rust rs cargoRoot webUnstable lastSupportedVersion gistId;
+      inherit pkgs rust rs cargoRoot webUnstable lastSupportedVersion;
       runtimeInputs = map (n: pkgs.lib.getAttrFromPath (pkgs.lib.splitString "." n) pkgs) (installConfig.packages or [ ]);
     };
     particles = import ./particles {
@@ -281,12 +281,12 @@ if nixpkgs != null && pkgs == null then {
     customSh = (import ../git/pre_commit.nix) { inherit pkgs pname cargoNightly semverChecks excludeDirs cargoRoot; gitOps = if labelsEnabled then git_ops else null; traceyCheck = actualTraceyCheck; styleFormat = actualStyleFormat; styleAssert = actualStyleAssert; moduleFlags = actualModuleFlags; codestyleLazyInstall = rsCodestyleLazyInstall; autoinherit = if rs != null then (import ../tools/cargo_autoinherit.nix) pkgs.stdenv.hostPlatform.system else null; };
     preCommitInstallHook =
       if effectiveLangs == [ ] && rust == null then "" else
-        ''
-          ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
-          ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
-          [[ ! -f $_vf_hooks/pre-commit || $(<"$_vf_hooks"/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} "$_vf_hooks"/pre-commit
-          [[ -x $_vf_hooks/custom.sh && $(<"$_vf_hooks"/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} "$_vf_hooks"/custom.sh
-        '';
+      ''
+        ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
+        ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
+        [[ ! -f $_vf_hooks/pre-commit || $(<"$_vf_hooks"/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} "$_vf_hooks"/pre-commit
+        [[ -x $_vf_hooks/custom.sh && $(<"$_vf_hooks"/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} "$_vf_hooks"/custom.sh
+      '';
 
     lfsGitConfig = ''
       git config merge.ours.driver true

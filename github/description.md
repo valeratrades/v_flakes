@@ -47,9 +47,11 @@ github = v-utils.github {
 
   # A particle: { name; program | builds; prepare ? null; ci ? null; ciCache ? null; }
   #   program  runs at the repo root, bringing its own runtimeInputs (no `nix develop`)
-  #   prepare  setup left out of its time (the js module's `npm ci` where node_modules is absent)
-  #   ci       { job; work; post ? [ ]; timedIf ? null; }: its own CI job, for what CI needs that the local
+  #   prepare  setup left out of `seconds`, timed and reported on its own as `prepare_seconds` (the js module's
+  #            `npm ci` where node_modules is absent; rust-tests' warm `cargo test --no-run`)
+  #   ci       { job; work; post ? [ ]; timedIf ? null; badges ? { }; }: its own CI job, for what CI needs that the local
   #            run doesn't (the rust ones: toolchain matrix, pre_ci, rust-cache). The rest share one job.
+  #            `badges`: gist key -> a job output of seconds, which the section's `report` job writes as that badge
   #   ciCache  { paths; hashFiles; } the shared job keeps between runs
 
   labels = {

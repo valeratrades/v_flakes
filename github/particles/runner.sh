@@ -41,18 +41,23 @@ nix build --no-link --keep-going "${drvs[@]/%/^out}" || true
 # valid, not merely present: a failed build can leave its output on disk
 out() { local o; o=$(nix-store --query --outputs "$1") && nix-store --check-validity "$o" 2>/dev/null && echo "$o"; }
 
-declare -A status=() secs=() prepared=()
+declare -A status=() secs=() prepared=() prepSecs=() prepOf=()
+us() { local t=${1//[.,]/}; echo $((10#$t)); }
+dur() { printf '%d.%ds' $(($1 / 1000000)) $(($1 / 100000 % 10)); }
+prepared() { [ -z "${prepOf[$1]:-}" ] || echo "${prepSecs[${prepOf[$1]}]}"; } # µs; nothing for a particle without a prepare
 fail() { status[$1]=failed && printf '%s\n' "$2" >>"$logs/$1.log" && echo "✗ $1"; }
 
 mapfile -t prepares < <(jq -r '[.[] | select(.prepare != null) | .prepare] | unique[]' <<<"$selected")
 mapfile -t prepareBins < <(jq -r '[.[] | select(.prepare != null) | {prepare, prepareBin}] | unique_by(.prepare)[] | .prepareBin' <<<"$selected")
 for i in "${!prepares[@]}"; do
 	drv=${prepares[$i]}
+	start=$EPOCHREALTIME
 	if ! p=$(out "$drv"); then
 		prepared[$drv]="did not build: $drv"
 	elif ! "$p/${prepareBins[$i]}" >"$logs/prepare-$i.log" 2>&1 </dev/null; then
 		prepared[$drv]="its prepare failed: $logs/prepare-$i.log"$'\n'"$(<"$logs/prepare-$i.log")"
 	fi
+	prepSecs[$drv]=$(($(us "$EPOCHREALTIME") - $(us "$start")))
 done
 
 run_one() {
@@ -60,19 +65,19 @@ run_one() {
 	"$2" >>"$logs/$1.log" 2>&1 </dev/null || rc=$?
 	printf '%s %s %s\n' "$rc" "$s" "$EPOCHREALTIME" >"$logs/$1.stat"
 }
-us() { local t=${1//[.,]/}; echo $((10#$t)); }
 finish() {
 	local rc s e mark
 	read -r rc s e <"$logs/$1.stat"
 	secs[$1]=$(($(us "$e") - $(us "$s")))
 	if [ "$rc" = 0 ]; then status[$1]=ok mark=✓; else status[$1]=failed mark=✗; fi
-	printf '%s %s %d.%ds\n' "$mark" "$1" $((secs[$1] / 1000000)) $((secs[$1] / 100000 % 10))
+	printf '%s %s %s\n' "$mark" "$1" "$(dur "${secs[$1]}")"
 }
 
 declare -A pids=()
 mapfile -t order < <(jq -r '.[].name' <<<"$selected")
 while IFS=$'\t' read -r name program prepare bin; do
 	secs[$name]=0
+	[ "$prepare" = null ] || prepOf[$name]=$prepare
 	if [ "$prepare" != null ] && [ -n "${prepared[$prepare]:-}" ]; then
 		fail "$name" "${prepared[$prepare]}"
 	elif ! p=$(out "$program"); then
@@ -94,9 +99,11 @@ done
 width=$(printf '%s\n' "${order[@]}" | wc -L)
 failed=0 failed_errors=0
 echo
+printf '%-*s  %-8s  %-6s  %-8s  %s\n' "$width" particle severity status prepare seconds
 for name in "${order[@]}"; do
 	sev=$(jq -r --arg n "$name" '.[] | select(.name == $n) | .severity' <<<"$selected")
-	printf '%-*s  %-8s  %-6s  %d.%ds\n' "$width" "$name" "$sev" "${status[$name]}" $((secs[$name] / 1000000)) $((secs[$name] / 100000 % 10))
+	p=$(prepared "$name")
+	printf '%-*s  %-8s  %-6s  %-8s  %s\n' "$width" "$name" "$sev" "${status[$name]}" "$(if [ -n "$p" ]; then dur "$p"; else echo -; fi)" "$(dur "${secs[$name]}")"
 	if [ "${status[$name]}" = failed ]; then
 		failed=$((failed + 1))
 		[ "$sev" != errors ] || failed_errors=$((failed_errors + 1))
@@ -119,14 +126,16 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
 	for name in "${order[@]}"; do
 		echo "${name}_seconds=$((secs[$name] / 1000000))"
 		echo "${name}_status=${status[$name]}"
+		p=$(prepared "$name")
+		[ -z "$p" ] || echo "${name}_prepare_seconds=$((p / 1000000))"
 	done >>"$GITHUB_OUTPUT"
 fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
 	{
-		echo "| particle | severity | status | seconds |"
-		echo "|---|---|---|---|"
+		echo "| particle | severity | status | prepare | seconds |"
+		echo "|---|---|---|---|---|"
 		for name in "${order[@]}"; do
-			echo "| $name | $(jq -r --arg n "$name" '.[] | select(.name == $n) | .severity' <<<"$selected") | ${status[$name]} | $((secs[$name] / 1000000)) |"
+			echo "| $name | $(jq -r --arg n "$name" '.[] | select(.name == $n) | .severity' <<<"$selected") | ${status[$name]} | $(p=$(prepared "$name"); if [ -n "$p" ]; then echo $((p / 1000000)); else echo -; fi) | $((secs[$name] / 1000000)) |"
 		done
 	} >>"$GITHUB_STEP_SUMMARY"
 fi

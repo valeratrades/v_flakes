@@ -432,8 +432,9 @@ if nixpkgs != null && pkgs == null then {
           runs-on = "ubuntu-latest";
           timeout-minutes = 90;
           outputs = builtins.listToAttrs (lib.concatMap
-            (n: map (o: { name = "${n}_${o}"; value = "\${{ steps.run.outputs['${n}_${o}'] }}"; }) [ "seconds" "status" ])
-            names);
+            (p: map (o: { name = "${p.name}_${o}"; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
+              ([ "seconds" "status" ] ++ lib.optional (p.prepare != null) "prepare_seconds"))
+            generic);
           steps = [ ({ uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; }) ]
             ++ nixCi.setupSteps
             ++ [ nixCi.installStep ]
@@ -446,6 +447,10 @@ if nixpkgs != null && pkgs == null then {
           // lib.optionalAttrs (generic != [ ]) { particles = genericJob; };
         needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues jobs);
 
+        # a bespoke particle's `ci.badges`: gist key -> the job output holding its seconds
+        timed = lib.concatMap (p: lib.mapAttrsToList (key: output: { inherit key output; particle = p.name; }) (p.ci.badges or { })) bespoke;
+        timedVar = t: "BADGE_${lib.toUpper t.key}";
+
         report = {
           name = "Report";
           needs = builtins.attrNames jobs;
@@ -456,6 +461,7 @@ if nixpkgs != null && pkgs == null then {
             env = {
               NEEDS = "\${{ toJSON(needs) }}";
               PARTICLES = builtins.toJSON (map (p: { inherit (p) name; generic = p.ci == null; }) particles);
+              TIMED = builtins.toJSON timed;
             };
             run = ''
               read -r failed total seconds incomplete < <(jq -rn --argjson needs "$NEEDS" --argjson spec "$PARTICLES" '
@@ -469,6 +475,11 @@ if nixpkgs != null && pkgs == null then {
                 echo "::notice::a particle's job was skipped or cancelled: the badge keeps its last complete run"
                 exit 0
               fi
+              # only a succeeded job's numbers: a failed run's are partial
+              jq -rn --argjson needs "$NEEDS" --argjson timed "$TIMED" '
+                $timed[] | select($needs[.particle].result == "success")
+                | ($needs[.particle].outputs[.output] | tonumber) as $s
+                | "BADGE_\(.key | ascii_upcase)=\($s / 60 | floor)m \($s % 60)s"' >> "$GITHUB_ENV"
               time="$((seconds / 60))m $((seconds % 60))s"
               if [ "$failed" = 0 ]; then msg="✓ $time" color=brightgreen; else msg="✗ $failed/$total · $time" color=red; fi
               { echo "BADGE_MESSAGE=$msg"; echo "BADGE_COLOR=$color"; } >> "$GITHUB_ENV"
@@ -482,7 +493,11 @@ if nixpkgs != null && pkgs == null then {
               color = "$BADGE_COLOR";
               labelColor = { errors = "420d09"; warnings = "d16002"; }.${severity};
             };
-          };
+          } ++ lib.optionals (timed != [ ]) (import ./shared/gist-badges.nix {
+            inherit gistId;
+            condition = lib.concatMapStringsSep " && " (t: "env.${timedVar t} != ''") timed;
+            badges = builtins.listToAttrs (map (t: { name = t.key; value = { label = t.key; message = "$" + timedVar t; }; }) timed);
+          });
         };
       in
       if particles == [ ] then null else

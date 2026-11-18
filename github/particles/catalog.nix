@@ -1,7 +1,7 @@
 # The particles v_flakes ships, by the name a `jobs.<section>` list gives them. Each is
 # `args: { program; ci ? null; }`; `ci` is a CI body for what the local program can't do there
-# (a toolchain matrix, pre_ci's path-dep rewriting, rust-cache): `{ job; work; post ? [ ]; timedIf ? null; }`.
-{ pkgs, rust, rs, runtimeInputs, cargoRoot, webUnstable, lastSupportedVersion, gistId }:
+# (a toolchain matrix, pre_ci's path-dep rewriting, rust-cache): `{ job; work; post ? [ ]; timedIf ? null; badges ? { }; }`.
+{ pkgs, rust, rs, runtimeInputs, cargoRoot, webUnstable, lastSupportedVersion }:
 let
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
@@ -39,8 +39,9 @@ in
   rust-tests = { skipPatterns ? [ ] }:
     let skipArgs = lib.optionalString (skipPatterns != [ ]) (" -- " + lib.concatMapStringsSep " " (p: "--skip ${p}") skipPatterns); in
     {
+      prepare = cargo "rust-tests-prepare" [ ] "cargo test --workspace --no-run";
       program = cargo "rust-tests" [ ] "cargo test --workspace${skipArgs}";
-      ci = rustCi { } (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion gistId skipArgs; });
+      ci = rustCi { } (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion skipArgs; });
     };
 
   rust-doc = { package ? null }:
