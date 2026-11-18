@@ -1,6 +1,9 @@
 
 [profile.dev]
 split-debuginfo = "unpacked"
+[[include]]
+optional = true
+path = "local.toml"
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 rustflags = "-C link-arg=-fuse-ld=mold --cfg tokio_unstable -Z threads=8 -Z track-diagnostics"

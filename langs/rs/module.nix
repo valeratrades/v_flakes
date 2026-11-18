@@ -4,7 +4,7 @@
   cranelift ? true
 , # `--cfg web_sys_unstable_apis` on every target and in CI. For apps only: see files/config.nix
   webUnstable ? false
-, # kache as RUSTC_WRAPPER and cargo shim; `false` builds with no wrapper at all
+, # kache as rustc-wrapper and cargo shim; `false` builds with no wrapper at all
   kache ? true
 , targets ? { }
 , config ? { }
@@ -59,7 +59,7 @@ if nixpkgs != null && pkgs == null then {
     rs = v-utils.rs {
       inherit pkgs rust;  # rust is the nix toolchain package
       cranelift = true;  # Workspace members compile with cranelift when unoptimized and for the host target; deps, wasm and release stay LLVM (default: true)
-      kache = true;      # kache as RUSTC_WRAPPER, its cargo shim on PATH; sccache, then none, where kache isn't installed and has no release (default: true). `false` sets no wrapper, overriding a global one
+      kache = true;      # kache as rustc-wrapper (gitignored .cargo/local.toml), its cargo shim on PATH; sccache, then none, where kache isn't installed and has no release (default: true). `false` sets no wrapper, overriding a global one
       webUnstable = false; # Build against web-sys' unstable APIs (`--cfg web_sys_unstable_apis`), native + wasm + CI. Apps only: a library built so compiles against an API its dependents don't get (default: false)
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
       clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see langs/rs/files/clippy.nix)
@@ -261,7 +261,9 @@ if nixpkgs != null && pkgs == null then {
           [[ -f $_vf_attrs && $(<"$_vf_attrs") == *'/.cargo/config.toml filter=vf-cargo-patch'* ]] || { mkdir -p "''${_vf_attrs%/attributes}" && echo '/.cargo/config.toml filter=vf-cargo-patch' >> "$_vf_attrs"; }
           _vf_stamp cargo-patch-filter "${patchAwkKey}" "$_vf_gitconfig" "$_vf_attrs"
         fi
-        unset _vf_attrs
+        _vf_exclude=''${_vf_gitconfig%config}info/exclude
+        grep -qxF /.cargo/local.toml "$_vf_exclude" 2>/dev/null || { mkdir -p "''${_vf_exclude%/exclude}" && echo /.cargo/local.toml >> "$_vf_exclude"; }
+        unset _vf_attrs _vf_exclude
       fi
       if ! _vf_fresh cargo-config "${configFile} ${./cargo-config-merge.rs}" ./.cargo/config.toml; then
         _vf_owned=("$_vf_stamps/cargo-config.owned") # what we last generated, so keys dropped from it get retracted
@@ -328,14 +330,18 @@ if nixpkgs != null && pkgs == null then {
             mkdir -p "$_vf_shim" && ln -sfn "$_vf_kache" "$_vf_shim/cargo" && : > "$_vf_shim/.kache-shims"
           fi
           export PATH="$_vf_shim:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it
-          [ -n "''${RUSTC_WRAPPER+set}" ] || export RUSTC_WRAPPER=$_vf_kache # a caller's wins: CI sets it empty
-          export KACHE_CACHE_EXECUTABLES=false # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store
+          # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store
+          _vf_local=$(printf '[build]\nrustc-wrapper = "%s"\n\n[env]\nKACHE_CACHE_EXECUTABLES = "false"' "$_vf_kache")
           unset _vf_shim
         else
-          [ -n "''${RUSTC_WRAPPER+set}" ] || export RUSTC_WRAPPER=$(command -v sccache)
+          _vf_local=$(printf '[build]\nrustc-wrapper = "%s"' "$(command -v sccache)")
         fi
         unset _vf_kache
-      '' else "export RUSTC_WRAPPER= # also turns off a global wrapper"}
+      '' else ''
+        _vf_local=$(printf '[build]\nrustc-wrapper = ""') # also turns off a global wrapper
+      ''}
+      [ "$(cat ./.cargo/local.toml 2>/dev/null)" = "$_vf_local" ] || printf '%s\n' "$_vf_local" > ./.cargo/local.toml
+      unset _vf_local
     '';
 
     # cargo-binstall for tracey and codestyle

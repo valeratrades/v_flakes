@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `rs`: kache is the devshell's exported `RUSTC_WRAPPER`, no longer `rustc-wrapper` in the committed `.cargo/config.toml` (shell entry drops the key). A plain `cargo build` outside the shell failed with "kache not found" on any machine without it. Where kache isn't installed and has no upstream release (FreeBSD), the wrapper is `sccache` if on PATH, else none. A `RUSTC_WRAPPER` already set is kept. Consumer packages no longer need `RUSTC_WRAPPER = ""`.
+- `rs`: `rustc-wrapper` moved out of the committed `.cargo/config.toml` into `.cargo/local.toml`, which the shell writes, git excludes, and `config.toml` includes optionally. A clone built without the shell failed with "kache not found" on any machine without it. Where kache isn't installed and has no upstream release (FreeBSD), the wrapper is `sccache` if on PATH, else none. Consumer packages no longer need `RUSTC_WRAPPER = ""`.
 
 - CI: the badge gist write is `continue-on-error`. A rate-limited gist API failed the release job before its binary upload.
 

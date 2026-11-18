@@ -1,17 +1,16 @@
 # `nix run .#test`: the repo's particles. $spec is their table, each program and prepare a .drv built only once selected.
 usage() {
 	cat <<EOF
-nix run .#test [-- [--severity errors|warnings] [--serial] [--build-only] [name…]]
+nix run .#test [-- [--severity errors|warnings] [--serial] [name…]]
   every particle (or those named), in parallel; exits non-zero iff an error particle fails
   --severity <s>  only that section's; then any failure exits non-zero (as CI runs it)
   --serial        one at a time, so no particle's time is inflated by another's
-  --build-only    build their programs and prepares, run nothing; exits as nix build does
 particles:
 $(jq -r '.[] | "  \(.severity)\t\(.name)"' "$spec")
 EOF
 }
 
-severity='' serial='' build_only='' names=()
+severity='' serial='' names=()
 while (($#)); do
 	case $1 in
 	--severity)
@@ -19,9 +18,7 @@ while (($#)); do
 		severity=$2
 		shift 2
 		;;
-	--serial) serial=1 && shift ;;
-	--build-only) build_only=1 && shift ;;
-	-h | --help) usage && exit 0 ;;
+	--serial) serial=1 && shift ;;	-h | --help) usage && exit 0 ;;
 	-*) { echo "unknown flag $1"; usage; } >&2 && exit 2 ;;
 	*) names+=("$1") && shift ;;
 	esac
@@ -39,9 +36,7 @@ logs=$(mktemp -d "${TMPDIR:-/tmp}/particles.XXXXXX")
 
 mapfile -t drvs < <(jq -r '[.[] | .program, .prepare | select(. != null)] | unique[]' <<<"$selected")
 # --keep-going: a particle that doesn't build fails alone, below
-built=0
-nix build --no-link --keep-going "${drvs[@]/%/^out}" || built=$?
-[ -z "$build_only" ] || exit "$built"
+nix build --no-link --keep-going "${drvs[@]/%/^out}" || true
 # valid, not merely present: a failed build can leave its output on disk
 out() { local o; o=$(nix-store --query --outputs "$1") && nix-store --check-validity "$o" 2>/dev/null && echo "$o"; }
 

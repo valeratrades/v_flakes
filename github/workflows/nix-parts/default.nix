@@ -59,7 +59,7 @@ if nixpkgs != null && pkgs == null then {
     a higher-level interface with default job selection based on langs.
 
     Errors and Warnings run the particles of `jobs.errors` / `jobs.warnings` (github/particles): each
-    as a job: a `ci` body's own, or `nix run .#test -- --severity <s> <name>` from what one `particles` job built for them all,
+    as a job: a `ci` body's own, or `nix run .#test -- --severity <s> <name>` over its own lean nix cache,
     then a `report` job writing the section's badge (`<repo>-errors.json` / `-warnings.json` in the badge gist).
 
     Other jobs: loc-badge, asset-gate (`jobs.other`), the latter with args:
@@ -391,8 +391,7 @@ if nixpkgs != null && pkgs == null then {
       in
       if wf != null then wf.jobs else { };
 
-    # A section's particles, a job each: a `ci` body's own, or `nix run .#test` after the `particles` job built them all
-    # once and handed its store paths over; and on the default branch a `report` job writing the section's
+    # A section's particles, a job each: a `ci` body's own, or `nix run .#test` over that particle's own lean cache; and on the default branch a `report` job writing the section's
     # badge from their outcomes and their own run seconds (setup, nix install and cache restore left out).
     particleWorkflow = { title, severity, particles, installConfig, hooks }:
       let
@@ -400,7 +399,6 @@ if nixpkgs != null && pkgs == null then {
         nixCi = import ../../cache.nix { inherit cache; };
         bespoke = builtins.filter (p: p.ci != null) particles;
         generic = builtins.filter (p: p.ci == null) particles;
-        artifact = "particles-${severity}-nix";
 
         bespokeJob = p: withInstall installConfig (p.ci.job // {
           outputs = (p.ci.job.outputs or { }) // { seconds = "\${{ steps.particle.outputs.seconds }}"; };
@@ -416,20 +414,6 @@ if nixpkgs != null && pkgs == null then {
         });
 
         checkout = { uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; };
-        buildJob = {
-          name = "Build particles";
-          runs-on = "ubuntu-latest";
-          timeout-minutes = 90;
-          steps = [ checkout ]
-            ++ nixCi.setupSteps
-            ++ [ nixCi.installStep ]
-            ++ nixCi.cacheSteps
-            ++ [{ continue-on-error = true; run = "nix run .#test -- --severity ${severity} --build-only"; }] # one that doesn't build fails its own job
-            ++ lib.optional (nixCi.leanDir != null) {
-            uses = "actions/upload-artifact@v4";
-            "with" = { name = artifact; path = nixCi.leanDir; if-no-files-found = "error"; retention-days = 1; compression-level = 0; }; # already zstd
-          };
-        };
         # as cache.nix's lean cache: every ref reads the default branch's, so only it saves
         ciCacheSteps = p:
           let
@@ -446,7 +430,6 @@ if nixpkgs != null && pkgs == null then {
           ];
         genericJob = p: {
           inherit (p) name;
-          needs = "particles";
           runs-on = "ubuntu-latest";
           timeout-minutes = 90;
           outputs = builtins.listToAttrs (map (o: { name = o; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
@@ -454,17 +437,15 @@ if nixpkgs != null && pkgs == null then {
           steps = [ checkout ]
             ++ nixCi.setupSteps
             ++ [ nixCi.installStep ]
-            ++ (if nixCi.leanDir != null
-          then [{ uses = "actions/download-artifact@v4"; "with" = { name = artifact; path = nixCi.leanDir; }; }] # already a substituter
-          else nixCi.cacheSteps)
+            ++ (if nixCi.leanDir != null then nixCi.scopedCacheSteps "particle-${p.name}" else nixCi.cacheSteps)
             ++ ciCacheSteps p
-            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }];
+            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
+            ++ lib.optional (nixCi.leanDir != null) nixCi.pruneStep;
         };
 
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke
-            ++ map (p: { inherit (p) name; value = genericJob p; }) generic)
-        // lib.optionalAttrs (generic != [ ]) { particles = buildJob; };
+            ++ map (p: { inherit (p) name; value = genericJob p; }) generic);
         needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues jobs);
 
         # a bespoke particle's `ci.badges`: gist key -> the job output holding its seconds

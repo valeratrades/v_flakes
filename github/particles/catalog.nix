@@ -20,6 +20,11 @@ let
       cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
       ${text}
     '';
+  # one that reads the crate rather than building it: no toolchain
+  crateTool = name: inputs: text: program name inputs ''
+    cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
+    ${text}
+  '';
   # job-level, not workflow-level: the shared jobs alongside need the repo root
   inCargoRoot = job:
     if cargoRoot == "." then job
@@ -33,7 +38,9 @@ let
   machete = (import ../../langs/rs).machete system;
   sortDerives = (import ../../langs/rs).sort_derives system;
   qlty = import ../../tools/qlty.nix system;
-  scriptRust = (import ../../langs/rs).default_nightly system; # v_flakes' own scripts', whatever toolchain the repo has
+  scriptRust = # v_flakes' own scripts', whatever toolchain the repo has: the canonical nightly's, without the dev extensions
+    let p = import (import ../../pins/nixpkgs.nix) { inherit system; overlays = [ (import (import ../../pins/rust_overlay.nix)) ]; };
+    in p.rust-bin.nightly.${import ../../langs/rs/nightly_version.nix}.minimal;
 in
 {
   rust-tests = { skipPatterns ? [ ] }:
@@ -88,12 +95,12 @@ in
     };
 
   # Not upstream's build: it can't see an orphan in `[workspace.dependencies]` (tools/machete.nix)
-  rust-machete = {}: { program = cargo "rust-machete" [ machete ] "cargo-machete"; };
+  rust-machete = {}: { program = crateTool "rust-machete" [ machete ] "cargo-machete"; };
 
-  rust-sorted = {}: { program = cargo "rust-sorted" [ pkgs.cargo-sort ] "cargo sort --workspace --grouped --check || { echo 'Cargo.toml is not sorted: cargo sort -w fixes it'; exit 1; }"; };
+  rust-sorted = {}: { program = crateTool "rust-sorted" [ pkgs.cargo-sort ] "cargo-sort --workspace --grouped --check || { echo 'Cargo.toml is not sorted: cargo sort -w fixes it'; exit 1; }"; };
 
   # Not upstream's build: it ignores the `qualified_last` key v_flakes patches in (tools/sort_derives.nix)
-  rust-sorted-derives = {}: { program = cargo "rust-sorted-derives" [ sortDerives ] "cargo sort-derives --check || { echo 'Derives are not sorted: cargo sort-derives fixes it'; exit 1; }"; };
+  rust-sorted-derives = {}: { program = crateTool "rust-sorted-derives" [ sortDerives ] "cargo-sort-derives sort-derives --check || { echo 'Derives are not sorted: cargo sort-derives fixes it'; exit 1; }"; };
 
   rust-unused-features = {}: {
     program = cargo "rust-unused-features" [ pkgs.cargo-unused-features pkgs.jq ] ''
@@ -103,7 +110,7 @@ in
     '';
   };
 
-  rust-leptosfmt = {}: { program = cargo "rust-leptosfmt" [ pkgs.leptosfmt ] "leptosfmt --check ."; };
+  rust-leptosfmt = {}: { program = crateTool "rust-leptosfmt" [ pkgs.leptosfmt ] "leptosfmt --check ."; };
 
   tokei = {}: {
     program = program "tokei" [ pkgs.tokei pkgs.jq ] ''

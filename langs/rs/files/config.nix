@@ -10,6 +10,7 @@ let
   webCfg = if webUnstable then [ "--cfg" "web_sys_unstable_apis" ] else [ ];
 
   base = {
+    include = [{ path = "local.toml"; optional = true; }]; # written by the shell, never committed: what only this machine has, as its wrapper
     profile.dev.split-debuginfo = "unpacked"; # DWARF stays in per-crate .dwo, not copied into every test binary
     target = {
       "x86_64-unknown-linux-gnu".rustflags = [

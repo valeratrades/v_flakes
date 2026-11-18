@@ -77,6 +77,36 @@ assert (modeCount <= 1) || throw
   setupSteps = if hasLean then [ leanSetupStep ] else [ ];
   leanDir = if hasLean then leanDir else null;
 
+  # Lean only: `scope`'s own cache, which a lock bump doesn't empty (self-pinned paths survive it): the newest of any
+  # lock is restored, and `pruneStep`, a job's last, drops what this run didn't use before the post step saves.
+  scopedCacheSteps = scope:
+    assert hasLean;
+    let
+      prefix = "nix-lean-${scope}-\${{ runner.os }}-";
+      cacheWith = {
+        path = leanDir;
+        key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ github.run_id }}";
+        restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}";
+      };
+    in
+    [
+      { name = "Restore lean nix cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
+      { name = "Lean nix cache (built-only paths)"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
+    ];
+  pruneStep = assert hasLean; {
+    name = "Prune lean nix cache to what this run used";
+    "if" = "always() && github.ref_name == github.event.repository.default_branch";
+    shell = "bash";
+    # substitution is lazy: a restored path this run never needed isn't valid in the store
+    run = ''
+      shopt -s nullglob
+      for n in ${leanDir}/*.narinfo; do
+        nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
+        sudo rm -f "${leanDir}/$(sed -n 's/^URL: //p' "$n")" "$n"
+      done
+    '';
+  };
+
   cacheSteps =
     if hasCachix then [{
       name = "Setup Cachix";
