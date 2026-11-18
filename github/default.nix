@@ -285,7 +285,13 @@ if nixpkgs != null && pkgs == null then {
         ${"# cargo is guaranteed on PATH by utils.combine (which requires `rust`)."}
         ${"# builtins-only checks: this runs on every direnv load, and cargo -Zscript alone is ~7 processes"}
         [[ ! -f $_vf_hooks/pre-commit || $(<"$_vf_hooks"/pre-commit) == *'source "$script_dir"/custom.sh'* ]] || cargo -Zscript -q ${../git/append-custom.rs} "$_vf_hooks"/pre-commit
-        [[ -x $_vf_hooks/custom.sh && $(<"$_vf_hooks"/custom.sh) == "$(<${customSh})" ]] || install -m 0755 ${customSh} "$_vf_hooks"/custom.sh
+        ${"# hooks run with the dev shell's tools even when committing from outside it; only its store entries, so the outer PATH is not frozen in"}
+        _vf_path=
+        IFS=: read -ra _vf_dirs <<< "$PATH"
+        for _vf_d in "''${_vf_dirs[@]}"; do [[ $_vf_d == /nix/store/* ]] && _vf_path+=$_vf_d:; done
+        printf -v _vf_custom 'export PATH=%q"$PATH"\n%s' "$_vf_path" "$(<${customSh})"
+        [[ -x $_vf_hooks/custom.sh && $(<"$_vf_hooks"/custom.sh) == "$_vf_custom" ]] || { printf '%s\n' "$_vf_custom" > "$_vf_hooks"/custom.sh && chmod 0755 "$_vf_hooks"/custom.sh; }
+        unset _vf_path _vf_dirs _vf_d _vf_custom
       '';
 
     lfsGitConfig = ''
