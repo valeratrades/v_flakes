@@ -9,7 +9,7 @@ let
 
   program = name: inputs: text: pkgs.writeShellApplication {
     inherit name text;
-    runtimeInputs = inputs ++ runtimeInputs ++ [ pkgs.git ];
+    runtimeInputs = inputs ++ runtimeInputs ++ [ pkgs.gitMinimal ];
   };
   # every rust particle runs in the cargo root, with the shell's toolchain and wrapper, and what CI's
   # nix-shell gives every rust job (install.nix): a linker, pkg-config, openssl, the section's packages' .pc files

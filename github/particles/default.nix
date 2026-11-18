@@ -61,7 +61,7 @@ assert duplicates == [ ] || throw "v_flakes.github: particles listed twice: ${to
   inherit (bySection) errors warnings;
   runner = pkgs.writeShellApplication {
     name = "particles";
-    runtimeInputs = [ pkgs.jq pkgs.git pkgs.coreutils ];
+    runtimeInputs = [ pkgs.jq pkgs.gitMinimal pkgs.coreutils ];
     text = "spec=${spec}\n" + builtins.readFile ./runner.sh;
     passthru.vFlakesParticles = true; # how v_flakes' flake-utils finds it in a devShell, for `apps.test`
     meta.description = "the repo's checks (particles), in parallel, with their times; `-- --help`";
