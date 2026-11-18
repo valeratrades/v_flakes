@@ -12,7 +12,7 @@ rustc-wrapper = "sccache"
 [profile.rust]
 codegen-backend = "cranelift"
 
-[target.x86_64-unknown-linux-gnu]
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 rustflags = ["--cfg", "tokio_unstable"]
 "#;
 
@@ -64,7 +64,7 @@ fn fresh_checkout_gets_generated() {
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 	----- index -----
 	[build]
@@ -73,7 +73,7 @@ fn fresh_checkout_gets_generated() {
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 	"#);
 }
@@ -120,7 +120,7 @@ FOO = "1"
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 	----- index -----
 	# my aliases
@@ -136,7 +136,7 @@ FOO = "1"
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 	"#);
 }
@@ -146,7 +146,7 @@ fn keys_dropped_from_generated_are_removed() {
 	let generated = r#"[build]
 rustc-wrapper = "sccache"
 
-[target.x86_64-unknown-linux-gnu]
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 rustflags = ["--cfg", "tokio_unstable"]
 "#;
 	let on_disk = format!("{GENERATED}\n[profile.dev]\nopt-level = 1\n\n[patch.crates-io]\na = {{ path = \"../a\" }}\n");
@@ -154,7 +154,7 @@ rustflags = ["--cfg", "tokio_unstable"]
 	[build]
 	rustc-wrapper = "sccache"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 
 	[profile.dev]
@@ -166,7 +166,7 @@ rustflags = ["--cfg", "tokio_unstable"]
 	[build]
 	rustc-wrapper = "sccache"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 
 	[profile.dev]
@@ -184,7 +184,7 @@ fn bare_patch_table_stays_out_of_git() {
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 
 	[patch]
@@ -196,7 +196,7 @@ fn bare_patch_table_stays_out_of_git() {
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = ["--cfg", "tokio_unstable"]
 	"#);
 }
@@ -209,7 +209,7 @@ rustc-wrapper = "kache"
 [profile.rust]
 codegen-backend = "cranelift"
 
-[target.x86_64-unknown-linux-gnu]
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 rustflags = "--cfg tokio_unstable"
 "#;
 	let on_disk = format!("{GENERATED}\n[patch.crates-io]\na = {{ path = \"../a\" }}\n");
@@ -220,7 +220,7 @@ rustflags = "--cfg tokio_unstable"
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = "--cfg tokio_unstable"
 
 	[patch.crates-io]
@@ -232,7 +232,7 @@ rustflags = "--cfg tokio_unstable"
 	[profile.rust]
 	codegen-backend = "cranelift"
 
-	[target.x86_64-unknown-linux-gnu]
+	[target.'cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))']
 	rustflags = "--cfg tokio_unstable"
 	"#);
 }
