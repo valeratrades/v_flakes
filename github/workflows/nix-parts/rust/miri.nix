@@ -14,7 +14,7 @@
         uses = "actions/download-artifact@v7";
         "with".name = "modified-cargo-files";
       }
-      { uses = "Swatinem/rust-cache@v2"; }
+      { uses = "Swatinem/rust-cache@v2"; "with".cache-on-failure = true; } # a failing check is a normal run; its deps stay warm
       { run = "cargo miri setup"; }
     ];
   };

@@ -73,7 +73,7 @@ in
         "with".name = "modified-cargo-files";
       }
       { run = "cargo update"; }
-      { uses = "Swatinem/rust-cache@v2"; } # after `cargo update`: the key hashes Cargo.lock
+      { uses = "Swatinem/rust-cache@v2"; "with".cache-on-failure = true; } # after `cargo update`: the key hashes Cargo.lock
     ];
   };
   # `--workspace`: a bare invocation covers only `default-members`
