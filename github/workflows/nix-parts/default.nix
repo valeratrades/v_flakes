@@ -58,8 +58,8 @@ if nixpkgs != null && pkgs == null then {
     Note: This module is typically used via github/default.nix which provides
     a higher-level interface with default job selection based on langs.
 
-    Errors and Warnings run the particles of `jobs.errors` / `jobs.warnings` (github/particles): those
-    with a `ci` body as a job each, the rest in one `particles` job (`nix run .#test -- --severity <s> --serial <names>`),
+    Errors and Warnings run the particles of `jobs.errors` / `jobs.warnings` (github/particles): each
+    as a job: a `ci` body's own, or `nix run .#test -- --severity <s> <name>` from what one `particles` job built for them all,
     then a `report` job writing the section's badge (`<repo>-errors.json` / `-warnings.json` in the badge gist).
 
     Other jobs: loc-badge, asset-gate (`jobs.other`), the latter with args:
@@ -391,8 +391,8 @@ if nixpkgs != null && pkgs == null then {
       in
       if wf != null then wf.jobs else { };
 
-    # A section's particles: one job per particle with a `ci` body, one `particles` job running the rest
-    # serially through `nix run .#test`, and on the default branch a `report` job writing the section's
+    # A section's particles, a job each: a `ci` body's own, or `nix run .#test` after the `particles` job built them all
+    # once and handed its store paths over; and on the default branch a `report` job writing the section's
     # badge from their outcomes and their own run seconds (setup, nix install and cache restore left out).
     particleWorkflow = { title, severity, particles, installConfig, hooks }:
       let
@@ -400,7 +400,7 @@ if nixpkgs != null && pkgs == null then {
         nixCi = import ../../cache.nix { inherit cache; };
         bespoke = builtins.filter (p: p.ci != null) particles;
         generic = builtins.filter (p: p.ci == null) particles;
-        names = map (p: p.name) generic;
+        artifact = "particles-${severity}-nix";
 
         bespokeJob = p: withInstall installConfig (p.ci.job // {
           outputs = (p.ci.job.outputs or { }) // { seconds = "\${{ steps.particle.outputs.seconds }}"; };
@@ -415,36 +415,56 @@ if nixpkgs != null && pkgs == null then {
             ++ (p.ci.post or [ ]);
         });
 
-        caches = builtins.filter (c: c != null) (map (p: p.ciCache) generic);
-        cachePrefix = "particles-${severity}-\${{ runner.os }}-";
-        cacheWith = {
-          path = lib.concatStringsSep "\n" (lib.unique (lib.concatMap (c: c.paths) caches));
-          key = "${cachePrefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") (lib.unique (lib.concatMap (c: c.hashFiles) caches))}) }}";
-          restore-keys = cachePrefix;
-        };
-        # as cache.nix's lean cache: every ref reads the default branch's, so only it saves
-        cacheSteps = lib.optionals (caches != [ ]) [
-          { name = "Restore particles' cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
-          { name = "Particles' cache"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
-        ];
-        genericJob = {
-          name = "Particles";
+        checkout = { uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; };
+        buildJob = {
+          name = "Build particles";
           runs-on = "ubuntu-latest";
           timeout-minutes = 90;
-          outputs = builtins.listToAttrs (lib.concatMap
-            (p: map (o: { name = "${p.name}_${o}"; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
-              ([ "seconds" "status" ] ++ lib.optional (p.prepare != null) "prepare_seconds"))
-            generic);
-          steps = [ ({ uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; }) ]
+          steps = [ checkout ]
             ++ nixCi.setupSteps
             ++ [ nixCi.installStep ]
             ++ nixCi.cacheSteps
-            ++ cacheSteps
-            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} --serial ${lib.escapeShellArgs names}"; }];
+            ++ [{ continue-on-error = true; run = "nix run .#test -- --severity ${severity} --build-only"; }] # one that doesn't build fails its own job
+            ++ lib.optional (nixCi.leanDir != null) {
+            uses = "actions/upload-artifact@v4";
+            "with" = { name = artifact; path = nixCi.leanDir; if-no-files-found = "error"; retention-days = 1; compression-level = 0; }; # already zstd
+          };
+        };
+        # as cache.nix's lean cache: every ref reads the default branch's, so only it saves
+        ciCacheSteps = p:
+          let
+            prefix = "particles-${severity}-${p.name}-\${{ runner.os }}-";
+            cacheWith = {
+              path = lib.concatStringsSep "\n" p.ciCache.paths;
+              key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") p.ciCache.hashFiles}) }}";
+              restore-keys = prefix;
+            };
+          in
+          lib.optionals (p.ciCache != null) [
+            { name = "Restore particle's cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
+            { name = "Particle's cache"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
+          ];
+        genericJob = p: {
+          inherit (p) name;
+          needs = "particles";
+          runs-on = "ubuntu-latest";
+          timeout-minutes = 90;
+          outputs = builtins.listToAttrs (map (o: { name = o; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
+            ([ "seconds" ] ++ lib.optional (p.prepare != null) "prepare_seconds"));
+          steps = [ checkout ]
+            ++ nixCi.setupSteps
+            ++ [ nixCi.installStep ]
+            ++ (if nixCi.leanDir != null
+          then [{ uses = "actions/download-artifact@v4"; "with" = { name = artifact; path = nixCi.leanDir; }; }] # already a substituter
+          else nixCi.cacheSteps)
+            ++ ciCacheSteps p
+            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }];
         };
 
-        jobs = builtins.listToAttrs (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke)
-          // lib.optionalAttrs (generic != [ ]) { particles = genericJob; };
+        jobs = builtins.listToAttrs
+          (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke
+            ++ map (p: { inherit (p) name; value = genericJob p; }) generic)
+        // lib.optionalAttrs (generic != [ ]) { particles = buildJob; };
         needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues jobs);
 
         # a bespoke particle's `ci.badges`: gist key -> the job output holding its seconds
@@ -460,16 +480,13 @@ if nixpkgs != null && pkgs == null then {
             name = "Tally the particles";
             env = {
               NEEDS = "\${{ toJSON(needs) }}";
-              PARTICLES = builtins.toJSON (map (p: { inherit (p) name; generic = p.ci == null; }) particles);
+              PARTICLES = builtins.toJSON (map (p: p.name) particles);
               TIMED = builtins.toJSON timed;
             };
             run = ''
               read -r failed total seconds incomplete < <(jq -rn --argjson needs "$NEEDS" --argjson spec "$PARTICLES" '
                 def secs: if . == null or . == "" then 0 else tonumber end;
-                [ $spec[] | . as $p
-                  | if $p.generic
-                    then $needs.particles as $j | { ok: ($j.outputs[$p.name + "_status"] == "ok"), t: ($j.outputs[$p.name + "_seconds"] | secs), r: $j.result }
-                    else $needs[$p.name] as $j | { ok: ($j.result == "success"), t: ($j.outputs.seconds | secs), r: $j.result } end ]
+                [ $spec[] | $needs[.] as $j | { ok: ($j.result == "success"), t: ($j.outputs.seconds | secs), r: $j.result } ]
                 | "\(map(select(.ok | not)) | length) \(length) \(map(.t) | add) \(map(select(.r == "skipped" or .r == "cancelled")) | length)"')
               if [ "$incomplete" != 0 ]; then
                 echo "::notice::a particle's job was skipped or cancelled: the badge keeps its last complete run"

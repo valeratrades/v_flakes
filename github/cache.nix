@@ -75,6 +75,7 @@ assert (modeCount <= 1) || throw
   };
 
   setupSteps = if hasLean then [ leanSetupStep ] else [ ];
+  leanDir = if hasLean then leanDir else null;
 
   cacheSteps =
     if hasCachix then [{
