@@ -22,6 +22,6 @@ in
   # an extra rust-std component is ~free, while omitting one in some repos would
   # fork the toolchain drv (see rpath note above).
 pkgs.rust-bin.nightly.${import ./nightly_version.nix}.default.override {
-  extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
+  extensions = [ "rust-src" "rust-analyzer" "rust-docs" ] ++ pkgs.lib.optional (!pkgs.stdenv.hostPlatform.isFreeBSD) "rustc-codegen-cranelift-preview"; # not shipped for FreeBSD
   targets = [ "wasm32-unknown-unknown" "x86_64-unknown-linux-musl" ];
 }

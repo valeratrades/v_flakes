@@ -14,8 +14,9 @@ let
     x86_64-darwin = { target = "x86_64-apple-darwin"; hash = "sha256-i5pNBdsBUJqRFPvOAE90458C9ce0W5B+jN2vhR0XI8A="; };
     aarch64-darwin = { target = "aarch64-apple-darwin"; hash = "sha256-ok1NCkkHLpW0LFJ3qK9eeTLTXCyekeqz2/DkoHL3ZTY="; };
   };
-  inherit (targets.${system} or (throw "v_flakes.qlty: no upstream release for ${system}")) target hash;
+  inherit (targets.${system}) target hash;
 in
+if !(targets ? ${system}) then pkgs.writeShellScriptBin "qlty" ''echo "qlty: no upstream release for ${system}" >&2; exit 1'' else
 pkgs.runCommand "qlty-${version}"
 {
   meta = {

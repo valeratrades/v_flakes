@@ -9,6 +9,9 @@
   webAssets ? null
 ,
 }:
+let
+  preCommit = if pkgs.stdenv.hostPlatform.isFreeBSD then pkgs.pre-commit.overridePythonAttrs { doCheck = false; } else pkgs.pre-commit; # its tests pull GHC, which nixpkgs can't bootstrap on FreeBSD
+in
 assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames webAssets) == [ ]
   || throw "v_flakes files.preCommit: webAssets is { allow ? [ ]; }, got ${builtins.toJSON webAssets}";
 {
@@ -21,8 +24,8 @@ assert webAssets == null || lib.subtractLists [ "allow" ] (builtins.attrNames we
       runtimeInputs = [ pkgs.flock pkgs.git ];
       text = ''
         case "''${1-}" in
-          install | uninstall) exec flock "$(git rev-parse --path-format=absolute --git-common-dir)/v_flakes-hooks.lock" ${lib.getExe pkgs.pre-commit} "$@" ;;
-          *) exec ${lib.getExe pkgs.pre-commit} "$@" ;;
+          install | uninstall) exec flock "$(git rev-parse --path-format=absolute --git-common-dir)/v_flakes-hooks.lock" ${lib.getExe preCommit} "$@" ;;
+          *) exec ${lib.getExe preCommit} "$@" ;;
         esac
       '';
     } // { pname = "pre-commit"; }; # git-hooks.nix branches on `package.pname` (prek vs pre-commit)

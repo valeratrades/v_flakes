@@ -126,10 +126,11 @@ if nixpkgs != null && pkgs == null then {
     # A `"#"` key becomes the file's leading comment.
     yaml = value:
       let
+        yq = if pkgs.stdenv.hostPlatform.isFreeBSD then pkgs.yq-go.overrideAttrs { nativeBuildInputs = [ ]; postInstall = ""; } else pkgs.yq-go; # its man page needs pandoc, i.e. GHC, which nixpkgs can't bootstrap on FreeBSD
         json = pkgs.writeText "workflow.json" (builtins.toJSON (builtins.removeAttrs value [ "#" ]));
         header = pkgs.lib.optionalString (value ? "#") (pkgs.lib.concatMapStrings (l: if l == "" then "#\n" else "# ${l}\n") (pkgs.lib.splitString "\n" (pkgs.lib.removeSuffix "\n" value."#")));
       in
-      pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ pkgs.yq-go pkgs.bash ]; } ''
+      pkgs.runCommand "workflow.yml" { nativeBuildInputs = [ yq pkgs.bash ]; } ''
         generated=workflow.yml
         yq -p json -o yaml '(.. style="") | (.. | select(tag == "!!str" and test("\t"))) style="double"' ${json} > $generated # yq writes a tab into a block scalar, which no parser reads
         [ "$(yq -p json -o json -I0 'sort_keys(..)' ${json})" = "$(yq -o json -I0 'sort_keys(..)' $generated)" ] \

@@ -218,7 +218,10 @@
       # their own copies — same rev everywhere means nix store dedup, shared caches.
       # `nixpkgs` is the flake (for consumers needing `.lib`); default_nixpkgs above
       # is the same rev as a bare source tree, for `import`.
-      inherit nixpkgs rust-overlay pre-commit-hooks process-compose-flake devenv lean4-nix;
+      inherit nixpkgs rust-overlay process-compose-flake devenv lean4-nix;
+      pre-commit-hooks = pre-commit-hooks // {
+        lib = pre-commit-hooks.lib // { x86_64-freebsd = { inherit (import "${pre-commit-hooks}/nix" { inherit nixpkgs; system = "x86_64-freebsd"; isFlakes = true; }) run; }; }; # upstream lists only linux/darwin
+      };
       # Wrapped to give every flake built through them an `apps.help`, unless it defines its own `help`,
       # a rust `packages.default` an `apps.default` (utils/cargo-run.nix), unless it defines its own,
       # and `apps.test`, the particle runner its devShell carries (github/particles).
@@ -245,7 +248,7 @@
         flake-utils // {
           lib = flake-utils.lib // {
             eachSystem = systems: f: flake-utils.lib.eachSystem systems (withApps f);
-            eachDefaultSystem = f: flake-utils.lib.eachDefaultSystem (withApps f);
+            eachDefaultSystem = f: flake-utils.lib.eachSystem (flake-utils.lib.defaultSystems ++ [ "x86_64-freebsd" ]) (withApps f);
           };
         };
       flake-parts = flake-parts // {
