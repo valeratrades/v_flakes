@@ -428,20 +428,23 @@ if nixpkgs != null && pkgs == null then {
             { name = "Restore particle's cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
             { name = "Particle's cache"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
           ];
-        genericJob = p: {
-          inherit (p) name;
-          runs-on = "ubuntu-latest";
-          timeout-minutes = 90;
-          outputs = builtins.listToAttrs (map (o: { name = o; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
-            ([ "seconds" ] ++ lib.optional (p.prepare != null) "prepare_seconds"));
-          steps = [ checkout ]
-            ++ nixCi.setupSteps
-            ++ [ nixCi.installStep ]
-            ++ (if nixCi.leanDir != null then nixCi.scopedCacheSteps "particle-${p.name}" else nixCi.cacheSteps)
-            ++ ciCacheSteps p
-            ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
-            ++ lib.optional (nixCi.leanDir != null) nixCi.pruneStep;
-        };
+        genericJob = p:
+          let lean = nixCi.scopedCache "particle-${p.name}"; in {
+            inherit (p) name;
+            runs-on = "ubuntu-latest";
+            timeout-minutes = 90;
+            outputs = builtins.listToAttrs (map (o: { name = o; value = "\${{ steps.run.outputs['${p.name}_${o}'] }}"; })
+              ([ "seconds" ] ++ lib.optional (p.prepare != null) "prepare_seconds"));
+            steps = [ checkout ]
+              ++ nixCi.setupSteps
+              ++ [ nixCi.installStep ]
+              ++ (if nixCi.leanDir != null then [ lean.restore ] else nixCi.cacheSteps)
+              ++ [ nixCi.evalCache.restore ]
+              ++ ciCacheSteps p
+              ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
+              ++ [ nixCi.evalCache.save ]
+              ++ lib.optionals (nixCi.leanDir != null) lean.save;
+          };
 
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke

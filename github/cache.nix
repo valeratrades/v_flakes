@@ -57,6 +57,21 @@ let
       chmod 0755 ${leanHook}
     '';
   };
+  leanPrune = {
+    name = "Prune lean nix cache to what this run used";
+    shell = "bash";
+    # substitution is lazy: a restored path this run never needed isn't valid in the store
+    run = ''
+      cd ${leanDir}
+      shopt -s nullglob
+      narinfos=(*.narinfo)
+      ((''${#narinfos[@]})) || exit 0
+      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+        n=$(basename "$p") && n=''${n%%-*}.narinfo
+        echo "$n" && sed -n 's/^URL: //p' "$n"
+      done | sudo xargs -r rm -f
+    '';
+  };
 in
 assert (modeCount <= 1) || throw
   "v_flakes cache: set at most one of `cache.nix-action = true`, `cache.lean = true`, or `cache.cachix = \"<name>\"` (unset = lean)";
@@ -78,37 +93,27 @@ assert (modeCount <= 1) || throw
   leanDir = if hasLean then leanDir else null;
 
   # Lean only: `scope`'s own cache, which a lock bump doesn't empty (self-pinned paths survive it): the newest of any
-  # lock is restored, and `pruneStep`, a job's last, drops what this run didn't use before the post step saves.
-  scopedCacheSteps = scope:
+  # lock is restored. `save` goes last, failed job or not: it prunes to what this run used, then saves.
+  scopedCache = scope:
     assert hasLean;
     let
       prefix = "nix-lean-${scope}-\${{ runner.os }}-";
-      cacheWith = {
-        path = leanDir;
-        key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ github.run_id }}";
-        restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}";
-      };
+      key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ github.run_id }}";
+      onDefault = "always() && github.ref_name == github.event.repository.default_branch"; # every ref reads the default branch's
     in
-    [
-      { name = "Restore lean nix cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
-      { name = "Lean nix cache (built-only paths)"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
-    ];
-  pruneStep = assert hasLean; {
-    name = "Prune lean nix cache to what this run used";
-    "if" = "always() && github.ref_name == github.event.repository.default_branch";
-    shell = "bash";
-    # substitution is lazy: a restored path this run never needed isn't valid in the store
-    run = ''
-      cd ${leanDir}
-      shopt -s nullglob
-      narinfos=(*.narinfo)
-      ((''${#narinfos[@]})) || exit 0
-      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
-        n=$(basename "$p") && n=''${n%%-*}.narinfo
-        echo "$n" && sed -n 's/^URL: //p' "$n"
-      done | sudo xargs -r rm -f
-    '';
-  };
+    {
+      restore = { name = "Restore lean nix cache"; uses = "actions/cache/restore@v5"; "with" = { path = leanDir; inherit key; restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}"; }; };
+      save = [ (leanPrune // { "if" = onDefault; }) { name = "Save lean nix cache"; "if" = onDefault; uses = "actions/cache/save@v5"; "with" = { path = leanDir; inherit key; }; } ];
+    };
+  # the flake inputs' tarball cache, which `nix run .#flake` otherwise unpacks anew
+  evalCache =
+    let
+      key = "nix-eval-\${{ runner.os }}-\${{ hashFiles('flake.lock') }}";
+    in
+    {
+      restore = { id = "eval-cache"; name = "Restore nix eval cache"; uses = "actions/cache/restore@v5"; "with" = { path = "~/.cache/nix"; inherit key; }; };
+      save = { name = "Save nix eval cache"; "if" = "always() && steps.eval-cache.outputs.cache-hit != 'true' && github.ref_name == github.event.repository.default_branch"; uses = "actions/cache/save@v5"; "with" = { path = "~/.cache/nix"; inherit key; }; };
+    };
 
   cacheSteps =
     if hasCachix then [{
