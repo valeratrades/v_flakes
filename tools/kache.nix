@@ -11,8 +11,9 @@ let
     aarch64-linux = { triple = "aarch64-unknown-linux-musl"; hash = "sha256-Rm8K70iF9SkTWbPBvAyZdoJGNBlMW2fhzuKk/jA1FVo="; };
     x86_64-darwin = { triple = "x86_64-apple-darwin"; hash = "sha256-aWJ8/sMBeqUh0GqEr8bF50c0RoZ4vWZZ2Sr9V9mk9Fc="; };
     aarch64-darwin = { triple = "aarch64-apple-darwin"; hash = "sha256-1FM7qjxXvlHV8jkLcFUcqdbCqDoZMyZvoKVwU3dOCPY="; };
-  }.${system} or (throw "kache: no upstream release binary for ${system}");
+  }.${system} or null;
 in
+if release == null then null else
 pkgs.stdenvNoCC.mkDerivation {
   pname = "kache";
   inherit version;

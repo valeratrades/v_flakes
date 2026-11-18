@@ -4,7 +4,7 @@
   cranelift ? true
 , # `--cfg web_sys_unstable_apis` on every target and in CI. For apps only: see files/config.nix
   webUnstable ? false
-, # kache as rustc-wrapper and cargo shim; `false` builds with no wrapper at all
+, # kache as RUSTC_WRAPPER and cargo shim; `false` builds with no wrapper at all
   kache ? true
 , targets ? { }
 , config ? { }
@@ -59,7 +59,7 @@ if nixpkgs != null && pkgs == null then {
     rs = v-utils.rs {
       inherit pkgs rust;  # rust is the nix toolchain package
       cranelift = true;  # Workspace members compile with cranelift when unoptimized and for the host target; deps, wasm and release stay LLVM (default: true)
-      kache = true;      # kache as rustc-wrapper, its cargo shim on PATH (default: true). `false` sets no wrapper, overriding a global one
+      kache = true;      # kache as RUSTC_WRAPPER, its cargo shim on PATH; sccache, then none, where kache isn't installed and has no release (default: true). `false` sets no wrapper, overriding a global one
       webUnstable = false; # Build against web-sys' unstable APIs (`--cfg web_sys_unstable_apis`), native + wasm + CI. Apps only: a library built so compiles against an API its dependents don't get (default: false)
       deny = false;      # Copy deny.toml for cargo-deny (default: false)
       clippy = {};      # Extend .cargo/clippy.toml (default: base defaults, see langs/rs/files/clippy.nix)
@@ -199,7 +199,7 @@ if nixpkgs != null && pkgs == null then {
     targetsExtend = if targets != { } then { target.augment = targets; } else { };
     configExtend = assert !(config ? patch) || throw "v_flakes.rs: `config.patch` would be stripped from git by the `.cargo/config.toml` clean filter; put it in Cargo.toml"; core.mergeConfig targetsExtend config;
     configFile = import ./files/config.nix {
-      inherit pkgs webUnstable kache;
+      inherit pkgs webUnstable;
       extend = configExtend;
     };
     denyExtend = if builtins.isAttrs deny then deny else { };
@@ -321,15 +321,21 @@ if nixpkgs != null && pkgs == null then {
       ${if cranelift then ''export RUSTC_WORKSPACE_WRAPPER=${craneliftWrapper} # env, not config: a nix sandbox build reads the committed config.toml'' else ""}
       ${if kache then ''
         # the machine's kache, which runs the daemon: a devshell pinning its own splits versions on every kache bump until each repo's lock follows
-        _vf_kache=$(command -v kache) || { _vf_kache=${kachePkg}/bin/kache; export PATH="${kachePkg}/bin:$PATH"; }
-        # only the cargo shim: kache's cc/gcc ones would sit in front of nix's cc-wrapper. The marker makes kache skip this dir when looking for the real cargo
-        _vf_shim=$_vf_stamps/kache-shim
-        if ! [ "$_vf_shim/cargo" -ef "$_vf_kache" ]; then
-          mkdir -p "$_vf_shim" && ln -sfn "$_vf_kache" "$_vf_shim/cargo" && : > "$_vf_shim/.kache-shims"
+        if _vf_kache=$(command -v kache)${if kachePkg != null then " || { _vf_kache=${kachePkg}/bin/kache && export PATH=\"${kachePkg}/bin:$PATH\"; }" else ""}; then
+          # only the cargo shim: kache's cc/gcc ones would sit in front of nix's cc-wrapper. The marker makes kache skip this dir when looking for the real cargo
+          _vf_shim=$_vf_stamps/kache-shim
+          if ! [ "$_vf_shim/cargo" -ef "$_vf_kache" ]; then
+            mkdir -p "$_vf_shim" && ln -sfn "$_vf_kache" "$_vf_shim/cargo" && : > "$_vf_shim/.kache-shims"
+          fi
+          export PATH="$_vf_shim:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it
+          [ -n "''${RUSTC_WRAPPER+set}" ] || export RUSTC_WRAPPER=$_vf_kache # a caller's wins: CI sets it empty
+          export KACHE_CACHE_EXECUTABLES=false # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store
+          unset _vf_shim
+        else
+          [ -n "''${RUSTC_WRAPPER+set}" ] || export RUSTC_WRAPPER=$(command -v sccache)
         fi
-        export PATH="$_vf_shim:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it
-        unset _vf_kache _vf_shim
-      '' else ""}
+        unset _vf_kache
+      '' else "export RUSTC_WRAPPER= # also turns off a global wrapper"}
     '';
 
     # cargo-binstall for tracey and codestyle

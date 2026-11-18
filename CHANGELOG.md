@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs`: kache is the devshell's exported `RUSTC_WRAPPER`, no longer `rustc-wrapper` in the committed `.cargo/config.toml` (shell entry drops the key). A plain `cargo build` outside the shell failed with "kache not found" on any machine without it. Where kache isn't installed and has no upstream release (FreeBSD), the wrapper is `sccache` if on PATH, else none. A `RUSTC_WRAPPER` already set is kept. Consumer packages no longer need `RUSTC_WRAPPER = ""`.
+
 - CI: the badge gist write is `continue-on-error`. A rate-limited gist API failed the release job before its binary upload.
 
 - pre-commit: `cargo autoinherit` is a patched build passed in by store path (`tools/cargo_autoinherit.nix`), no longer whatever is on PATH. Upstream merged a member's `default-features = false` into a workspace entry that keeps the defaults and rewrote the member to `workspace = true`, silently turning the defaults back on; such a dep is now left as the member wrote it.

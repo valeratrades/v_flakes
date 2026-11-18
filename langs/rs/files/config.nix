@@ -1,6 +1,5 @@
 { pkgs
 , webUnstable ? false
-, kache ? true
 , extend ? { }
 ,
 }:
@@ -11,9 +10,6 @@ let
   webCfg = if webUnstable then [ "--cfg" "web_sys_unstable_apis" ] else [ ];
 
   base = {
-    build.rustc-wrapper = if kache then "kache" else ""; # "" also turns off the global wrapper ~/.cargo/config.toml sets
-    # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store
-    env = pkgs.lib.optionalAttrs kache { KACHE_CACHE_EXECUTABLES = "false"; };
     profile.dev.split-debuginfo = "unpacked"; # DWARF stays in per-crate .dwo, not copied into every test binary
     target = {
       "x86_64-unknown-linux-gnu".rustflags = [

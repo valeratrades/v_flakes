@@ -78,9 +78,8 @@ JS: the package's directory goes in the gitignored `_.js-local.json` beside `pac
 
 ## Build cache (kache)
 
-The rs module sets kache as `rustc-wrapper` and puts its `cargo` shim on PATH, so a new worktree reuses main's compiled deps. Design: `docs/ARCHITECTURE.md`, "Compile reuse across checkouts".
+The rs module's shell exports kache as `RUSTC_WRAPPER` and puts its `cargo` shim on PATH, so a new worktree reuses main's compiled deps. Design: `docs/ARCHITECTURE.md`, "Compile reuse across checkouts".
 
-- A repo's Rust package (`buildRustPackage` etc.) sets `RUSTC_WRAPPER = ""`: the sandbox has no kache.
 - `rs { kache = false; }` builds with no wrapper at all.
 - Generated rustflags are strings under `target.'cfg(..)'` keys. No cargo config above a repo, `~/.cargo/config.toml` included, may set those keys or `build.rustflags` as an array: cargo errors when a key is a string in one file and an array in another.
 
