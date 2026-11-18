@@ -99,11 +99,14 @@ assert (modeCount <= 1) || throw
     shell = "bash";
     # substitution is lazy: a restored path this run never needed isn't valid in the store
     run = ''
+      cd ${leanDir}
       shopt -s nullglob
-      for n in ${leanDir}/*.narinfo; do
-        nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-        sudo rm -f "${leanDir}/$(sed -n 's/^URL: //p' "$n")" "$n"
-      done
+      narinfos=(*.narinfo)
+      ((''${#narinfos[@]})) || exit 0
+      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+        n=$(basename "$p") && n=''${n%%-*}.narinfo
+        echo "$n" && sed -n 's/^URL: //p' "$n"
+      done | sudo xargs -r rm -f
     '';
   };
 
