@@ -411,7 +411,7 @@ ${content}
 
     <br>
 
-    <sup>Links for devs:</sup>
+    #### Dev links
     ${architectureItem}- <sup><a href="https://github.com/EV-Main/.github/blob/main/code/STYLE.md">style</a></sup>
     - <sup><a href="https://github.com/EV-Main/.github/tree/main/code/conventions">conventions</a></sup>
     - <sup><a href="${contributingHref}">contributing</a></sup>
