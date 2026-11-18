@@ -51,11 +51,14 @@ jobs:
       - if: always() && github.ref_name == github.event.repository.default_branch
         name: Prune lean nix cache to what this run used
         run: |
+          cd /tmp/nix-lean-cache
           shopt -s nullglob
-          for n in /tmp/nix-lean-cache/*.narinfo; do
-            nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-            sudo rm -f "/tmp/nix-lean-cache/$(sed -n 's/^URL: //p' "$n")" "$n"
-          done
+          narinfos=(*.narinfo)
+          ((${#narinfos[@]})) || exit 0
+          sed -n 's/^StorePath: //p' "${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+            n=$(basename "$p") && n=${n%%-*}.narinfo
+            echo "$n" && sed -n 's/^URL: //p' "$n"
+          done | sudo xargs -r rm -f
         shell: bash
     timeout-minutes: 90
   pre_ci:
@@ -225,11 +228,14 @@ jobs:
       - if: always() && github.ref_name == github.event.repository.default_branch
         name: Prune lean nix cache to what this run used
         run: |
+          cd /tmp/nix-lean-cache
           shopt -s nullglob
-          for n in /tmp/nix-lean-cache/*.narinfo; do
-            nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-            sudo rm -f "/tmp/nix-lean-cache/$(sed -n 's/^URL: //p' "$n")" "$n"
-          done
+          narinfos=(*.narinfo)
+          ((${#narinfos[@]})) || exit 0
+          sed -n 's/^StorePath: //p' "${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+            n=$(basename "$p") && n=${n%%-*}.narinfo
+            echo "$n" && sed -n 's/^URL: //p' "$n"
+          done | sudo xargs -r rm -f
         shell: bash
     timeout-minutes: 90
   rust-sorted:
@@ -278,11 +284,14 @@ jobs:
       - if: always() && github.ref_name == github.event.repository.default_branch
         name: Prune lean nix cache to what this run used
         run: |
+          cd /tmp/nix-lean-cache
           shopt -s nullglob
-          for n in /tmp/nix-lean-cache/*.narinfo; do
-            nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-            sudo rm -f "/tmp/nix-lean-cache/$(sed -n 's/^URL: //p' "$n")" "$n"
-          done
+          narinfos=(*.narinfo)
+          ((${#narinfos[@]})) || exit 0
+          sed -n 's/^StorePath: //p' "${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+            n=$(basename "$p") && n=${n%%-*}.narinfo
+            echo "$n" && sed -n 's/^URL: //p' "$n"
+          done | sudo xargs -r rm -f
         shell: bash
     timeout-minutes: 90
   rust-sorted-derives:
@@ -331,11 +340,14 @@ jobs:
       - if: always() && github.ref_name == github.event.repository.default_branch
         name: Prune lean nix cache to what this run used
         run: |
+          cd /tmp/nix-lean-cache
           shopt -s nullglob
-          for n in /tmp/nix-lean-cache/*.narinfo; do
-            nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-            sudo rm -f "/tmp/nix-lean-cache/$(sed -n 's/^URL: //p' "$n")" "$n"
-          done
+          narinfos=(*.narinfo)
+          ((${#narinfos[@]})) || exit 0
+          sed -n 's/^StorePath: //p' "${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+            n=$(basename "$p") && n=${n%%-*}.narinfo
+            echo "$n" && sed -n 's/^URL: //p' "$n"
+          done | sudo xargs -r rm -f
         shell: bash
     timeout-minutes: 90
   tokei:
@@ -384,11 +396,14 @@ jobs:
       - if: always() && github.ref_name == github.event.repository.default_branch
         name: Prune lean nix cache to what this run used
         run: |
+          cd /tmp/nix-lean-cache
           shopt -s nullglob
-          for n in /tmp/nix-lean-cache/*.narinfo; do
-            nix-store --check-validity "$(sed -n 's/^StorePath: //p' "$n")" 2>/dev/null && continue
-            sudo rm -f "/tmp/nix-lean-cache/$(sed -n 's/^URL: //p' "$n")" "$n"
-          done
+          narinfos=(*.narinfo)
+          ((${#narinfos[@]})) || exit 0
+          sed -n 's/^StorePath: //p' "${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+            n=$(basename "$p") && n=${n%%-*}.narinfo
+            echo "$n" && sed -n 's/^URL: //p' "$n"
+          done | sudo xargs -r rm -f
         shell: bash
     timeout-minutes: 90
 name: Warnings
