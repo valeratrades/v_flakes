@@ -498,7 +498,7 @@ if nixpkgs != null && pkgs == null then {
                 | ($needs[.particle].outputs[.output] | tonumber) as $s
                 | "BADGE_\(.key | ascii_upcase)=\($s / 60 | floor)m \($s % 60)s"' >> "$GITHUB_ENV"
               time="$((seconds / 60))m $((seconds % 60))s"
-              if [ "$failed" = 0 ]; then msg="✓ $time" color=brightgreen; else msg="✗ $failed/$total · $time" color=red; fi
+              if [ "$failed" = 0 ]; then msg="✓ $time" color=brightgreen; else msg="✗ $((total - failed))/$total · $time" color=red; fi
               { echo "BADGE_MESSAGE=$msg"; echo "BADGE_COLOR=$color"; } >> "$GITHUB_ENV"
             '';
           }] ++ import ./shared/gist-badges.nix {
