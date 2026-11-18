@@ -1,14 +1,21 @@
 #![cfg(feature = "toml")]
 
 use v_fixtures::Fixture;
-use v_flakes::pyproject_merge::merge;
+use v_flakes::pyproject_merge::{Paths, merge};
+
+fn paths() -> Paths {
+	Paths {
+		venv_path: ".devenv/state/venv".into(),
+		src_path: "py_src".into(),
+	}
+}
 
 fn run(fixture_str: &str) -> String {
 	let fixture = Fixture::parse(fixture_str);
 	let temp = fixture.write_to_tempdir();
 	let path = temp.path("/pyproject.toml");
 	let original = std::fs::read_to_string(&path).unwrap();
-	let result = merge(&original, ".devenv/state/venv", "py_src");
+	let result = merge(&original, &paths());
 	result
 }
 
@@ -106,7 +113,7 @@ fn idempotent() {
 	"#;
 
 	let first = run(fixture_str);
-	let second = merge(&first, ".devenv/state/venv", "py_src");
+	let second = merge(&first, &paths());
 	assert_eq!(first, second, "merge is not idempotent");
 }
 
@@ -140,8 +147,8 @@ fn sections_and_keys_sorted_alphabetically() {
 
 #[test]
 fn no_write_when_unchanged() {
-	let input = merge("", ".devenv/state/venv", "py_src");
-	insta::assert_snapshot!(merge(&input, ".devenv/state/venv", "py_src"), @r#"
+	let input = merge("", &paths());
+	insta::assert_snapshot!(merge(&input, &paths()), @r#"
 	[tool]
 
 	[tool.inline-snapshot]

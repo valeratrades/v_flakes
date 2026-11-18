@@ -22,6 +22,19 @@ struct Ctx<'a> {
 	dir: PathBuf,
 }
 
+struct Move<'a> {
+	from: &'a str,
+	to: &'a str,
+}
+
+#[derive(Clone, Copy)]
+enum Method {
+	Put,
+	Patch,
+	Post,
+	Delete,
+}
+
 /// The source's history, fetched into `Ctx::dir` and rewritten without the dropped LFS pointers.
 struct Prepared {
 	/// oid → size, over branch tips
@@ -55,11 +68,11 @@ pub(crate) fn run(repo: &str) -> Result<(), String> {
 		dir: std::env::temp_dir().join(format!("v_flakes-lfs-clean-{owner}-{name}")),
 	};
 
-	match (get(owner, name)?, get(owner, &c.clean)?, get(owner, &c.bak)?) {
+	match (get(&c, name)?, get(&c, &c.clean)?, get(&c, &c.bak)?) {
 		(Some(src), clean, None) => migrate(&c, &src, clean.is_some())?,
 		(None, Some(_), Some(_)) => {
 			println!("resuming: {name} was already renamed to {}", c.bak);
-			rename(owner, &c.clean, name)?;
+			rename(&c, Move { from: &c.clean, to: name })?;
 		}
 		(Some(_), None, Some(b)) if b["archived"] == true =>
 			return Err(format!(
@@ -118,12 +131,12 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 
 	let p = prepare(c, name)?;
 	let gb = |keep: bool| p.all.iter().filter(|(oid, _)| p.kept.contains_key(*oid) == keep).map(|(_, s)| *s).sum::<u64>() as f64 / 1e9;
-	let items = issue_numbers(o, name)?;
+	let items = issue_numbers(c, name)?;
 	println!("\n{o}/{name} → new repo with the same history minus dropped LFS objects; those stay behind in {o}/{}", c.bak);
 	println!("  LFS kept (∪ branch tips): {} objects, {:.2} GB", p.kept.len(), gb(true));
 	println!("  LFS dropped:              {} objects, {:.2} GB", p.all.len() - p.kept.len(), gb(false));
 	println!("  commits getting a new SHA: {}", p.rewritten);
-	let done = if resuming { issue_numbers(o, &c.clean)?.keys().max().copied().unwrap_or(0) } else { 0 };
+	let done = if resuming { issue_numbers(c, &c.clean)?.keys().max().copied().unwrap_or(0) } else { 0 };
 	let max = items.keys().max().copied().unwrap_or(0).max(done);
 	println!("  numbers 1..={max}:");
 	let kind = |n: u64| match items.get(&n) {
@@ -140,7 +153,7 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 		}
 	}
 	println!("  then by hand:");
-	for m in manual_steps(o, name, src, p.rewritten)? {
+	for m in manual_steps(c, name, src, p.rewritten)? {
 		println!("    - {m}");
 	}
 	println!("\ntype `{o}/{name}` to continue:");
@@ -157,7 +170,7 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 		let visibility = src["visibility"].as_str().expect("repo has a visibility");
 		gh(&["repo", "create", &format!("{o}/{to}"), &format!("--{visibility}")], None)?;
 	}
-	send("PUT", &format!("repos/{o}/{to}/actions/permissions"), &json!({ "enabled": false }))?;
+	send(Method::Put, &format!("repos/{o}/{to}/actions/permissions"), &json!({ "enabled": false }))?;
 	push(c, to, &p)?;
 
 	let mut keys = vec![
@@ -185,8 +198,8 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 	}
 	let mut settings = fields(src, &keys);
 	settings["has_issues"] = json!(true); // transfers need it; finalize sets the real value
-	send("PATCH", &format!("repos/{o}/{to}"), &settings)?;
-	send("PUT", &format!("repos/{o}/{to}/topics"), &json!({ "names": src["topics"] }))?;
+	send(Method::Patch, &format!("repos/{o}/{to}"), &settings)?;
+	send(Method::Put, &format!("repos/{o}/{to}/topics"), &json!({ "names": src["topics"] }))?;
 	if src["owner"]["type"] == "Organization" {
 		let props: Vec<_> = api(&[&format!("repos/{o}/{name}/properties/values")])?
 			.as_array()
@@ -195,10 +208,10 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 			.filter(|p| !p["value"].is_null())
 			.cloned()
 			.collect();
-		send("PATCH", &format!("repos/{o}/{to}/properties/values"), &json!({ "properties": props }))?;
+		send(Method::Patch, &format!("repos/{o}/{to}/properties/values"), &json!({ "properties": props }))?;
 		for t in list(&format!("repos/{o}/{name}/teams"), None)? {
 			send(
-				"PUT",
+				Method::Put,
 				&format!("orgs/{o}/teams/{}/repos/{o}/{to}", t["slug"].as_str().expect("slug")),
 				&fields(&t, &["permission"]),
 			)?;
@@ -215,7 +228,7 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 			"write" => "push",
 			r => r,
 		};
-		send("PUT", &format!("repos/{o}/{to}/collaborators/{login}"), &json!({ "permission": permission }))?;
+		send(Method::Put, &format!("repos/{o}/{to}/collaborators/{login}"), &json!({ "permission": permission }))?;
 	}
 
 	let have: Vec<Value> = list(&format!("repos/{o}/{to}/labels"), None)?;
@@ -223,17 +236,17 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 	let lower = |l: &Value| l["name"].as_str().expect("label name").to_lowercase();
 	for h in &have {
 		if !want.iter().any(|w| lower(w) == lower(h)) {
-			send("DELETE", &format!("repos/{o}/{to}/labels/{}", enc(h["name"].as_str().expect("label name"))), &Value::Null)?;
+			send(Method::Delete, &format!("repos/{o}/{to}/labels/{}", enc(h["name"].as_str().expect("label name"))), &Value::Null)?;
 		}
 	}
 	for w in &want {
 		let body = fields(w, &["name", "color", "description"]);
 		match have.iter().find(|h| lower(h) == lower(w)) {
-			None => send("POST", &format!("repos/{o}/{to}/labels"), &body)?,
+			None => send(Method::Post, &format!("repos/{o}/{to}/labels"), &body)?,
 			Some(h) if fields(h, &["name", "color", "description"]) != body => {
 				let mut b = body.clone();
 				b["new_name"] = b["name"].take();
-				send("PATCH", &format!("repos/{o}/{to}/labels/{}", enc(h["name"].as_str().expect("label name"))), &b)?
+				send(Method::Patch, &format!("repos/{o}/{to}/labels/{}", enc(h["name"].as_str().expect("label name"))), &b)?
 			}
 			Some(_) => Value::Null,
 		};
@@ -246,8 +259,8 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 			body["due_on"] = json!(format!("{}T12:00:00Z", &due[..10])); // POST stores midnight UTC as the previous day; the transfer matches milestones on title + due date
 		}
 		match have.iter().find(|h| h["title"] == m["title"]) {
-			Some(h) => send("PATCH", &format!("repos/{o}/{to}/milestones/{}", h["number"]), &body)?,
-			None => send("POST", &format!("repos/{o}/{to}/milestones"), &body)?,
+			Some(h) => send(Method::Patch, &format!("repos/{o}/{to}/milestones/{}", h["number"]), &body)?,
+			None => send(Method::Post, &format!("repos/{o}/{to}/milestones"), &body)?,
 		};
 	}
 
@@ -256,7 +269,11 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 		let new = match have.iter().find(|h| h["tag_name"] == r["tag_name"]) {
 			Some(h) => h.clone(),
 			// no target_commitish: it may name a pre-rewrite SHA, and the pushed tag decides the commit anyway
-			None => send("POST", &format!("repos/{o}/{to}/releases"), &fields(&r, &["tag_name", "name", "body", "draft", "prerelease"]))?,
+			None => send(
+				Method::Post,
+				&format!("repos/{o}/{to}/releases"),
+				&fields(&r, &["tag_name", "name", "body", "draft", "prerelease"]),
+			)?,
 		};
 		let dir = c.dir.join("assets").join(r["id"].to_string());
 		std::fs::create_dir_all(&dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
@@ -300,19 +317,19 @@ fn migrate(c: &Ctx, src: &Value, resuming: bool) -> Result<(), String> {
 		)?;
 	}
 
-	walk(c, name, to)?;
-	rename(o, name, &c.bak)?;
-	rename(o, to, name)
+	walk(c, Move { from: name, to })?;
+	rename(c, Move { from: name, to: &c.bak })?;
+	rename(c, Move { from: to, to: name })
 }
 
 /// Everything that has to happen once the new repo answers to the old name: the old one is `.bak` and gets frozen.
 fn finalize(c: &Ctx) -> Result<(), String> {
 	let (o, name, bak) = (c.owner, c.name, c.bak.as_str());
-	let src = get(o, bak)?.expect("finalize runs after the first rename");
+	let src = get(c, bak)?.expect("finalize runs after the first rename");
 	let p = prepare(c, bak)?;
 	push(c, name, &p)?;
-	walk(c, bak, name)?;
-	let mut manual = manual_steps(o, bak, &src, p.rewritten)?;
+	walk(c, Move { from: bak, to: name })?;
+	let mut manual = manual_steps(c, bak, &src, p.rewritten)?;
 
 	let dst_prs = list(&format!("repos/{o}/{name}/pulls?state=all"), None)?;
 	for pr in list(&format!("repos/{o}/{bak}/pulls?state=open"), None)? {
@@ -327,13 +344,13 @@ fn finalize(c: &Ctx) -> Result<(), String> {
 			None => {
 				let body = format!("Re-created from {origin}\n\n{}", pr["body"].as_str().unwrap_or("")); // null body: the PR has no description
 				let new = send(
-					"POST",
+					Method::Post,
 					&format!("repos/{o}/{name}/pulls"),
 					&json!({ "title": pr["title"], "head": pr["head"]["ref"], "base": pr["base"]["ref"], "draft": pr["draft"], "body": body }),
 				)?;
 				let names = |k: &str, f: &str| pr[k].as_array().expect("array").iter().map(|x| x[f].clone()).collect::<Vec<_>>();
 				send(
-					"PATCH",
+					Method::Patch,
 					&format!("repos/{o}/{name}/issues/{}", new["number"]),
 					&json!({ "labels": names("labels", "name"), "assignees": names("assignees", "login") }),
 				)?;
@@ -344,18 +361,18 @@ fn finalize(c: &Ctx) -> Result<(), String> {
 			"{PLACEHOLDER}\nPull request, kept read-only at {origin}; continued at {}",
 			new["html_url"].as_str().expect("html_url")
 		);
-		send("PATCH", &format!("repos/{o}/{name}/issues/{n}"), &json!({ "body": body }))?;
+		send(Method::Patch, &format!("repos/{o}/{name}/issues/{n}"), &json!({ "body": body }))?;
 	}
 
-	send("PATCH", &format!("repos/{o}/{name}"), &fields(&src, &["has_issues"]))?;
+	send(Method::Patch, &format!("repos/{o}/{name}"), &fields(&src, &["has_issues"]))?;
 
 	let have = list(&format!("repos/{o}/{name}/rulesets?includes_parents=false"), None)?;
 	for r in list(&format!("repos/{o}/{bak}/rulesets?includes_parents=false"), None)? {
 		let full = api(&[&format!("repos/{o}/{bak}/rulesets/{}", r["id"])])?;
 		let body = fields(&full, &["name", "target", "enforcement", "bypass_actors", "conditions", "rules"]);
 		match have.iter().find(|h| h["name"] == r["name"]) {
-			Some(h) => send("PUT", &format!("repos/{o}/{name}/rulesets/{}", h["id"]), &body)?,
-			None => send("POST", &format!("repos/{o}/{name}/rulesets"), &body)?,
+			Some(h) => send(Method::Put, &format!("repos/{o}/{name}/rulesets/{}", h["id"]), &body)?,
+			None => send(Method::Post, &format!("repos/{o}/{name}/rulesets"), &body)?,
 		};
 	}
 
@@ -365,8 +382,8 @@ fn finalize(c: &Ctx) -> Result<(), String> {
 			"deploy key `{}` (read_only: {}) is off {o}/{bak} but not on {o}/{name}; add it by hand: {}",
 			k["title"], k["read_only"], k["key"]
 		);
-		send("DELETE", &format!("repos/{o}/{bak}/keys/{}", k["id"]), &Value::Null)?;
-		send("POST", &format!("repos/{o}/{name}/keys"), &fields(&k, &["title", "key", "read_only"])).map_err(|e| format!("{e}\n{lost}"))?;
+		send(Method::Delete, &format!("repos/{o}/{bak}/keys/{}", k["id"]), &Value::Null)?;
+		send(Method::Post, &format!("repos/{o}/{name}/keys"), &fields(&k, &["title", "key", "read_only"])).map_err(|e| format!("{e}\n{lost}"))?;
 	}
 
 	if src["has_wiki"] == true {
@@ -397,17 +414,17 @@ fn finalize(c: &Ctx) -> Result<(), String> {
 	}
 
 	let perms = api(&[&format!("repos/{o}/{bak}/actions/permissions")])?;
-	send("PUT", &format!("repos/{o}/{name}/actions/permissions"), &fields(&perms, &["enabled", "allowed_actions"]))?;
+	send(Method::Put, &format!("repos/{o}/{name}/actions/permissions"), &fields(&perms, &["enabled", "allowed_actions"]))?;
 	if perms["enabled"] == true {
 		if perms["allowed_actions"] == "selected" {
 			let s = api(&[&format!("repos/{o}/{bak}/actions/permissions/selected-actions")])?;
-			send("PUT", &format!("repos/{o}/{name}/actions/permissions/selected-actions"), &s)?;
+			send(Method::Put, &format!("repos/{o}/{name}/actions/permissions/selected-actions"), &s)?;
 		}
 		let w = api(&[&format!("repos/{o}/{bak}/actions/permissions/workflow")])?;
-		send("PUT", &format!("repos/{o}/{name}/actions/permissions/workflow"), &w)?;
+		send(Method::Put, &format!("repos/{o}/{name}/actions/permissions/workflow"), &w)?;
 	}
 
-	send("PATCH", &format!("repos/{o}/{bak}"), &json!({ "archived": true }))?;
+	send(Method::Patch, &format!("repos/{o}/{bak}"), &json!({ "archived": true }))?;
 	std::fs::remove_dir_all(&c.dir).map_err(|e| format!("removing {}: {e}", c.dir.display()))?;
 
 	println!("\ndone. {o}/{name} has the history minus dropped LFS objects, and every issue at its old number.");
@@ -421,10 +438,10 @@ fn finalize(c: &Ctx) -> Result<(), String> {
 }
 
 /// Moves issues across at their own numbers, filling PRs and gaps with closed placeholders, so `issues/N` links keep resolving.
-fn walk(c: &Ctx, from: &str, to: &str) -> Result<(), String> {
+fn walk(c: &Ctx, Move { from, to }: Move) -> Result<(), String> {
 	let o = c.owner;
-	let src = issue_numbers(o, from)?;
-	let dst = issue_numbers(o, to)?;
+	let src = issue_numbers(c, from)?;
+	let dst = issue_numbers(c, to)?;
 	for (n, d) in &dst {
 		match src.get(n) {
 			Some(s) if s.get("pull_request").is_none() => return Err(format!("{o}/{to}#{n} is taken, yet {o}/{from}#{n} is still an issue there")),
@@ -432,7 +449,7 @@ fn walk(c: &Ctx, from: &str, to: &str) -> Result<(), String> {
 			_ => {}
 		}
 	}
-	let to_id = get(o, to)?.expect("target exists")["node_id"].as_str().expect("node_id").to_owned();
+	let to_id = get(c, to)?.expect("target exists")["node_id"].as_str().expect("node_id").to_owned();
 	let done = dst.keys().max().copied().unwrap_or(0);
 	for n in done + 1..=src.keys().max().copied().unwrap_or(0) {
 		let got = match src.get(&n) {
@@ -461,9 +478,17 @@ fn walk(c: &Ctx, from: &str, to: &str) -> Result<(), String> {
 						format!("#{n} was deleted (or a discussion) in https://github.com/{o}/{}; this keeps later numbers in place", c.bak),
 					),
 				};
-				let issue = send("POST", &format!("repos/{o}/{to}/issues"), &json!({ "title": title, "body": format!("{PLACEHOLDER}\n{what}") }))?;
+				let issue = send(
+					Method::Post,
+					&format!("repos/{o}/{to}/issues"),
+					&json!({ "title": title, "body": format!("{PLACEHOLDER}\n{what}") }),
+				)?;
 				let got = issue["number"].as_u64().expect("number");
-				send("PATCH", &format!("repos/{o}/{to}/issues/{got}"), &json!({ "state": "closed", "state_reason": "not_planned" }))?;
+				send(
+					Method::Patch,
+					&format!("repos/{o}/{to}/issues/{got}"),
+					&json!({ "state": "closed", "state_reason": "not_planned" }),
+				)?;
 				got
 			}
 		};
@@ -553,14 +578,15 @@ fn lfs_oids(dir: &Path, refs: &[String]) -> Result<BTreeMap<String, u64>, String
 	Ok(out)
 }
 
-fn issue_numbers(o: &str, repo: &str) -> Result<BTreeMap<u64, Value>, String> {
-	Ok(list(&format!("repos/{o}/{repo}/issues?state=all"), None)?
+fn issue_numbers(c: &Ctx, repo: &str) -> Result<BTreeMap<u64, Value>, String> {
+	Ok(list(&format!("repos/{}/{repo}/issues?state=all", c.owner), None)?
 		.into_iter()
 		.map(|i| (i["number"].as_u64().expect("number"), i))
 		.collect())
 }
 
-fn manual_steps(o: &str, repo: &str, src: &Value, rewritten: usize) -> Result<Vec<String>, String> {
+fn manual_steps(c: &Ctx, repo: &str, src: &Value, rewritten: usize) -> Result<Vec<String>, String> {
+	let o = c.owner;
 	let names = |v: Vec<Value>| v.iter().map(|x| x["name"].as_str().expect("name").to_owned()).collect::<Vec<_>>().join(", ");
 	let mut out = Vec::new();
 	if rewritten > 0 {
@@ -595,15 +621,16 @@ fn manual_steps(o: &str, repo: &str, src: &Value, rewritten: usize) -> Result<Ve
 	Ok(out)
 }
 
-fn rename(o: &str, from: &str, to: &str) -> Result<(), String> {
-	send("PATCH", &format!("repos/{o}/{from}"), &json!({ "name": to }))?;
+fn rename(c: &Ctx, Move { from, to }: Move) -> Result<(), String> {
+	let o = c.owner;
+	send(Method::Patch, &format!("repos/{o}/{from}"), &json!({ "name": to }))?;
 	println!("renamed {o}/{from} → {o}/{to}");
 	Ok(())
 }
 
 /// `None` when absent. A renamed repo's old name redirects to it, hence the name check.
-fn get(o: &str, name: &str) -> Result<Option<Value>, String> {
-	match api(&[&format!("repos/{o}/{name}")]) {
+fn get(c: &Ctx, name: &str) -> Result<Option<Value>, String> {
+	match api(&[&format!("repos/{}/{name}", c.owner)]) {
 		Ok(v) => Ok((v["name"] == name).then_some(v)),
 		Err(e) if e.contains("HTTP 404") => Ok(None),
 		Err(e) => Err(e),
@@ -614,7 +641,13 @@ fn api(args: &[&str]) -> Result<Value, String> {
 	parse(&gh(&[&["api"], args].concat(), None)?, args)
 }
 
-fn send(method: &str, endpoint: &str, body: &Value) -> Result<Value, String> {
+fn send(method: Method, endpoint: &str, body: &Value) -> Result<Value, String> {
+	let method = match method {
+		Method::Put => "PUT",
+		Method::Patch => "PATCH",
+		Method::Post => "POST",
+		Method::Delete => "DELETE",
+	};
 	let args = ["-X", method, endpoint, "--input", "-"];
 	parse(&gh(&[&["api"], &args[..]].concat(), Some(&body.to_string()))?, &args)
 }

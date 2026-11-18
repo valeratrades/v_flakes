@@ -5,6 +5,12 @@ use toml_edit::{DocumentMut, Item, Table, value};
 #[derive(clap::Args)]
 pub struct Cli {
 	pub path: PathBuf,
+	#[command(flatten)]
+	pub paths: Paths,
+}
+
+#[derive(clap::Args)]
+pub struct Paths {
 	pub venv_path: String,
 	pub src_path: String,
 }
@@ -15,18 +21,19 @@ pub fn run(args: Cli) {
 	} else {
 		format!(
 			"[build-system]\nrequires = [\"setuptools>=75.0\"]\nbuild-backend = \"setuptools.backends._legacy:_Backend\"\n\n[tool.setuptools.packages.find]\nwhere = [\"{src_path}\"]\n",
-			src_path = args.src_path
+			src_path = args.paths.src_path
 		)
 	};
 
-	let merged = merge(&existing, &args.venv_path, &args.src_path);
+	let merged = merge(&existing, &args.paths);
 
 	if merged != existing {
 		std::fs::write(&args.path, &merged).expect("writing pyproject.toml");
 	}
 }
 
-pub fn merge(content: &str, venv_path: &str, src_path: &str) -> String {
+pub fn merge(content: &str, Paths { venv_path, src_path }: &Paths) -> String {
+	let (venv_path, src_path) = (venv_path.as_str(), src_path.as_str());
 	let mut doc = content.parse::<DocumentMut>().expect("valid TOML");
 
 	if let Some(tool) = doc.get_mut("tool").and_then(|t| t.as_table_mut()) {
