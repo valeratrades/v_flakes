@@ -3,6 +3,7 @@
 { folder ? null, lfs, cache ? { } }:
 let
   nixCi = import ../../../cache.nix { inherit cache; };
+  render = import ./figma-render.nix;
 in
 {
   standalone = true;
@@ -49,8 +50,9 @@ in
           state="''${XDG_STATE_HOME:-$HOME/.local/state}/evinvest-figma-render"
           mkdir -p "$state"
           printf '%s' "$FIGMA_OAUTH" > "$state/oauth.json"
+          printf '%s' "$FIGMA_TOKEN" > "$state/token"
           status=0 # a render with uncaptured frames still prints its link
-          nix run .#figma -- --folder "$FIGMA_FOLDER" --name "''${{ github.event.repository.name }}" > "$RUNNER_TEMP/link" || status=$?
+          { ${render} } > "$RUNNER_TEMP/link" || status=$?
           cat "$RUNNER_TEMP/link"
           echo "Figma: $(cat "$RUNNER_TEMP/link")" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"

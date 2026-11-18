@@ -112,11 +112,13 @@ github = v-utils.github {
     rustCache = "uikit";     # optional rust-cache shared-key
   };
 
-  # figma.yml: on a `v*` tag, a `[figma]` comment (by an owner, member or collaborator; a PR's renders its head) or
-  # a dispatch, `nix run .#figma -- --folder <folder> --name <repo>`: the file named after the repo in that Figma folder
-  # is created or overwritten. `folder` defaults to the FIGMA_FOLDER variable (set it org-wide).
-  figma = { };
-  figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; };
+  # `nix run .#figma -- --folder <folder> --name <repo>` (shared/figma-render.nix, the same text either way): the file
+  # named after the repo in that Figma folder is created or overwritten. `folder` defaults to the FIGMA_FOLDER variable
+  # (set it org-wide). on = "gha": figma.yml, on a `v*` tag, a `[figma]` comment (by an owner, member or collaborator;
+  # a PR's renders its head) or a dispatch. on = "publish": github's `publish` app runs it after pushing the tag, on
+  # this machine (`apps.publish = github.publish;`); for a render that needs what only a developer's machine has.
+  figma = { on = "gha"; };
+  figma = { on = "publish"; folder = "https://www.figma.com/files/team/<team>/folder/<id>"; };
 
   # release-typst.yml: on a `v*` tag, `nix build .#default` (must be `typ.document`); each `output.<ext>` goes on the
   # Release as `<repo>.<ext>`. With the typ module's `html`, output.html is deployed to GitHub Pages as index.html,
@@ -183,4 +185,6 @@ gh run download <run-id> -n visual-snapshots -D <dir>
 `apps.figma` is `@evinvest/figma-render`'s bin over the repo's suite (sites_tools' `mkLanding` has one) and passes its
 arguments on. It runs as plain `nix run`, outside the dev shell, so the render is of the committed tree. Secrets:
 `FIGMA_OAUTH`, the bin's `oauth.json` from a machine logged in to the account that owns the folder; `FIGMA_TOKEN`, a
-personal access token of that account with `folders:read` (90 days at most, rotate it).
+personal access token of that account with `folders:read` (90 days at most, rotate it). Under `on = "publish"` the
+machine has both in the bin's state dir (`$XDG_STATE_HOME/evinvest-figma-render/`: `oauth.json` from its login,
+`token`), and `gh` reads FIGMA_FOLDER unless `folder` is set.

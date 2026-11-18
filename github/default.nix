@@ -40,7 +40,7 @@ args@{ pkgs ? null
   visualBaselines ? null
 , # typ module with `main`: release-typst.yml, its document on release tags (+ GitHub Pages with `html`); contract in description.md
   typ ? null
-, # { folder ? null; }: figma.yml, the repo's pages into a Figma folder on a release tag or a `[figma]` comment; contract in description.md
+, # { on = "gha" | "publish"; folder ? null; }: the repo's pages into a Figma folder, by figma.yml (release tag, `[figma]` comment) or by `publish`; contract in description.md
   figma ? null
 , # { skargo ? <pins/skargo.nix rev>; }: skills.yml, `skargo check` / `publish` of a repo shipping agent skills
   skills ? null
@@ -204,6 +204,21 @@ if nixpkgs != null && pkgs == null then {
       sections = { errors = jobsErrors; warnings = jobsWarnings; };
     };
 
+    figmaChecked =
+      if figma == null then null
+      else
+        let unknown = builtins.removeAttrs figma [ "on" "folder" ]; in
+        assert unknown == { } || throw "v_flakes figma: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}";
+        assert builtins.elem (figma.on or null) [ "gha" "publish" ] || throw "v_flakes figma: `on` is \"gha\" (figma.yml) or \"publish\" (github's `publish` app)";
+        figma;
+    figmaPublish = pkgs.writeShellApplication {
+      name = "figma-publish";
+      runtimeInputs = [ pkgs.git pkgs.gh pkgs.coreutils ];
+      text = (if figma.folder or null != null then "FIGMA_FOLDER=${pkgs.lib.escapeShellArg figma.folder}\n" else ''
+        FIGMA_FOLDER="$(gh variable get FIGMA_FOLDER --org "$(gh repo view --json owner -q .owner.login)")"
+      '') + import ./workflows/nix-parts/shared/figma-render.nix;
+    };
+
     workflows = import ./workflows/nix-parts ({
       inherit pkgs gistId cargoNightly cache publishCachix;
       syncFork = effectiveSyncFork;
@@ -211,7 +226,8 @@ if nixpkgs != null && pkgs == null then {
       typstRelease = if typ == null then null else
         assert typ ? document || throw "v_flakes.github: `typ` is only taken for its document; set `main` on the typ module";
         { inherit (typ) html; };
-      inherit pname lastSupportedVersion jobsOther release containerRelease npmRelease visualBaselines figma gitlabSync cargoRoot webUnstable;
+      inherit pname lastSupportedVersion jobsOther release containerRelease npmRelease visualBaselines gitlabSync cargoRoot webUnstable;
+      figma = figmaChecked;
       lfs = lfs == true;
       skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
       rustRepo = rust != null;
@@ -315,6 +331,8 @@ if nixpkgs != null && pkgs == null then {
   warnIfNeeded ({
     inherit workflows;
     inherit (workflows) errors warnings other;
+
+    publish = import ../utils/publish.nix { inherit pkgs; after = pkgs.lib.optional (enable && figmaChecked != null && figmaChecked.on == "publish") (pkgs.lib.getExe figmaPublish); };
 
     appendCustom = ../git/append-custom.rs;
     preCommit = import ../git/pre_commit.nix;

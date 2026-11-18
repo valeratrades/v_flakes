@@ -1,7 +1,8 @@
 # `nix run .#publish -- [-y|--yes] major|minor|patch [note]`: the next `vX.Y.Z` after the newest remote tag,
 # annotated, pushed. The version lives in the tag, not in a manifest: `release-container.yml`
 # ships the image on `v[0-9]+.*`, and a second copy of the number would be a second source for it.
-pkgs: {
+# `after`: programs run once the tag is pushed (github's `publish`: the figma render, with `figma.on = "publish"`).
+{ pkgs, after ? [ ] }: {
   type = "app";
   meta.description = "tag the next vX.Y.Z after the newest remote tag and push it: [-y|--yes] major|minor|patch [note]";
   program = pkgs.lib.getExe (pkgs.writeShellApplication {
@@ -69,6 +70,6 @@ pkgs: {
         git tag -a "$next" -m "$next"
       fi
       git push origin "$next"
-    '';
+      ${pkgs.lib.concatMapStrings (p: "${p}\n") after}    '';
   });
 }

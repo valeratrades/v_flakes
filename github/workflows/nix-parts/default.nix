@@ -13,7 +13,7 @@ args@{ pkgs ? null
   npmRelease ? null
 , # { dir; render; gate ? null; paths ? null; rustCache ? null; }: visual-baselines.yml. See shared/visual-baselines.nix.
   visualBaselines ? null
-, # { folder ? null; }: figma.yml. See shared/figma.nix.
+, # { on; folder ? null; }: figma.yml when on = "gha". See shared/figma.nix.
   figma ? null
 , # { html; }: release-typst.yml, the typ module's document on release tags. See shared/release-typst.nix.
   typstRelease ? null
@@ -77,9 +77,10 @@ if nixpkgs != null && pkgs == null then {
     - visualBaselines = { dir = "tests/__screenshots__"; render = "accept-test"; gate = "test"; paths = [ "frontend/**" ]; }
         visual-baselines.yml: renders every baseline under `dir` on ubuntu-latest, uploads them as the
         `visual-snapshots` artifact and fails when they differ from the committed ones. Contract in github/description.md.
-    - figma = { folder = "https://www.figma.com/files/team/<team>/folder/<id>"; }
-        figma.yml: on a release tag or a `[figma]` comment, `nix run .#figma` renders into the file named after the repo
-        in the folder (`folder`, else the FIGMA_FOLDER variable). Contract in github/description.md.
+    - figma = { on = "gha" | "publish"; folder = "https://www.figma.com/files/team/<team>/folder/<id>"; }
+        `nix run .#figma` renders into the file named after the repo in the folder (`folder`, else the FIGMA_FOLDER
+        variable): "gha", figma.yml on a release tag or a `[figma]` comment; "publish", github's `publish` app after
+        the tag is pushed. Contract in github/description.md.
     - typstRelease = { html = true; }  # set by `github { typ = ...; }` from a typ module with `main`
         release-typst.yml: on a release tag, `nix build .#default` and attach each `output.<ext>` to the Release as
         `<repo>.<ext>`; with `html`, also deploy output.html to GitHub Pages.
@@ -321,12 +322,8 @@ if nixpkgs != null && pkgs == null then {
       else null;
 
     figmaWorkflow =
-      if figma != null then
-        assert (
-          let unknown = builtins.removeAttrs figma [ "folder" ]; in
-          unknown == { } || throw "v_flakes figma: unknown keys ${builtins.toJSON (builtins.attrNames unknown)}"
-        );
-        yaml (builtins.removeAttrs (import ./shared/figma.nix (figma // { inherit lfs cache; })) [ "standalone" ])
+      if figma != null && figma.on == "gha" then
+        yaml (builtins.removeAttrs (import ./shared/figma.nix ((builtins.removeAttrs figma [ "on" ]) // { inherit lfs cache; })) [ "standalone" ])
       else null;
 
     typstReleaseWorkflow =
@@ -604,7 +601,9 @@ if nixpkgs != null && pkgs == null then {
     figmaHook =
       if figmaWorkflow != null then ''
         _vf_cp ${figmaWorkflow} ./.github/workflows/figma.yml
-      '' else "";
+      '' else ''
+        [ -e ./.github/workflows/figma.yml ] && rm -f ./.github/workflows/figma.yml && echo "v_flakes: removed .github/workflows/figma.yml, figma.on is not \"gha\"" >&2
+      '';
 
     typstReleaseHook =
       if typstReleaseWorkflow != null then ''
