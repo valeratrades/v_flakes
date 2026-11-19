@@ -3,8 +3,8 @@
 #   "rust-tests" | { name = "rust-doc"; args.package = "x"; }   one of ./catalog.nix
 #   { name; program; prepare ? null; ci ? null; ciCache ? null; } a repo's own; `program` an executable derivation
 #   { name; builds = self.checks.${system}; }                    building derivations is the work
-# `prepare` sets up what `program` needs; its time is reported apart from `program`'s; `ciCache` is `{ paths; hashFiles; }`
-# for the section's CI job to keep between runs.
+# `prepare` sets up what `program` needs; its time is reported apart from `program`'s; `ciCache` is `{ paths; hashFiles; }`, or a
+# list of them, for the section's CI job to keep between runs.
 { pkgs, catalogs, sections }:
 let
   lib = pkgs.lib;
@@ -36,7 +36,7 @@ let
       program = if s ? builds then builds s.name s.builds else p.program;
       prepare = p.prepare or null;
       ci = p.ci or null;
-      ciCache = p.ciCache or null;
+      ciCache = lib.toList (p.ciCache or [ ]);
     };
 
   bySection = builtins.mapAttrs (severity: map (resolve severity)) sections;

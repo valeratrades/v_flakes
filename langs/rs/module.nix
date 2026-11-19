@@ -296,6 +296,8 @@ if nixpkgs != null && pkgs == null then {
   in
   {
     cargoRoot = cargoRootNormalized;
+    # a particle's `ciCache`, for one that runs cargo in the repo's target dir
+    ciCache = { paths = [ (inRoot "target") "~/.cargo/registry/index" "~/.cargo/registry/cache" "~/.cargo/git/db" ]; hashFiles = [ (inRoot "Cargo.lock") ]; };
     inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall webUnstable;
 
     # For backwards compatibility, expose the first build file

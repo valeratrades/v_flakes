@@ -413,22 +413,33 @@ if nixpkgs != null && pkgs == null then {
         });
 
         checkout = { uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; };
-        # as cache.nix's lean cache: every ref reads the default branch's, so only it saves
-        ciCacheSteps = p:
-          let
-            prefix = "particles-${severity}-${p.name}-\${{ runner.os }}-";
-            cacheWith = {
-              path = lib.concatStringsSep "\n" p.ciCache.paths;
-              key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") p.ciCache.hashFiles}) }}";
-              restore-keys = prefix;
-            };
-          in
-          lib.optionals (p.ciCache != null) [
-            { name = "Restore particle's cache"; "if" = "github.ref_name != github.event.repository.default_branch"; uses = "actions/cache/restore@v5"; "with" = cacheWith; }
-            { name = "Particle's cache"; "if" = "github.ref_name == github.event.repository.default_branch"; uses = "actions/cache@v5"; "with" = cacheWith; }
-          ];
+        # Every ref reads the default branch's, so only it saves: after the run, failed or not, on a miss, then drops the entry it
+        # replaces (one per cache). flake.lock in the prefix: the toolchains come from it, and it bounds what a rolled-forward entry gathers.
+        ciCaches = p: lib.imap0
+          (i: c:
+            let
+              family = "particles-${severity}-${p.name}-${toString i}-\${{ runner.os }}-";
+              prefix = "${family}\${{ hashFiles('flake.lock') }}-";
+              id = "particle-cache-${toString i}";
+              path = lib.concatStringsSep "\n" c.paths;
+              ifMiss = "always() && github.ref_name == github.event.repository.default_branch && steps.${id}.outputs.cache-hit != 'true'";
+            in
+            {
+              restore = { inherit id; name = "Restore particle's cache"; uses = "actions/cache/restore@v5"; "with" = { inherit path; key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") c.hashFiles}) }}"; restore-keys = prefix; }; };
+              save = [
+                { name = "Save particle's cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { inherit path; key = "\${{ steps.${id}.outputs.cache-primary-key }}"; }; }
+                {
+                  name = "Drop particle's older caches";
+                  "if" = ifMiss;
+                  env = { GH_TOKEN = "\${{ github.token }}"; FAMILY = family; KEY = "\${{ steps.${id}.outputs.cache-primary-key }}"; };
+                  # only once the new entry is listed: a save that found none of its paths saved nothing
+                  run = ''gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"'';
+                }
+              ];
+            })
+          p.ciCache;
         genericJob = p:
-          let lean = nixCi.scopedCache "particle-${p.name}"; in {
+          let lean = nixCi.scopedCache "particle-${p.name}"; caches = ciCaches p; in {
             inherit (p) name;
             runs-on = "ubuntu-latest";
             timeout-minutes = 90;
@@ -439,11 +450,12 @@ if nixpkgs != null && pkgs == null then {
               ++ [ nixCi.installStep ]
               ++ (if nixCi.leanDir != null then [ lean.restore ] else nixCi.cacheSteps)
               ++ [ nixCi.evalCache.restore ]
-              ++ ciCacheSteps p
+              ++ map (c: c.restore) caches
               ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
+              ++ lib.concatMap (c: c.save) caches
               ++ [ nixCi.evalCache.save ]
               ++ lib.optionals (nixCi.leanDir != null) lean.save;
-          };
+          } // lib.optionalAttrs (caches != [ ]) { permissions = (import files.base).permissions // { actions = "write"; }; }; # dropping older caches
 
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke

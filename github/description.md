@@ -52,7 +52,7 @@ github = v-utils.github {
   #   ci       { job; work; post ? [ ]; timedIf ? null; badges ? { }; }: its own CI job, for what CI needs that the local
   #            run doesn't (the rust ones: toolchain matrix, pre_ci, rust-cache). The rest run from what one `particles` job built.
   #            `badges`: gist key -> a job output of seconds, which the section's `report` job writes as that badge
-  #   ciCache  { paths; hashFiles; } the shared job keeps between runs
+  #   ciCache  { paths; hashFiles; }, or a list of them (`rs.ciCache`: cargo's target and registry), the shared job keeps between runs
 
   labels = {
     enable = true;    # Auto-sync labels on every commit, from the pre-commit hook (default: true)
