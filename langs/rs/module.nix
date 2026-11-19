@@ -298,6 +298,14 @@ if nixpkgs != null && pkgs == null then {
     cargoRoot = cargoRootNormalized;
     # a particle's `ciCache`, for one that runs cargo in the repo's target dir
     ciCache = { paths = [ (inRoot "target") "~/.cargo/registry/index" "~/.cargo/registry/cache" "~/.cargo/git/db" ]; hashFiles = [ (inRoot "Cargo.lock") ]; };
+    # a CI job's mkShell that builds and runs the code, never develops it: none of the dev tools nor the hook's generated files
+    ciShell =
+      let system = pkgs.stdenv.hostPlatform.system; in
+      assert rust.outPath == (import ./default_nightly.nix system).outPath || throw "v_flakes.rs.ciShell: its toolchain is the canonical nightly's, the shell's `rust` is another";
+      {
+        packages = [ (import ./ci_nightly.nix system) ];
+        shellHook = if cranelift then "export RUSTC_WORKSPACE_WRAPPER=${craneliftWrapper}" else "";
+      };
     inherit rust rustfmtFile configFile denyFile clippyFile sortDerivesFile lintsFile styleFormat styleAssert moduleFlags codestyleLazyInstall webUnstable;
 
     # For backwards compatibility, expose the first build file
