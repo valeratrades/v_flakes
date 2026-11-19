@@ -25,7 +25,7 @@ if pkgs == null then {
     A missing script fails its particle: `jobs.<section>.exclude` it instead. CI keeps `~/.npm` by the lockfiles.
 
     `js.script <package> <script>`: another of a package's scripts as a particle (`frontend-lint-css` for `lint:css`).
-    `js.playwright { name; package; config; env ? { }; run ? "exec playwright test -c <config> \"$@\""; runtimeInputs ? [ ]; }`:
+    `js.playwright { name; package; config; env ? { }; run ? "exec playwright test -c <config> \"$@\""; runtimeInputs ? [ ]; browsers ? [ "chromium" ]; }`:
     a particle running playwright from nixpkgs (its browsers pinned with it) in `package`, `config`'s
     `node_modules` linked to nixpkgs' `@playwright/test`. Its `program` serves as an app too.
   '';
@@ -105,26 +105,38 @@ if pkgs == null then {
       warnings = map (d: script d "lint") roots;
     };
 
-    playwright = { name, package, config, env ? { }, run ? ''exec playwright test -c ${lib.escapeShellArg config} "$@"'', runtimeInputs ? [ ] }:
+    playwright = { name, package, config, env ? { }, run ? ''exec playwright test -c ${lib.escapeShellArg config} "$@"'', runtimeInputs ? [ ], browsers ? [ "chromium" ] }:
+      assert lib.subtractLists [ "chromium" "firefox" "webkit" ] browsers == [ ] || throw "v_flakes.js.playwright `${name}`: `browsers` takes chromium, firefox, webkit";
       assert !(builtins.elem (lib.removeSuffix "/" config) [ "." "" ]) || throw "v_flakes.js.playwright `${name}`: `config` is where nixpkgs' @playwright/test is linked as node_modules, so a dir below the package, never the package itself";
+      let
+        # each engine is its own closure: webkit alone pulls gstreamer, bluez, cups…
+        engines = pkgs.playwright-driver.browsers.override { withChromium = builtins.elem "chromium" browsers; withFirefox = builtins.elem "firefox" browsers; withWebkit = builtins.elem "webkit" browsers; };
+        # its wrapper's default names every engine, and so holds them all in the closure
+        test = pkgs.playwright-test.overrideAttrs (o: {
+          installPhase =
+            let phase = builtins.replaceStrings [ "${pkgs.playwright-driver.browsers}" ] [ "${engines}" ] o.installPhase; in
+            assert phase != o.installPhase || throw "v_flakes.js.playwright: nixpkgs' playwright-test no longer names playwright-driver.browsers in its wrapper";
+            phase;
+        });
+      in
       {
-      inherit name;
-      prepare = prepare package;
-      ciCache = ciCache package;
-      program = pkgs.writeShellApplication {
         inherit name;
-        runtimeInputs = [ nodejs pkgs.git pkgs.coreutils pkgs.playwright-test ] ++ runtimeInputs;
-        runtimeEnv = env // {
-          PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
-        };
-        # the specs import `@playwright/test`, which node resolves by walking up node_modules, never NODE_PATH
-        text = cdInto package + ''
+        prepare = prepare package;
+        ciCache = ciCache package;
+        program = pkgs.writeShellApplication {
+          inherit name;
+          runtimeInputs = [ nodejs pkgs.git pkgs.coreutils test ] ++ runtimeInputs;
+          runtimeEnv = env // {
+            PLAYWRIGHT_BROWSERS_PATH = "${engines}";
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+          };
+          # the specs import `@playwright/test`, which node resolves by walking up node_modules, never NODE_PATH
+          text = cdInto package + ''
 
           ${install " >&2"}
-          ln -sfn ${pkgs.playwright-test}/lib/node_modules ${lib.escapeShellArg config}/node_modules
+          ln -sfn ${test}/lib/node_modules ${lib.escapeShellArg config}/node_modules
           ${run}
         '';
+        };
       };
-    };
   }
