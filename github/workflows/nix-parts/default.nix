@@ -102,9 +102,10 @@ if nixpkgs != null && pkgs == null then {
   let
     utils = import ../../../utils;
 
-    # Generate load_nix workflow for a section if it has packages
+    # lean caches only what a job builds, and load_nix only fetches: there it saves nothing, and would only gate the jobs
+    prefetches = (import ../../cache.nix { inherit cache; }).leanDir == null;
     makeLoadNixWorkflow = installConfig:
-      import ./shared/load_nix.nix { packages = installConfig.packages or [ ]; inherit cache; };
+      if prefetches then import ./shared/load_nix.nix { packages = installConfig.packages or [ ]; inherit cache; } else null;
 
     # Generate install steps for jobs (just cache restore, actual install done by load_nix)
     makeInstallSteps = installConfig: import ./shared/install.nix {
@@ -222,7 +223,7 @@ if nixpkgs != null && pkgs == null then {
 
         existingNeeds = valueWithWrappedRuns.needs or null;
         newNeeds =
-          if needsNix then
+          if needsNix && prefetches then
             if existingNeeds == null then "load_nix"
             else if builtins.isList existingNeeds then [ "load_nix" ] ++ existingNeeds
             else [ "load_nix" existingNeeds ]

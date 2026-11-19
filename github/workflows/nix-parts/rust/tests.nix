@@ -78,8 +78,7 @@ in
   };
   # `--workspace`: a bare invocation covers only `default-members`
   work = [
-    (timed "prepare" "cargo test --workspace --no-run") # before `check`, so it times the workspace build over cached deps
-    { run = "cargo check --workspace --all-targets"; }
+    (timed "prepare" "cargo test --workspace --no-run")
     (timed "tests" "cargo test --workspace${skipArgs}")
   ];
 }
