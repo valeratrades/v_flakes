@@ -98,12 +98,14 @@ assert (modeCount <= 1) || throw
     assert hasLean;
     let
       prefix = "nix-lean-${scope}-\${{ runner.os }}-";
-      key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ github.run_id }}";
+      # not per run: each save is a new entry of the whole closure, which evicts every other cache from the 10 GB budget.
+      # A non-nix input changing (a script a particle wraps) only rebuilds that trivial derivation.
+      key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ hashFiles('**/*.nix') }}";
       onDefault = "always() && github.ref_name == github.event.repository.default_branch"; # every ref reads the default branch's
     in
     {
-      restore = { name = "Restore lean nix cache"; uses = "actions/cache/restore@v5"; "with" = { path = leanDir; inherit key; restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}"; }; };
-      save = [ (leanPrune // { "if" = onDefault; }) { name = "Save lean nix cache"; "if" = onDefault; uses = "actions/cache/save@v5"; "with" = { path = leanDir; inherit key; }; } ];
+      restore = { id = "lean-restore"; name = "Restore lean nix cache"; uses = "actions/cache/restore@v5"; "with" = { path = leanDir; inherit key; restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}"; }; };
+      save = let ifMiss = "${onDefault} && steps.lean-restore.outputs.cache-hit != 'true'"; in [ (leanPrune // { "if" = ifMiss; }) { name = "Save lean nix cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { path = leanDir; inherit key; }; } ];
     };
   # the flake inputs' tarball cache, which `nix run .#flake` otherwise unpacks anew
   evalCache =

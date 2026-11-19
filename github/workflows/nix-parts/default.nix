@@ -213,7 +213,7 @@ if nixpkgs != null && pkgs == null then {
             if builtins.substring 0 4 step.run == "nix " then step
             else if builtins.substring 0 9 step.run == "nix-shell" then step
             else if builtins.substring 0 5 step.run == "echo " then step
-            else step // { run = "nix-shell -p ${pkgList} --command \"${ldLibPathSetup}${escapeForNixShell step.run}\""; }
+            else step // { run = "nix-shell -p ${pkgList} --command \"set -e; ${ldLibPathSetup}${escapeForNixShell step.run}\""; }
           else step;
         valueWithWrappedRuns =
           if needsNix then
