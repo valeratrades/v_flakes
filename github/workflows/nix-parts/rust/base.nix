@@ -10,6 +10,9 @@
     # the devshell exports kache as RUSTC_WRAPPER unless one is set; its store isn't kept on runners.
     # Only the Errors/Warnings workflows inherit this env.
     RUSTC_WRAPPER = "";
+    # test binaries a fraction the size, to link and to cache; a CI backtrace names no lines
+    CARGO_PROFILE_DEV_DEBUG = "0";
+    CARGO_PROFILE_DEV_STRIP = "debuginfo";
   };
 }
 

@@ -43,8 +43,14 @@ in
   rust-tests = { skipPatterns ? [ ] }:
     let skipArgs = lib.optionalString (skipPatterns != [ ]) (" -- " + lib.concatMapStringsSep " " (p: "--skip ${p}") skipPatterns); in
     {
-      prepare = cargo "rust-tests-prepare" [ ] "cargo test --workspace --no-run";
-      program = cargo "rust-tests" [ ] "cargo test --workspace${skipArgs}";
+      prepare = cargo "rust-tests-prepare" [ pkgs.cargo-nextest ] "cargo nextest run --workspace --no-run";
+      # nextest runs the test binaries side by side, and no doctests; `cargo test --doc` refuses a workspace without a library
+      program = cargo "rust-tests" [ pkgs.cargo-nextest pkgs.jq ] ''
+        cargo nextest run --workspace --no-tests=warn${skipArgs}
+        if cargo metadata --no-deps --format-version 1 | jq -e '[.packages[].targets[].kind[]] | any(. == "lib" or . == "proc-macro")' > /dev/null; then
+          cargo test --workspace --doc${skipArgs}
+        fi
+      '';
       ciCache = rs.ciCache;
       badges = { build = "prepare_seconds"; test = "seconds"; };
       release = if lastSupportedVersion == null then null else rustCi (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion skipArgs; });
@@ -52,18 +58,22 @@ in
 
   rust-doc = { package ? null }:
     {
-      # cargo-docs-rs isn't in nixpkgs: `cargo doc` per documented member, as its `[package.metadata.docs.rs]` asks docs.rs (`--cfg docsrs` for rustdoc only)
+      # cargo-docs-rs isn't in nixpkgs: `cargo doc` of the documented members, as their `[package.metadata.docs.rs]` asks docs.rs (`--cfg docsrs`
+      # for rustdoc only); one invocation per set of whole-invocation flags, so rustdoc runs the members of each side by side
       program = cargo "rust-doc" [ pkgs.jq ] ''
         cargo metadata --no-deps --format-version 1 | jq -r --arg only ${lib.escapeShellArg (if package == null then "" else package)} '
-          .packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | select($only == "" or .name == $only)
-          | (.metadata.docs.rs // {}) as $d
-          | [.name,
-             ([if $d["all-features"] then "--all-features" else empty end, if $d["no-default-features"] then "--no-default-features" else empty end]
-               + (if ($d.features // []) != [] then ["--features", ($d.features | join(","))] else [] end) | join(" ")),
-             (($d["rustdoc-args"] // []) | join(" "))]
-          | @tsv' | while IFS=$'\t' read -r p flags rustdoc; do
-          # shellcheck disable=SC2086 # flags are cargo's words
-          RUSTDOCFLAGS="-Dwarnings --cfg docsrs $rustdoc" cargo doc --no-deps -p "$p" $flags
+          [ .packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | select($only == "" or .name == $only)
+            | (.metadata.docs.rs // {}) as $d
+            | { name, all: ($d["all-features"] // false), bare: ($d["no-default-features"] // false),
+                features: [($d.features // [])[] as $f | "\(.name)/\($f)"], rustdoc: (($d["rustdoc-args"] // []) | join(" ")) } ]
+          | group_by([.all, .bare, .rustdoc])[]
+          | [ (map("-p " + .name) | join(" ")),
+              ([if .[0].all then "--all-features" else empty end, if .[0].bare then "--no-default-features" else empty end]
+                + (map(.features[]) | if . == [] then [] else ["--features", join(",")] end) | join(" ")),
+              .[0].rustdoc ]
+          | join("\u001f")' | while IFS=$'\x1f' read -r packages flags rustdoc; do # not a tab: whitespace in IFS folds an empty field away
+          # shellcheck disable=SC2086 # packages and flags are cargo's words
+          RUSTDOCFLAGS="-Dwarnings --cfg docsrs $rustdoc" cargo doc --no-deps $packages $flags
         done
       '';
       ciCache = rs.ciCache;
