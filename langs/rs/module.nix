@@ -375,8 +375,9 @@ if nixpkgs != null && pkgs == null then {
             mkdir -p "$_vf_shim" && ln -sfn "$_vf_kache" "$_vf_shim/cargo" && : > "$_vf_shim/.kache-shims"
           fi
           export PATH="$_vf_shim:$PATH" # last, so the hook's own `cargo -Zscript` runs skip it
-          # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store
-          _vf_local=$(printf '[build]\nrustc-wrapper = "%s"\n\n[env]\nKACHE_CACHE_EXECUTABLES = "false"' "$_vf_kache")
+          # own bins and test binaries change on every edit: 9% reuse, yet each miss copies ~80 MB into the store.
+          # Workspace crates keep -C incremental: kache strips it to store them, so every edit was a whole-crate compile
+          _vf_local=$(printf '[build]\nrustc-wrapper = "%s"\n\n[env]\nKACHE_CACHE_EXECUTABLES = "false"\nKACHE_PRESERVE_INCREMENTAL = "true"' "$_vf_kache")
           unset _vf_shim
         else
           _vf_local=$(printf '[build]\nrustc-wrapper = "%s"' "$(command -v sccache)")
