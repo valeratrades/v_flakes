@@ -6,7 +6,7 @@
 #
 # `cache` selects at most one mechanism:
 #   unset / { lean = true; } → cache ONLY paths built locally (i.e. NOT on cache.nixos.org).
-#                             A post-build-hook copies each freshly-built path (not its closure) into a
+#                             A post-build-hook copies each freshly-built path into a
 #                             file:// binary cache; actions/cache persists just that
 #                             (your own outputs; a toolchain valeratrades.cachix lacks). Everything
 #                             substitutable is re-fetched from cache.nixos.org or valeratrades.cachix — faster than
@@ -48,31 +48,38 @@ let
   leanSetupStep = {
     name = "Lean cache setup";
     shell = "bash";
-    # post-build-hook fires per locally-built derivation with $OUT_PATHS — copy those
-    # (and only those; substitutable paths are never "built") into the file cache.
+    # post-build-hook fires per locally-built derivation with $OUT_PATHS: copied with their closure, as a binary cache takes no path
+    # without its references, and listed in `built`, for a scoped cache to keep them alone.
     # `|| true`: a cache-copy hiccup must never fail a release build.
     run = ''
       mkdir -p ${leanDir}
       chmod 0777 ${leanDir}
-      printf '#!/bin/sh\nexport PATH=/nix/var/nix/profiles/default/bin:$PATH\nnix copy --no-recursive --to "file://${leanDir}?compression=zstd&parallel-compression=true" $OUT_PATHS || true\n' > ${leanHook}
+      printf '#!/bin/sh\nexport PATH=/nix/var/nix/profiles/default/bin:$PATH\necho $OUT_PATHS >> ${leanDir}/built\nnix copy --to "file://${leanDir}?compression=zstd&parallel-compression=true" $OUT_PATHS || true\n' > ${leanHook}
       chmod 0755 ${leanHook}
     '';
   };
   leanPrune = {
     name = "Prune lean nix cache to what this run used";
     shell = "bash";
-    # substitution is lazy: a restored path this run never needed isn't valid in the store
+    # what was built, and what of it this run needed (substitution is lazy: a restored path never asked for isn't valid); a narinfo's
+    # references are fetched from the other substituters, as a cache read doesn't need its closure
     run = ''
       cd ${leanDir}
       shopt -s nullglob
       narinfos=(*.narinfo)
       ((''${#narinfos[@]})) || exit 0
-      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+      [ -e built ] || : > built
+      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | sort -u > /tmp/lean-all
+      tr -s ' ' '\n' < built | sed '/^$/d' | sort -u | comm -12 - /tmp/lean-all > /tmp/lean-built
+      xargs -r nix-store --check-validity --print-invalid < /tmp/lean-built | sort -u | comm -23 /tmp/lean-built - > /tmp/lean-keep
+      comm -23 /tmp/lean-all /tmp/lean-keep | while read -r p; do
         n=$(basename "$p") && n=''${n%%-*}.narinfo
         echo "$n" && sed -n 's/^URL: //p' "$n"
       done | sudo xargs -r rm -f
+      sudo rm -f built && cp /tmp/lean-keep built
     '';
   };
+
 in
 assert (modeCount <= 1) || throw
   "v_flakes cache: set at most one of `cache.nix-action = true`, `cache.lean = true`, or `cache.cachix = \"<name>\"` (unset = lean)";
