@@ -61,16 +61,13 @@ let
   leanPrune = {
     name = "Prune lean nix cache to what this run used";
     shell = "bash";
-    # substitution is lazy: a restored path this run never needed isn't valid in the store; one `upstream` has needs no copy here
+    # substitution is lazy: a restored path this run never needed isn't valid in the store
     run = ''
       cd ${leanDir}
       shopt -s nullglob
       narinfos=(*.narinfo)
       ((''${#narinfos[@]})) || exit 0
-      paths=$(sed -n 's/^StorePath: //p' "''${narinfos[@]}")
-      { xargs nix-store --check-validity --print-invalid <<< "$paths"
-        sed 's|^/nix/store/\([a-z0-9]*\)-.*|-o /dev/null ${upstream}/\1.narinfo|' <<< "$paths" | xargs curl -s --parallel -w '%{http_code} %{url}\n' | sed -n 's|^200 .*/\(.*\)\.narinfo$|/nix/store/\1|p'
-      } | while read -r p; do
+      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
         n=$(basename "$p") && n=''${n%%-*}.narinfo
         echo "$n" && sed -n 's/^URL: //p' "$n"
       done | sudo xargs -r rm -f
@@ -104,7 +101,7 @@ assert (modeCount <= 1) || throw
   scopedCache = scope:
     assert hasLean;
     let
-      prefix = "nix-lean-${scope}-\${{ runner.os }}-";
+      prefix = "nix-lean2-${scope}-\${{ runner.os }}-"; # 2: entries from before `upstream` carried the toolchains
       # not per run: each save is a new entry of the whole closure, which evicts every other cache from the 10 GB budget.
       # A non-nix input changing (a script a particle wraps) only rebuilds that trivial derivation.
       key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ hashFiles('**/*.nix') }}";
