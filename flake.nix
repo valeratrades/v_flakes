@@ -85,7 +85,7 @@
           utils = import ./utils;
           files = import ./files;
 
-          rsModule = (import ./langs/rs) { inherit pkgs rust; cargoRoot = "cli"; };
+          rsModule = (import ./langs/rs) { inherit pkgs rust; cargoRoot = "cli"; pinDeps = true; };
           github = (import ./github) {
             inherit pkgs pname;
             rs = rsModule;
