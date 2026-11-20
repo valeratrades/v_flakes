@@ -42,6 +42,7 @@ let
   # (root) and writes here; actions/cache (runner user) reads it back — a 0777 dir plus
   # nix's world-readable cache files bridge the uid gap. require-sigs=false since we don't
   # sign this ephemeral local cache.
+  upstream = "https://valeratrades.cachix.org";
   leanDir = "/tmp/nix-lean-cache";
   leanHook = "/tmp/nix-lean-pbh.sh";
   leanSetupStep = {
@@ -60,13 +61,16 @@ let
   leanPrune = {
     name = "Prune lean nix cache to what this run used";
     shell = "bash";
-    # substitution is lazy: a restored path this run never needed isn't valid in the store
+    # substitution is lazy: a restored path this run never needed isn't valid in the store; one `upstream` has needs no copy here
     run = ''
       cd ${leanDir}
       shopt -s nullglob
       narinfos=(*.narinfo)
       ((''${#narinfos[@]})) || exit 0
-      sed -n 's/^StorePath: //p' "''${narinfos[@]}" | xargs nix-store --check-validity --print-invalid | while read -r p; do
+      paths=$(sed -n 's/^StorePath: //p' "''${narinfos[@]}")
+      { xargs nix-store --check-validity --print-invalid <<< "$paths"
+        xargs -P 16 -I{} sh -c 'h=$(basename {}); curl -sfo /dev/null ${upstream}/''${h%%-*}.narinfo && echo {}; true' <<< "$paths"
+      } | while read -r p; do
         n=$(basename "$p") && n=''${n%%-*}.narinfo
         echo "$n" && sed -n 's/^URL: //p' "$n"
       done | sudo xargs -r rm -f
@@ -79,14 +83,17 @@ assert (modeCount <= 1) || throw
   installStep = {
     name = "Install Nix";
     uses = "DeterminateSystems/nix-installer-action@main";
-    "with".extra-conf =
-      if hasLean then ''
-        lazy-trees = true
-        post-build-hook = ${leanHook}
-        extra-substituters = file://${leanDir}
-        extra-trusted-substituters = file://${leanDir}
-        require-sigs = false
-      '' else "lazy-trees = true";
+    # valeratrades.cachix: the canonical toolchains, which are built (assembled from rust-overlay's components) rather than on
+    # cache.nixos.org, so lean would otherwise carry one per particle
+    "with".extra-conf = ''
+      lazy-trees = true
+      extra-substituters = ${upstream}${if hasLean then " file://${leanDir}" else ""}
+      extra-trusted-public-keys = valeratrades.cachix.org-1:gXVwhzO5YB+BaiEJYT48qZgzdaErGQew6xtZcz4Fo1Q=
+    '' + (if hasLean then ''
+      post-build-hook = ${leanHook}
+      extra-trusted-substituters = file://${leanDir}
+      require-sigs = false
+    '' else "");
   };
 
   setupSteps = if hasLean then [ leanSetupStep ] else [ ];
