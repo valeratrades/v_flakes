@@ -13,7 +13,7 @@
 , sortDerives ? { }
 , lints ? true
 , tracey ? true
-, # write pins/Cargo.toml's requirements into the workspace's manifests
+, # write pins/Cargo.toml's requirements into the workspace's manifests; `{ exclude = [ <crate> ]; }` leaves those to the repo
   pinDeps ? false
 , style ? { }
 , # build.rs options
@@ -68,7 +68,7 @@ if nixpkgs != null && pkgs == null then {
       sortDerives = {}; # Extend .sort-derives.toml (default: qualified_last, see langs/rs/files/sort_derives.nix)
       lints = true;     # `false` disables Cargo.toml [lints.rust]/[lints.cargo] (or [workspace.lints.*]) management. Pass an attrset to extend [lints.rust] defaults (default: { unused_features = "allow"; stable_features = "allow"; }). Use per-key `.replace`/`.augment`/`.exclude` modifiers from utils/core.nix. Also fills `[lints.clippy]` with `integer_division` + `if_not_else` = "warn", only where the manifest doesn't set that key.
       tracey = true;     # Enable tracey spec coverage (default: true)
-      pinDeps = false;   # Rewrite the requirement of every registry dep named in v_flakes' pins/Cargo.toml to the pinned one, in the root and every member manifest; features, inherited, path and git deps untouched (default: false)
+      pinDeps = false;   # Rewrite the requirement of every registry dep named in v_flakes' pins/Cargo.toml to the pinned one, in the root and every member manifest; features, inherited, path and git deps untouched. `{ exclude = [ "jiff" ]; }` pins all but the named crates, each of which must be pinned (default: false)
       cargoRoot = ".";   # Dir holding the Cargo root, relative to the repo root (default: "."). Same meaning as nixpkgs buildRustPackage.cargoRoot
       style = {
         format = true;   # Auto-fix style issues in pre-commit (default: true)
@@ -228,11 +228,17 @@ if nixpkgs != null && pkgs == null then {
         fi
       '' else "";
 
-    pinsKey = "${./cargo-pins.rs} ${../../pins/Cargo.toml}";
+    pinExclude =
+      if builtins.isAttrs pinDeps then
+        assert builtins.attrNames pinDeps == [ "exclude" ] || throw "rs.pinDeps: an attrset takes only `exclude`";
+        pinDeps.exclude
+      else [ ];
+    pinArgs = pkgs.lib.escapeShellArgs (builtins.concatMap (n: [ "--exclude" n ]) pinExclude);
+    pinsKey = "${./cargo-pins.rs} ${../../pins/Cargo.toml} ${pinArgs}";
     pinsHook =
-      if pinDeps then ''
+      if pinDeps != false then ''
         if [ -f ${manifest} ] && { [ ! -e .git ] || ! _vf_fresh cargo-pins "${pinsKey}" $(git ls-files -- '*Cargo.toml'); }; then
-          cargo -Zscript -q ${./cargo-pins.rs} ${manifest} ${../../pins/Cargo.toml} && { [ ! -e .git ] || _vf_stamp cargo-pins "${pinsKey}" $(git ls-files -- '*Cargo.toml'); }
+          cargo -Zscript -q ${./cargo-pins.rs} ${manifest} ${../../pins/Cargo.toml} ${pinArgs} && { [ ! -e .git ] || _vf_stamp cargo-pins "${pinsKey}" $(git ls-files -- '*Cargo.toml'); }
         fi
       '' else "";
 

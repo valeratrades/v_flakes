@@ -58,7 +58,7 @@ struct Run {
 }
 
 /// Shell entry's pin pass over a two-crate workspace.
-fn pin(root: &str, member: &str, pins: &str) -> Result<Run, String> {
+fn pin(root: &str, member: &str, pins: &str, exclude: &[&str]) -> Result<Run, String> {
 	let dir = std::env::temp_dir().join(format!("vf_cargo_pins_{}_{:?}", std::process::id(), std::thread::current().id()));
 	let _ = std::fs::remove_dir_all(&dir); // a previous run's leftovers, absent normally
 	for (path, content) in [
@@ -77,6 +77,7 @@ fn pin(root: &str, member: &str, pins: &str) -> Result<Run, String> {
 		.args(["-Zscript", "-q", SCRIPT])
 		.arg(dir.join("Cargo.toml"))
 		.arg(dir.join("pins.toml"))
+		.args(exclude.iter().flat_map(|n| ["--exclude", n]))
 		.output()
 		.unwrap();
 	let read = |p: &str| std::fs::read_to_string(Path::new(&dir).join(p)).unwrap();
@@ -91,7 +92,7 @@ fn pin(root: &str, member: &str, pins: &str) -> Result<Run, String> {
 
 #[test]
 fn pins_registry_deps_only() {
-	let run = pin(ROOT, MEMBER, PINS).unwrap();
+	let run = pin(ROOT, MEMBER, PINS, &[]).unwrap();
 	assert_eq!(
 		run.root,
 		r#"
@@ -146,14 +147,30 @@ v_flakes pins: member/Cargo.toml insta 1 → 1.48.0
 
 #[test]
 fn second_pass_is_silent() {
-	let first = pin(ROOT, MEMBER, PINS).unwrap();
-	let second = pin(&first.root, &first.member, PINS).unwrap();
+	let first = pin(ROOT, MEMBER, PINS, &[]).unwrap();
+	let second = pin(&first.root, &first.member, PINS, &[]).unwrap();
 	assert_eq!((second.root, second.member, second.stderr.as_str()), (first.root, first.member, ""));
 }
 
 #[test]
 fn table_pin_is_rejected() {
 	let pins = "[workspace]\n\n[workspace.dependencies]\ntokio = { version = \"1\", features = [\"full\"] }\n";
-	let err = pin(ROOT, MEMBER, pins).unwrap_err();
+	let err = pin(ROOT, MEMBER, pins, &[]).unwrap_err();
 	assert!(err.contains("tokio"), "{err}");
+}
+
+#[test]
+fn excluded_crate_keeps_its_requirement() {
+	let run = pin(ROOT, MEMBER, PINS, &["tokio", "regex"]).unwrap();
+	assert!(run.root.contains("tokio = \"1\"\n"), "{}", run.root);
+	assert!(run.member.contains("version = \"1\"\nfeatures = [\"unicode\"]"), "{}", run.member);
+	assert!(run.member.contains("regex = \"1.5\""), "{}", run.member);
+	assert!(!run.stderr.contains("tokio"), "{}", run.stderr);
+	assert!(!run.stderr.contains("regex"), "{}", run.stderr);
+}
+
+#[test]
+fn excluding_an_unpinned_crate_is_rejected() {
+	let err = pin(ROOT, MEMBER, PINS, &["anyhow"]).unwrap_err();
+	assert!(err.contains("anyhow"), "{err}");
 }

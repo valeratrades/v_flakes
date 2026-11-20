@@ -79,7 +79,7 @@ Rust toolchain configuration (config templates in `files/`):
 - Integrates cargo-deny for dependency auditing
 - Configures tracey for spec coverage
 - Sets up codestyle linting
-- `pinDeps`: `cargo-pins.rs` sets the requirement of every registry dep that `pins/Cargo.toml` names, in the root and each member manifest. Versions only: features, and deps inherited or from path/git, stay with the consumer. Our own crates aren't pinned, as they release faster than v_flakes
+- `pinDeps`: `cargo-pins.rs` sets the requirement of every registry dep that `pins/Cargo.toml` names, in the root and each member manifest. Versions only: features, and deps inherited or from path/git, stay with the consumer. Our own crates aren't pinned, as they release faster than v_flakes. `pinDeps = { exclude = [ … ]; }` leaves the named crates to the repo; naming one `pins/Cargo.toml` doesn't pin fails the shell
 - `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
 
 ### Compile reuse across checkouts

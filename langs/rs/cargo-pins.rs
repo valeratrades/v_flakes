@@ -25,12 +25,15 @@ struct Cli {
 	cargo_path: PathBuf,
 	/// a manifest whose `[workspace.dependencies]` maps crate name to requirement
 	pins_path: PathBuf,
+	/// a pinned crate this repo keeps its own requirement for
+	#[arg(long)]
+	exclude: Vec<String>,
 }
 
 fn main() {
 	let args = Cli::parse();
 	let pins_doc: DocumentMut = std::fs::read_to_string(&args.pins_path).expect("reading pins").parse().expect("valid pins TOML");
-	let pins: BTreeMap<&str, &str> = pins_doc["workspace"]["dependencies"]
+	let mut pins: BTreeMap<&str, &str> = pins_doc["workspace"]["dependencies"]
 		.as_table_like()
 		.expect("pins: [workspace.dependencies] is a table")
 		.iter()
@@ -41,6 +44,9 @@ fn main() {
 			)
 		})
 		.collect();
+	for name in &args.exclude {
+		assert!(pins.remove(name.as_str()).is_some(), "pins: excluded `{name}` is not pinned");
+	}
 
 	let out = Command::new("cargo")
 		.args(["metadata", "--no-deps", "--format-version", "1", "--manifest-path"])
