@@ -307,8 +307,31 @@ if nixpkgs != null && pkgs == null then {
   in
   {
     cargoRoot = cargoRootNormalized;
-    # a particle's `ciCache`, for one that runs cargo in the repo's target dir
-    ciCache = { paths = [ (inRoot "target") "~/.cargo/registry/index" "~/.cargo/registry/cache" "~/.cargo/git/db" ]; hashFiles = [ (inRoot "Cargo.lock") ]; };
+    # a particle's `ciCache`, for one that runs cargo in the repo's target dir. A save rolls the restored entry forward, so it drops
+    # the units this run's cargo didn't look at: every build reads the fingerprint of each unit in its graph.
+    ciCache =
+      let target = inRoot "target"; in
+      {
+        paths = [ target "~/.cargo/registry/index" "~/.cargo/registry/cache" "~/.cargo/git/db" ];
+        hashFiles = [ (inRoot "Cargo.lock") ];
+        # under relatime a read updates atime only while it's older than mtime or ctime
+        stamp = "[ ! -d ${target} ] || find ${target} -type f -exec touch -a -d @1 {} +";
+        sweep = ''
+          [ -d ${target} ] || exit 0
+          probe=$(mktemp -p ${target}) && echo x > "$probe" && touch -a -d @1 "$probe" && cat "$probe" > /dev/null
+          [ "$(stat -c %X "$probe")" != 1 ] || { echo "::error::a read doesn't update atime here: the sweep can't tell the units this run used"; exit 1; }
+          rm "$probe"
+          used=0 dropped=0
+          for fp in ${target}/*/.fingerprint/*/ ${target}/*/*/.fingerprint/*/; do
+            [ -d "$fp" ] || continue
+            if [ -n "$(find "$fp" -type f -newerat @2 -print -quit)" ]; then used=$((used + 1)); continue; fi
+            unit=''${fp%/}; hash=''${unit##*-}; dir=''${unit%/.fingerprint/*}
+            rm -rf "$fp" "$dir"/build/*-"$hash" "$dir"/deps/*-"$hash" "$dir"/deps/*-"$hash".* "$dir"/examples/*-"$hash" "$dir"/examples/*-"$hash".*
+            dropped=$((dropped + 1))
+          done
+          echo "cargo units kept: $used, dropped: $dropped"
+        '';
+      };
     # a CI job's mkShell that builds and runs the code, never develops it: none of the dev tools nor the hook's generated files
     ciShell =
       let system = pkgs.stdenv.hostPlatform.system; in

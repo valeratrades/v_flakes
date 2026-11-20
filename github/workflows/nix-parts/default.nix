@@ -398,6 +398,10 @@ if nixpkgs != null && pkgs == null then {
         nixCi = import ../../cache.nix { inherit cache; };
         bespoke = builtins.filter (p: p.ci != null) particles;
         generic = builtins.filter (p: p.ci == null) particles;
+        # outside `jobs`: the report tallies every push's, and these are skipped on all but release tags
+        releaseJobs = builtins.listToAttrs (map
+          (p: { name = "${p.name}-release"; value = withInstall installConfig (p.release.job // { steps = p.release.job.steps ++ p.release.work; }); })
+          (builtins.filter (p: p.release != null) particles));
 
         bespokeJob = p: withInstall installConfig (p.ci.job // {
           outputs = (p.ci.job.outputs or { }) // { seconds = "\${{ steps.particle.outputs.seconds }}"; };
@@ -426,7 +430,8 @@ if nixpkgs != null && pkgs == null then {
             in
             {
               restore = { inherit id; name = "Restore particle's cache"; uses = "actions/cache/restore@v5"; "with" = { inherit path; key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") c.hashFiles}) }}"; restore-keys = prefix; }; };
-              save = [
+              stamp = lib.optional (c ? stamp) { name = "Stamp particle's cache"; "if" = ifMiss; shell = "bash"; run = c.stamp; };
+              save = lib.optional (c ? sweep) { name = "Sweep particle's cache"; "if" = ifMiss; shell = "bash"; run = c.sweep; } ++ [
                 { name = "Save particle's cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { inherit path; key = "\${{ steps.${id}.outputs.cache-primary-key }}"; }; }
                 {
                   name = "Drop particle's older caches";
@@ -451,6 +456,7 @@ if nixpkgs != null && pkgs == null then {
               ++ (if nixCi.leanDir != null then [ lean.restore ] else nixCi.cacheSteps)
               ++ [ nixCi.evalCache.restore ]
               ++ map (c: c.restore) caches
+              ++ lib.concatMap (c: c.stamp) caches
               ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
               ++ lib.concatMap (c: c.save) caches
               ++ [ nixCi.evalCache.save ]
@@ -460,10 +466,9 @@ if nixpkgs != null && pkgs == null then {
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke
             ++ map (p: { inherit (p) name; value = genericJob p; }) generic);
-        needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues jobs);
+        needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues (jobs // releaseJobs));
 
-        # a bespoke particle's `ci.badges`: gist key -> the job output holding its seconds
-        timed = lib.concatMap (p: lib.mapAttrsToList (key: output: { inherit key output; particle = p.name; }) (p.ci.badges or { })) bespoke;
+        timed = lib.concatMap (p: lib.mapAttrsToList (key: output: { inherit key output; particle = p.name; }) p.badges) particles;
         timedVar = t: "BADGE_${lib.toUpper t.key}";
 
         report = {
@@ -521,6 +526,7 @@ if nixpkgs != null && pkgs == null then {
         jobs = lib.optionalAttrs needsPreCi { inherit ((import files.rust-base).jobs) pre_ci; }
           // lib.optionalAttrs (bespoke != [ ]) (loadNixJob installConfig)
           // jobs
+          // releaseJobs
           // { inherit report; };
       };
 

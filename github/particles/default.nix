@@ -3,8 +3,8 @@
 #   "rust-tests" | { name = "rust-doc"; args.package = "x"; }   one of ./catalog.nix
 #   { name; program; prepare ? null; ci ? null; ciCache ? null; } a repo's own; `program` an executable derivation
 #   { name; builds = self.checks.${system}; }                    building derivations is the work
-# `prepare` sets up what `program` needs; its time is reported apart from `program`'s; `ciCache` is `{ paths; hashFiles; }`, or a
-# list of them, for the section's CI job to keep between runs.
+# `prepare` sets up what `program` needs; its time is reported apart from `program`'s; `ciCache` is `{ paths; hashFiles; stamp ? _; sweep ? _; }`,
+# or a list of them, for the section's CI job to keep between runs: `stamp` runs after the restore, `sweep` before a save, to drop what the run didn't use.
 { pkgs, catalogs, sections }:
 let
   lib = pkgs.lib;
@@ -36,7 +36,9 @@ let
       program = if s ? builds then builds s.name s.builds else p.program;
       prepare = p.prepare or null;
       ci = p.ci or null;
-      ciCache = lib.toList (p.ciCache or [ ]);
+      ciCache = map (c: assert lib.subtractLists [ "paths" "hashFiles" "stamp" "sweep" ] (builtins.attrNames c) == [ ] || throw "v_flakes.github: particle `${s.name}`'s ciCache has unknown keys"; c) (lib.toList (p.ciCache or [ ]));
+      badges = p.badges or { };
+      release = p.release or null;
     };
 
   bySection = builtins.mapAttrs (severity: map (resolve severity)) sections;

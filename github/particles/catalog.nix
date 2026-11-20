@@ -1,7 +1,8 @@
 # The particles v_flakes ships, by the name a `jobs.<section>` list gives them. Each is
-# `args: { program; ci ? null; }`; `ci` is a CI body for what the local program can't do there
-# (a toolchain matrix, pre_ci's path-dep rewriting, rust-cache): `{ job; work; post ? [ ]; timedIf ? null; badges ? { }; }`.
-{ pkgs, rust, rs, runtimeInputs, cargoRoot, webUnstable, lastSupportedVersion }:
+# `args: { program; prepare ? null; ci ? null; ciCache ? [ ]; badges ? { }; release ? null; }`; `ci` is a CI body for what the local
+# program can't do there (miri's toolchain): `{ job; work; post ? [ ]; timedIf ? null; }`; `release` one more, run on release tags only.
+# `badges`: gist key -> a job output of seconds, which the section's `report` job writes as that badge.
+{ pkgs, rust, rs, runtimeInputs, cargoRoot, lastSupportedVersion }:
 let
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
@@ -29,11 +30,7 @@ let
   inCargoRoot = job:
     if cargoRoot == "." then job
     else lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
-  # the jobs that `rm` `.cargo/config.toml`; the rest read the cfg from it
-  withWebCfg = job:
-    if webUnstable then lib.recursiveUpdate job { env.RUSTFLAGS = "--cfg web_sys_unstable_apis"; }
-    else job;
-  rustCi = { web ? false }: ci: ci // { job = inCargoRoot (if web then withWebCfg ci.job else ci.job); };
+  rustCi = ci: ci // { job = inCargoRoot ci.job; };
 
   machete = (import ../../langs/rs).machete system;
   sortDerives = (import ../../langs/rs).sort_derives system;
@@ -48,20 +45,12 @@ in
     {
       prepare = cargo "rust-tests-prepare" [ ] "cargo test --workspace --no-run";
       program = cargo "rust-tests" [ ] "cargo test --workspace${skipArgs}";
-      ci = rustCi { } (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion skipArgs; });
+      ciCache = rs.ciCache;
+      badges = { build = "prepare_seconds"; test = "seconds"; };
+      release = if lastSupportedVersion == null then null else rustCi (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion skipArgs; });
     };
 
   rust-doc = { package ? null }:
-    let
-      # `cargo docs-rs` refuses to guess a member, and errors on one with no lib target, which a workspace's binary crate is
-      cargoDocsCmd =
-        if package != null then "cargo docs-rs -p ${package}"
-        else ''
-          for p in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select([.targets[].kind[]] | any(. == "lib" or . == "proc-macro")) | .name'); do
-            cargo docs-rs -p "$p"
-          done
-        '';
-    in
     {
       # cargo-docs-rs isn't in nixpkgs: `cargo doc` per documented member, as its `[package.metadata.docs.rs]` asks docs.rs (`--cfg docsrs` for rustdoc only)
       program = cargo "rust-doc" [ pkgs.jq ] ''
@@ -77,21 +66,19 @@ in
           RUSTDOCFLAGS="-Dwarnings --cfg docsrs $rustdoc" cargo doc --no-deps -p "$p" $flags
         done
       '';
-      ci = rustCi { web = true; } (import (parts + "/rust/doc.nix") { inherit cargoDocsCmd; });
+      ciCache = rs.ciCache;
     };
 
-  rust-clippy = {}:
-    let cmd = "cargo clippy --workspace --all-targets -- -Dwarnings"; in
-    {
-      program = cargo "rust-clippy" [ ] cmd;
-      ci = rustCi { web = true; } (import (parts + "/rust/clippy.nix") { inherit cmd; });
-    };
+  rust-clippy = {}: {
+    program = cargo "rust-clippy" [ ] "cargo clippy --workspace --all-targets -- -Dwarnings";
+    ciCache = rs.ciCache;
+  };
 
   rust-miri = {}:
     let cmd = "cargo miri test --lib --bins"; in    # `--lib --bins` is what's needed in 99% of cases
     {
       program = cargo "rust-miri" [ ] "MIRIFLAGS=-Zmiri-strict-provenance ${cmd}";
-      ci = rustCi { } (import (parts + "/rust/miri.nix") { inherit cmd; });
+      ci = rustCi (import (parts + "/rust/miri.nix") { inherit cmd; });
     };
 
   # Not upstream's build: it can't see an orphan in `[workspace.dependencies]` (tools/machete.nix)

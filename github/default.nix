@@ -195,7 +195,7 @@ if nixpkgs != null && pkgs == null then {
 
     # A section's `install.packages` are nixpkgs attribute paths its CI jobs get; v_flakes' own particles get them locally too
     catalogFor = installConfig: import ./particles/catalog.nix {
-      inherit pkgs rust rs cargoRoot webUnstable lastSupportedVersion;
+      inherit pkgs rust rs cargoRoot lastSupportedVersion;
       runtimeInputs = map (n: pkgs.lib.getAttrFromPath (pkgs.lib.splitString "." n) pkgs) (installConfig.packages or [ ]);
     };
     particles = import ./particles {
