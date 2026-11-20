@@ -131,7 +131,6 @@ jobs:
           start=$(date +%s)
           cargo test --workspace --no-run
           if [ "$TIMED" = true ]; then echo "seconds=$(($(date +%s) - start))" >> "$GITHUB_OUTPUT"; fi
-      - run: cargo check --workspace --all-targets
       - env:
           TIMED: ${{ matrix.rust == 'nightly' }}
         id: tests
