@@ -69,7 +69,7 @@ let
       ((''${#narinfos[@]})) || exit 0
       paths=$(sed -n 's/^StorePath: //p' "''${narinfos[@]}")
       { xargs nix-store --check-validity --print-invalid <<< "$paths"
-        xargs -P 16 -I{} sh -c 'h=$(basename {}); curl -sfo /dev/null ${upstream}/''${h%%-*}.narinfo && echo {}; true' <<< "$paths"
+        sed 's|^/nix/store/\([a-z0-9]*\)-.*|-o /dev/null ${upstream}/\1.narinfo|' <<< "$paths" | xargs curl -s --parallel -w '%{http_code} %{url}\n' | sed -n 's|^200 .*/\(.*\)\.narinfo$|/nix/store/\1|p'
       } | while read -r p; do
         n=$(basename "$p") && n=''${n%%-*}.narinfo
         echo "$n" && sed -n 's/^URL: //p' "$n"
@@ -112,7 +112,18 @@ assert (modeCount <= 1) || throw
     in
     {
       restore = { id = "lean-restore"; name = "Restore lean nix cache"; uses = "actions/cache/restore@v5"; "with" = { path = leanDir; inherit key; restore-keys = "${prefix}\${{ hashFiles('flake.lock') }}-\n${prefix}"; }; };
-      save = let ifMiss = "${onDefault} && steps.lean-restore.outputs.cache-hit != 'true'"; in [ (leanPrune // { "if" = ifMiss; }) { name = "Save lean nix cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { path = leanDir; inherit key; }; } ];
+      # the job needs `actions: write` for the drop
+      save = let ifMiss = "${onDefault} && steps.lean-restore.outputs.cache-hit != 'true'"; in [
+        (leanPrune // { "if" = ifMiss; })
+        { name = "Save lean nix cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { path = leanDir; inherit key; }; }
+        {
+          name = "Drop older lean nix caches";
+          "if" = ifMiss;
+          env = { GH_TOKEN = "\${{ github.token }}"; FAMILY = prefix; KEY = "\${{ steps.lean-restore.outputs.cache-primary-key }}"; };
+          # only once the new entry is listed: a save that found nothing saved nothing
+          run = ''gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"'';
+        }
+      ];
     };
   # the flake inputs' tarball cache, which `nix run .#flake` otherwise unpacks anew
   evalCache =

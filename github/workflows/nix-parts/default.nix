@@ -462,7 +462,7 @@ if nixpkgs != null && pkgs == null then {
               ++ lib.concatMap (c: c.save) caches
               ++ [ nixCi.evalCache.save ]
               ++ lib.optionals (nixCi.leanDir != null) lean.save;
-          } // lib.optionalAttrs (caches != [ ]) { permissions = (import files.base).permissions // { actions = "write"; }; }; # dropping older caches
+          } // lib.optionalAttrs (caches != [ ] || nixCi.leanDir != null) { permissions = (import files.base).permissions // { actions = "write"; }; }; # dropping older caches
 
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke

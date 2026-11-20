@@ -197,7 +197,7 @@ jobs:
           ((${#narinfos[@]})) || exit 0
           paths=$(sed -n 's/^StorePath: //p' "${narinfos[@]}")
           { xargs nix-store --check-validity --print-invalid <<< "$paths"
-            xargs -P 16 -I{} sh -c 'h=$(basename {}); curl -sfo /dev/null https://valeratrades.cachix.org/${h%%-*}.narinfo && echo {}; true' <<< "$paths"
+            sed 's|^/nix/store/\([a-z0-9]*\)-.*|-o /dev/null https://valeratrades.cachix.org/\1.narinfo|' <<< "$paths" | xargs curl -s --parallel -w '%{http_code} %{url}\n' | sed -n 's|^200 .*/\(.*\)\.narinfo$|/nix/store/\1|p'
           } | while read -r p; do
             n=$(basename "$p") && n=${n%%-*}.narinfo
             echo "$n" && sed -n 's/^URL: //p' "$n"
@@ -209,6 +209,13 @@ jobs:
         with:
           key: nix-lean-particle-rust-tests-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}
           path: /tmp/nix-lean-cache
+      - env:
+          FAMILY: nix-lean-particle-rust-tests-${{ runner.os }}-
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ steps.lean-restore.outputs.cache-primary-key }}
+        if: always() && github.ref_name == github.event.repository.default_branch && steps.lean-restore.outputs.cache-hit != 'true'
+        name: Drop older lean nix caches
+        run: gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"
     timeout-minutes: 90
   rust-tests-release:
     defaults:
