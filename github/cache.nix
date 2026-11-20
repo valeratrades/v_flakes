@@ -6,10 +6,10 @@
 #
 # `cache` selects at most one mechanism:
 #   unset / { lean = true; } → cache ONLY paths built locally (i.e. NOT on cache.nixos.org).
-#                             A post-build-hook copies each freshly-built path into a
+#                             A post-build-hook copies each freshly-built path (not its closure) into a
 #                             file:// binary cache; actions/cache persists just that
-#                             (~1 GB: rust-overlay toolchain + your own outputs). Everything
-#                             substitutable is re-fetched from cache.nixos.org — faster than
+#                             (your own outputs; a toolchain valeratrades.cachix lacks). Everything
+#                             substitutable is re-fetched from cache.nixos.org or valeratrades.cachix — faster than
 #                             a GH-cache restore — and never counts against the 10 GB limit.
 #                             Private, free, no external service. The default because it is
 #                             the only mode that stays inside the budget on a nix-heavy
@@ -54,7 +54,7 @@ let
     run = ''
       mkdir -p ${leanDir}
       chmod 0777 ${leanDir}
-      printf '#!/bin/sh\nexport PATH=/nix/var/nix/profiles/default/bin:$PATH\nnix copy --to "file://${leanDir}?compression=zstd&parallel-compression=true" $OUT_PATHS || true\n' > ${leanHook}
+      printf '#!/bin/sh\nexport PATH=/nix/var/nix/profiles/default/bin:$PATH\nnix copy --no-recursive --to "file://${leanDir}?compression=zstd&parallel-compression=true" $OUT_PATHS || true\n' > ${leanHook}
       chmod 0755 ${leanHook}
     '';
   };
@@ -101,8 +101,8 @@ assert (modeCount <= 1) || throw
   scopedCache = scope:
     assert hasLean;
     let
-      prefix = "nix-lean2-${scope}-\${{ runner.os }}-"; # 2: entries from before `upstream` carried the toolchains
-      # not per run: each save is a new entry of the whole closure, which evicts every other cache from the 10 GB budget.
+      prefix = "nix-lean3-${scope}-\${{ runner.os }}-"; # 3: earlier entries held the built paths' whole closures
+      # not per run: each save is a new entry, which evicts other caches from the 10 GB budget.
       # A non-nix input changing (a script a particle wraps) only rebuilds that trivial derivation.
       key = "${prefix}\${{ hashFiles('flake.lock') }}-\${{ hashFiles('**/*.nix') }}";
       onDefault = "always() && github.ref_name == github.event.repository.default_branch"; # every ref reads the default branch's
