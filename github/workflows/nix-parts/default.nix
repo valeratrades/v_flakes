@@ -466,7 +466,8 @@ if nixpkgs != null && pkgs == null then {
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke
             ++ map (p: { inherit (p) name; value = genericJob p; }) generic);
-        needsPreCi = builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues (jobs // releaseJobs));
+        needingPreCi = js: builtins.any (j: builtins.elem "pre_ci" (lib.toList (j.needs or [ ]))) (builtins.attrValues js);
+        needsPreCi = needingPreCi (jobs // releaseJobs);
 
         timed = lib.concatMap (p: lib.mapAttrsToList (key: output: { inherit key output; particle = p.name; }) p.badges) particles;
         timedVar = t: "BADGE_${lib.toUpper t.key}";
@@ -523,7 +524,7 @@ if nixpkgs != null && pkgs == null then {
         "on" = makeOn hooks;
         permissions = (import files.base).permissions;
         env = (import files.rust-base).env;
-        jobs = lib.optionalAttrs needsPreCi { inherit ((import files.rust-base).jobs) pre_ci; }
+        jobs = lib.optionalAttrs needsPreCi { pre_ci = (import files.rust-base).jobs.pre_ci // lib.optionalAttrs (!needingPreCi jobs) { "if" = "startsWith(github.ref, 'refs/tags/v')"; }; }
           // lib.optionalAttrs (bespoke != [ ]) (loadNixJob installConfig)
           // jobs
           // releaseJobs
