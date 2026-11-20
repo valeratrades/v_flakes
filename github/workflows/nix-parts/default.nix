@@ -418,7 +418,8 @@ if nixpkgs != null && pkgs == null then {
 
         checkout = { uses = "actions/checkout@v5"; } // lib.optionalAttrs lfs { "with".lfs = true; };
         # Every ref reads the default branch's, so only it saves: after the run, failed or not, on a miss, then drops the entry it
-        # replaces (one per cache). flake.lock in the prefix: the toolchains come from it, and it bounds what a rolled-forward entry gathers.
+        # replaces (one per cache). flake.lock in the key: the toolchains come from it; in the prefix too unless a `sweep` bounds what a
+        # rolled-forward entry gathers, so a lock bump restores the last entry instead of starting empty.
         ciCaches = p: lib.imap0
           (i: c:
             let
@@ -429,7 +430,7 @@ if nixpkgs != null && pkgs == null then {
               ifMiss = "always() && github.ref_name == github.event.repository.default_branch && steps.${id}.outputs.cache-hit != 'true'";
             in
             {
-              restore = { inherit id; name = "Restore particle's cache"; uses = "actions/cache/restore@v5"; "with" = { inherit path; key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") c.hashFiles}) }}"; restore-keys = prefix; }; };
+              restore = { inherit id; name = "Restore particle's cache"; uses = "actions/cache/restore@v5"; "with" = { inherit path; key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") c.hashFiles}) }}"; restore-keys = if c ? sweep then family else prefix; }; };
               stamp = lib.optional (c ? stamp) { name = "Stamp particle's cache"; "if" = ifMiss; shell = "bash"; run = c.stamp; };
               save = lib.optional (c ? sweep) { name = "Sweep particle's cache"; "if" = ifMiss; shell = "bash"; run = c.sweep; } ++ [
                 { name = "Save particle's cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { inherit path; key = "\${{ steps.${id}.outputs.cache-primary-key }}"; }; }
