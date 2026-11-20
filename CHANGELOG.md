@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `rs { pinDeps = true; }`: shell entry writes the requirements in `pins/Cargo.toml` (one per crate, plain strings, bumpable with crates.nvim / `cargo upgrade`) into the root and member manifests, over each registry dep's `version`; features, comments and `workspace = true` / path / git deps are kept. Each rewritten entry prints a `v_flakes pins:` line. `Cargo.lock` is left to cargo. Default `false`.
+
 - `x86_64-freebsd` is in the re-exported `flake-utils.lib.eachDefaultSystem`, so consumers' devShells evaluate there (with `pre-commit-hooks.lib.x86_64-freebsd`). nixpkgs can't bootstrap GHC on FreeBSD, so `pre-commit` builds without its tests and `yq-go` without its man page there; the nightly has no cranelift and `qlty` is a stub that fails when run. cache.nixos.org builds nothing for FreeBSD: a first shell builds the stdenv from source. Linux and darwin derivations are unchanged.
 
 - `rs`: `rustc-wrapper` moved out of the committed `.cargo/config.toml` into `.cargo/local.toml`, which the shell writes, git excludes, and `config.toml` includes optionally. A clone built without the shell failed with "kache not found" on any machine without it. Where kache isn't installed and has no upstream release (FreeBSD), the wrapper is `sccache` if on PATH, else none. Consumer packages no longer need `RUSTC_WRAPPER = ""`.

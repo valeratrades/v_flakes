@@ -13,7 +13,7 @@ flake.nix (entry point)
     │
     ├── github/        (depends on: files/, git/)
     │
-    ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs; the skargo rev skills.yml runs)
+    ├── pins/          (standalone - nixpkgs / rust-overlay revs, asserted equal to flake inputs; the skargo rev skills.yml runs; `Cargo.toml`, the crate requirements of `rs { pinDeps }`)
     │
     ├── tools/         (self-pinned binaries: qlty, cargo-machete, cargo-diet, cargo-sort-derives, kache; depend on pins/)
     │
@@ -78,6 +78,7 @@ Rust toolchain configuration (config templates in `files/`):
 - Integrates cargo-deny for dependency auditing
 - Configures tracey for spec coverage
 - Sets up codestyle linting
+- `pinDeps`: `cargo-pins.rs` sets the requirement of every registry dep that `pins/Cargo.toml` names, in the root and each member manifest. Versions only: features, and deps inherited or from path/git, stay with the consumer. Our own crates aren't pinned, as they release faster than v_flakes
 - `.cargo/config.toml` is merged: `cargo-config-merge.rs` owns only the keys v_flakes generates, the rest of the file is kept; `cargo-patch.awk`, as a git clean filter registered in `info/attributes`, keeps local `[patch.*]` out of the index
 
 ### Compile reuse across checkouts
