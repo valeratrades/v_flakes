@@ -91,7 +91,7 @@ if nixpkgs != null && pkgs == null then {
     build.workspace: Map of directories to their build.rs module lists.
       Each directory gets its own build.rs with the specified modules.
       Available modules:
-        - "git_version": Embed GIT_HASH at compile time
+        - "git_version": Embed GIT_HASH in release builds, "dev" in the rest (which a commit then never rebuilds)
         - "log_directives": Embed LOG_DIRECTIVES from .cargo/log_directives
         - "deprecate": Deprecation enforcement (see below)
         - "api_docs": The handlers' `///` into OUT_DIR for ev_lib's `api_docs!()` (build-dependency
