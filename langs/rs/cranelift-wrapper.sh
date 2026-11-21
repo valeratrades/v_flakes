@@ -7,6 +7,7 @@ backends=("${bin%/bin/*}"/lib/rustlib/*/codegen-backends/librustc_codegen_cranel
 prev=
 for a in "$@"; do
 	case "$prev $a" in
+	*" --test") exec "$rustc" "$@" ;; # cranelift's catch_unwind never catches: catch_unwind/should_panic tests fail
 	"--target wasm32"* | " --target=wasm32"* | "-C opt-level="[1-3sz]* | " -Copt-level="[1-3sz]*) exec "$rustc" "$@" ;;
 	esac
 	prev=$a
