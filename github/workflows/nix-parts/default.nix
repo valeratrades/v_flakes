@@ -432,6 +432,7 @@ if nixpkgs != null && pkgs == null then {
             {
               restore = { inherit id; name = "Restore particle's cache"; uses = "actions/cache/restore@v5"; "with" = { inherit path; key = "${prefix}\${{ hashFiles(${lib.concatMapStringsSep ", " (f: "'${f}'") c.hashFiles}) }}"; restore-keys = if c ? sweep then family else prefix; }; };
               stamp = lib.optional (c ? stamp) { name = "Stamp particle's cache"; "if" = ifMiss; shell = "bash"; run = c.stamp; };
+              restored = lib.optional (c ? restored) { name = "Align the checkout with particle's cache"; "if" = "steps.${id}.outputs.cache-matched-key != ''"; shell = "bash"; run = c.restored; };
               save = lib.optional (c ? sweep) { name = "Sweep particle's cache"; "if" = ifMiss; shell = "bash"; run = c.sweep; } ++ [
                 { name = "Save particle's cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { inherit path; key = "\${{ steps.${id}.outputs.cache-primary-key }}"; }; }
                 {
@@ -457,7 +458,7 @@ if nixpkgs != null && pkgs == null then {
               ++ (if nixCi.leanDir != null then [ lean.restore ] else nixCi.cacheSteps)
               ++ [ nixCi.evalCache.restore ]
               ++ map (c: c.restore) caches
-              ++ lib.concatMap (c: c.stamp) caches
+              ++ lib.concatMap (c: c.restored ++ c.stamp) caches
               ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
               ++ lib.concatMap (c: c.save) caches
               ++ nixCi.evalCache.save

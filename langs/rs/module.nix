@@ -319,9 +319,23 @@ if nixpkgs != null && pkgs == null then {
       let target = inRoot "target"; in
       {
         paths = [ target "~/.cargo/registry/index" "~/.cargo/registry/cache" "~/.cargo/git/db" ];
-        hashFiles = [ (inRoot "Cargo.lock") ];
+        hashFiles = map inRoot [ "Cargo.lock" "**/Cargo.toml" "**/*.rs" ]; # a commit that touches the crates rolls the entry to it
         # under relatime a read updates atime only while it's older than mtime or ctime
         stamp = "[ ! -d ${target} ] || find ${target} -type f -exec touch -a -d @1 {} +";
+        # a checkout's every file is new, and a build script's `rerun-if-changed` reads mtimes (`checksum-freshness` covers sources
+        # alone): what the cached build's commit already had goes back to before that build
+        restored = ''
+          [ -f ${target}/.commit ] || exit 0
+          built=$(cat ${target}/.commit)
+          git fetch -q --depth=1 origin "$built" || { echo "::notice::$built, the cached build's commit, can't be fetched: every watched file reads as changed"; exit 0; }
+          find . -path ./.git -prune -o -path ${target} -prune -o -exec touch -h -d @1 {} +
+          git diff --no-renames --name-only "$built" HEAD | while read -r p; do
+            while [ "$p" != . ]; do
+              [ ! -e "$p" ] || touch -h "$p"
+              p=$(dirname "$p")
+            done
+          done
+        '';
         sweep = ''
           [ -d ${target} ] || exit 0
           probe=$(mktemp -p ${target}) && echo x > "$probe" && touch -a -d @1 "$probe" && cat "$probe" > /dev/null
@@ -336,6 +350,7 @@ if nixpkgs != null && pkgs == null then {
             dropped=$((dropped + 1))
           done
           echo "cargo units kept: $used, dropped: $dropped"
+          git rev-parse HEAD > ${target}/.commit
         '';
       };
     # a CI job's mkShell that builds and runs the code, never develops it: none of the dev tools nor the hook's generated files

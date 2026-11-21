@@ -50,8 +50,8 @@ github = v-utils.github {
   #   prepare  setup left out of `seconds`, timed and reported on its own as `prepare_seconds` (the js module's
   #            `npm ci` where node_modules is absent; rust-tests' warm `cargo nextest run --no-run`)
   #   ci       { job; work; post ? [ ]; timedIf ? null; }: its own CI job, for what CI needs that the local run doesn't (miri's toolchain)
-  #   ciCache  { paths; hashFiles; stamp ? _; sweep ? _; }, or a list of them (`rs.ciCache`: cargo's target and registry, swept to
-  #            the units the run read), the particle's job keeps between runs
+  #   ciCache  { paths; hashFiles; stamp ? _; sweep ? _; restored ? _; }, or a list of them (`rs.ciCache`: cargo's target and registry,
+  #            swept to the units the run read; `restored` runs after any restore), the particle's job keeps between runs
 
   labels = {
     enable = true;    # Auto-sync labels on every commit, from the pre-commit hook (default: true)

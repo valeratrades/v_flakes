@@ -151,7 +151,12 @@ assert (modeCount <= 1) || throw
           name = "Drop older nix eval caches";
           "if" = ifMiss;
           env = { GH_TOKEN = "\${{ github.token }}"; FAMILY = prefix; KEY = "\${{ steps.eval-cache.outputs.cache-primary-key }}"; };
-          run = ''gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"'';
+          # every job drops them at once: one another job deleted first is fine
+          run = ''
+            gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | while read -r id; do
+              gh cache delete -R "$GITHUB_REPOSITORY" "$id" || ! gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id -q '.[].id' | grep -qx "$id"
+            done
+          '';
         }
       ];
     };
