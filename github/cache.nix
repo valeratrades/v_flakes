@@ -129,14 +129,31 @@ assert (modeCount <= 1) || throw
         }
       ];
     };
-  # the flake inputs' tarball cache, which `nix run .#flake` otherwise unpacks anew
+  # the flake inputs' tarball cache, which `nix run .#flake` otherwise unpacks anew; the job needs `actions: write` for the drop
   evalCache =
     let
-      key = "nix-eval-\${{ runner.os }}-\${{ hashFiles('flake.lock') }}";
+      prefix = "nix-eval2-\${{ runner.os }}-"; # 2: earlier entries lacked what cache.nixos.org has
+      key = "${prefix}\${{ hashFiles('flake.lock') }}";
+      ifMiss = "always() && steps.eval-cache.outputs.cache-hit != 'true' && github.ref_name == github.event.repository.default_branch";
     in
     {
       restore = { id = "eval-cache"; name = "Restore nix eval cache"; uses = "actions/cache/restore@v5"; "with" = { path = "~/.cache/nix"; inherit key; }; };
-      save = { name = "Save nix eval cache"; "if" = "always() && steps.eval-cache.outputs.cache-hit != 'true' && github.ref_name == github.event.repository.default_branch"; uses = "actions/cache/save@v5"; "with" = { path = "~/.cache/nix"; inherit key; }; };
+      save = [
+        {
+          # an input cache.nixos.org has (nixpkgs) is substituted unless the tarball cache holds it, and substituting never puts
+          # it there: fetched into an empty store, substituters off, every input lands in it
+          name = "Fetch the flake's inputs into the tarball cache";
+          "if" = ifMiss;
+          run = ''nix flake archive --store "$RUNNER_TEMP/inputs" --option substitute false > /dev/null && chmod -R u+w "$RUNNER_TEMP/inputs" && rm -rf "$RUNNER_TEMP/inputs"'';
+        }
+        { name = "Save nix eval cache"; "if" = ifMiss; uses = "actions/cache/save@v5"; "with" = { path = "~/.cache/nix"; inherit key; }; }
+        {
+          name = "Drop older nix eval caches";
+          "if" = ifMiss;
+          env = { GH_TOKEN = "\${{ github.token }}"; FAMILY = prefix; KEY = "\${{ steps.eval-cache.outputs.cache-primary-key }}"; };
+          run = ''gh cache list -R "$GITHUB_REPOSITORY" -L 100 --key "$FAMILY" --json id,key -q 'if any(.[]; .key == $ENV.KEY) then .[] | select(.key != $ENV.KEY) | .id else empty end' | xargs -r -n1 gh cache delete -R "$GITHUB_REPOSITORY"'';
+        }
+      ];
     };
 
   cacheSteps =

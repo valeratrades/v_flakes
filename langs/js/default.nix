@@ -27,7 +27,8 @@ if pkgs == null then {
     `js.script <package> <script>`: another of a package's scripts as a particle (`frontend-lint-css` for `lint:css`).
     `js.playwright { name; package; config; env ? { }; run ? "exec playwright test -c <config> \"$@\""; runtimeInputs ? [ ]; browsers ? [ "chromium" ]; }`:
     a particle running playwright from nixpkgs (its browsers pinned with it) in `package`, `config`'s
-    `node_modules` linked to nixpkgs' `@playwright/test`. Its `program` serves as an app too.
+    `node_modules` linked to nixpkgs' `@playwright/test`. Its `program` serves as an app too. One run of it at a time per repo,
+    worktrees included (./exclusive.sh): the next waits, told which run it waits on; `-f`/`--force` kills the running one instead.
   '';
 } else
   let
@@ -125,7 +126,7 @@ if pkgs == null then {
         ciCache = ciCache package;
         program = pkgs.writeShellApplication {
           inherit name;
-          runtimeInputs = [ nodejs pkgs.git pkgs.coreutils test ] ++ runtimeInputs;
+          runtimeInputs = [ nodejs pkgs.git pkgs.coreutils test pkgs.util-linux pkgs.procps pkgs.findutils ] ++ runtimeInputs;
           runtimeEnv = env // {
             PLAYWRIGHT_BROWSERS_PATH = "${engines}";
             PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
@@ -135,7 +136,13 @@ if pkgs == null then {
 
           ${install " >&2"}
           ln -sfn ${test}/lib/node_modules ${lib.escapeShellArg config}/node_modules
-          ${run}
+          exclusive_name=${lib.escapeShellArg name}
+          ${builtins.readFile ./exclusive.sh}
+          ( ${run} ) <&0 &
+          exclusive_child=$!
+          exclusive_status=0
+          wait "$exclusive_child" || exclusive_status=$?
+          exit "$exclusive_status"
         '';
         };
       };

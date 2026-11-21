@@ -239,7 +239,7 @@ if nixpkgs != null && pkgs == null then {
         jobArgs = if builtins.isString jobSpec then { } else (jobSpec.args or { });
         args =
           if jobName == "loc-badge"
-          then { inherit gistId; } // jobArgs
+          then { inherit gistId; tokei = builtins.unsafeDiscardStringContext "${pkgs.tokei}"; } // jobArgs
           # installs nix itself rather than going through load_nix, so it needs the repo's cache mode
           else if jobName == "asset-gate"
           then { inherit cache; preCi = rustRepo; } // jobArgs
@@ -460,9 +460,10 @@ if nixpkgs != null && pkgs == null then {
               ++ lib.concatMap (c: c.stamp) caches
               ++ [{ id = "run"; run = "nix run .#test -- --severity ${severity} ${lib.escapeShellArg p.name}"; }]
               ++ lib.concatMap (c: c.save) caches
-              ++ [ nixCi.evalCache.save ]
+              ++ nixCi.evalCache.save
               ++ lib.optionals (nixCi.leanDir != null) lean.save;
-          } // lib.optionalAttrs (caches != [ ] || nixCi.leanDir != null) { permissions = (import files.base).permissions // { actions = "write"; }; }; # dropping older caches
+            permissions = (import files.base).permissions // { actions = "write"; }; # dropping older caches
+          };
 
         jobs = builtins.listToAttrs
           (map (p: { inherit (p) name; value = bespokeJob p; }) bespoke

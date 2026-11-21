@@ -12,15 +12,17 @@ let
     inherit name text;
     runtimeInputs = inputs ++ runtimeInputs ++ [ pkgs.gitMinimal ];
   };
-  # every rust particle runs in the cargo root, with the shell's toolchain and wrapper, and what CI's
+  # every rust particle runs in the cargo root, with the shell's compiler and wrapper, and what CI's
   # nix-shell gives every rust job (install.nix): a linker, pkg-config, openssl, the section's packages' .pc files
   pkgConfigPath = lib.concatMapStringsSep ":" (p: "${p.dev or p}/lib/pkgconfig") ([ pkgs.openssl ] ++ runtimeInputs);
-  cargo = name: inputs: text: assert rs != null || throw "v_flakes.github: `${name}` needs the `rs` module";
-    program name ([ rust pkgs.stdenv.cc pkgs.mold pkgs.pkg-config ] ++ rs.enabledPackages ++ inputs) ''
+  cargoWith = toolchain: name: inputs: text: assert rs != null || throw "v_flakes.github: `${name}` needs the `rs` module";
+    program name ([ toolchain pkgs.stdenv.cc pkgs.mold pkgs.pkg-config ] ++ rs.enabledPackages ++ inputs) ''
       export PKG_CONFIG_PATH="${pkgConfigPath}''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
       cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
       ${text}
     '';
+  # the canonical toolchain's compiler without its dev extras: cargo reuses what the shell's built, and CI fetches 0.8 GiB less
+  cargo = cargoWith (if rust.outPath == ((import ../../langs/rs).default_nightly system).outPath then import ../../langs/rs/check_nightly.nix system else rust);
   # one that reads the crate rather than building it: no toolchain
   crateTool = name: inputs: text: program name inputs ''
     cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
@@ -87,7 +89,7 @@ in
   rust-miri = {}:
     let cmd = "cargo miri test --lib --bins"; in    # `--lib --bins` is what's needed in 99% of cases
     {
-      program = cargo "rust-miri" [ ] "MIRIFLAGS=-Zmiri-strict-provenance ${cmd}";
+      program = cargoWith rust "rust-miri" [ ] "MIRIFLAGS=-Zmiri-strict-provenance ${cmd}";
       ci = rustCi (import (parts + "/rust/miri.nix") { inherit cmd; });
     };
 
