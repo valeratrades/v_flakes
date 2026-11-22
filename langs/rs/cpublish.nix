@@ -34,6 +34,12 @@ pkgs.writeShellApplication {
       fi
     fi
 
+    # diet's `.cargo/*` catches the shell's git-ignored `local.toml`, and cargo refuses to package an ignored file
+    if [ -e .cargo/local.toml ]; then
+      local_toml=$(mktemp)
+      mv .cargo/local.toml "$local_toml"
+      trap 'mv "$local_toml" .cargo/local.toml' EXIT
+    fi
     cargo release --no-confirm --execute "''${args[@]}"
     # nix consumers pin `?ref=release`, the same ref `cnix_release` maintains
     git push --force origin HEAD:refs/heads/release

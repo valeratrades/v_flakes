@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `cpublish`: `.cargo/local.toml` is moved aside while `cargo release` runs. diet's `.cargo/*` include caught it, and cargo refuses to publish a git-ignored file it packages.
+
 - `rs { pinDeps = true; }`: shell entry writes the requirements in `pins/Cargo.toml` (one per crate, plain strings, bumpable with crates.nvim / `cargo upgrade`) into the root and member manifests, over each registry dep's `version`; features, comments and `workspace = true` / path / git deps are kept. Each rewritten entry prints a `v_flakes pins:` line. `Cargo.lock` is left to cargo. `pinDeps = { exclude = [ "jiff" ]; }` leaves the named crates' requirements to the repo; naming a crate that isn't pinned fails. Default `false`.
 
 - `x86_64-freebsd` is in the re-exported `flake-utils.lib.eachDefaultSystem`, so consumers' devShells evaluate there (with `pre-commit-hooks.lib.x86_64-freebsd`). nixpkgs can't bootstrap GHC on FreeBSD, so `pre-commit` builds without its tests and `yq-go` without its man page there; the nightly has no cranelift and `qlty` is a stub that fails when run. cache.nixos.org builds nothing for FreeBSD: a first shell builds the stdenv from source. Linux and darwin derivations are unchanged.
