@@ -56,7 +56,9 @@ in
       '';
       ciCache = rs.ciCache;
       badges = { build = "prepare_seconds"; test = "seconds"; };
-      release = lib.optionalAttrs (oldestSupportedVersion != null) { oldest = onToolchain oldestSupportedVersion skipArgs; }
+      release = assert oldestSupportedVersion != null
+        || throw "v_flakes.github: `rust-tests` needs `oldestSupportedVersion`: the oldest toolchain the code builds on, as a nightly date (\"nightly-2026-06-29\") or a version (\"1.85\"). Its CI job \"Rust <it>\" tests on it, and readme-fw's msrv badge shows it: define it once and pass it to both. `newestSupportedNightly` is the optional other end";
+        { oldest = onToolchain oldestSupportedVersion skipArgs; }
         // lib.optionalAttrs (newestSupportedNightly != null) { newest = onToolchain newestSupportedNightly skipArgs; };
     };
 

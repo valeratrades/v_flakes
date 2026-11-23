@@ -1,7 +1,7 @@
 args@{ pkgs ? null
 , nixpkgs ? null
 , pname ? null
-, # the oldest Rust toolchain the code builds on (a nightly date or a version): required of a rust repo; its CI job (release tags) and the readme's msrv badge
+, # the oldest Rust toolchain the code builds on (a nightly date or a version): required by `rust-tests`; its CI job (release tags) and the readme's msrv badge
   oldestSupportedVersion ? null
 , # the newest nightly it is known to build on: its own CI job (release tags) and the readme's newest_nightly badge
   newestSupportedNightly ? null
@@ -331,8 +331,6 @@ if nixpkgs != null && pkgs == null then {
         (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} </dev/null >/dev/null 2>/dev/null 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &) # fd 3+: direnv waits on its env-dump pipe
       '' else "";
   in
-  assert !(enable && rust != null && oldestSupportedVersion == null)
-    || throw "v_flakes.github: a rust repo must set `oldestSupportedVersion`: the oldest toolchain the code builds on, as a nightly date (\"nightly-2026-06-29\") or a version (\"1.85\"). The CI job \"Rust <it>\" tests on it, and readme-fw's msrv badge shows it: define it once and pass it to both. `newestSupportedNightly` is the optional other end";
   assert newestSupportedNightly == null || builtins.substring 0 8 newestSupportedNightly == "nightly-"
     || throw "v_flakes.github: `newestSupportedNightly` is a nightly date (\"nightly-2026-06-29\"), got \"${newestSupportedNightly}\"";
   warnIfNeeded ({
