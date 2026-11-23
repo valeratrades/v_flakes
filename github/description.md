@@ -6,7 +6,9 @@ github = v-utils.github {
   enable = true;  # Enable CI workflows, pre-commit hooks, gitignore, label sync
   inherit pkgs pname rs;  # Pass language modules — langs is inferred automatically
   # inherit py tex;       # Pass any combination; langs = ["rs" "py" "tex"] inferred
-  lastSupportedVersion = "nightly-1.86";
+  # required of a rust repo: the oldest toolchain the code builds on (a nightly date or a version). CI job "Rust <it>" on release tags; define once, pass to readme-fw too
+  oldestSupportedVersion = "nightly-2026-06-29";
+  # newestSupportedNightly = "nightly-2026-09-01";  # optional: the newest nightly it is known to build on; its own CI job
   gitignore.extra = "_scripts/node_modules";  # Appended to generated .gitignore
   lfs = false;  # null (default): don't touch .gitattributes; false: explicitly opt out of LFS for known binary patterns; true: track them via LFS
 

@@ -38,7 +38,7 @@ if nixpkgs != null && pkgs == null then {
     version, so the shell and the package can never diverge:
     ```nix
     packages.default = pkgs.writeShellScriptBin pname "exec ''${pyEnv}/bin/python -m src \"$@\"";
-    github = v-utils.github { lastSupportedVersion = "python-''${py.python.pythonVersion}"; ... };
+    github = v-utils.github { inherit pkgs pname py; ... };
     ```
 
     The shellHook will:

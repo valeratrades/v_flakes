@@ -1,11 +1,11 @@
-# The tests on `lastSupportedVersion`'s toolchain, on release tags only: every other push runs rust-tests in the shell's own (catalog.nix).
-{ lastSupportedVersion, skipArgs }:
+# The tests on `version`'s toolchain, on release tags only: every other push runs rust-tests in the shell's own (catalog.nix).
+{ version, skipArgs }:
 let
-  nightly = builtins.substring 0 7 lastSupportedVersion == "nightly";
+  nightly = builtins.substring 0 7 version == "nightly";
 in
 {
   job = {
-    name = "Rust ${lastSupportedVersion}";
+    name = "Rust ${version}";
     needs = "pre_ci";
     "if" = "needs.pre_ci.outputs.continue && startsWith(github.ref, 'refs/tags/v')";
     runs-on = "ubuntu-latest";
@@ -14,7 +14,7 @@ in
       { uses = "actions/checkout@v5"; }
       {
         uses = "dtolnay/rust-toolchain@master";
-        "with".toolchain = lastSupportedVersion;
+        "with".toolchain = version;
       }
       {
         name = "Install mold";

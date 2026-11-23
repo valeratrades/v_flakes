@@ -1,7 +1,10 @@
 args@{ pkgs ? null
 , nixpkgs ? null
 , pname ? null
-, lastSupportedVersion ? null
+, # the oldest Rust toolchain the code builds on (a nightly date or a version): required of a rust repo; its CI job (release tags) and the readme's msrv badge
+  oldestSupportedVersion ? null
+, # the newest nightly it is known to build on: its own CI job (release tags) and the readme's newest_nightly badge
+  newestSupportedNightly ? null
 , jobs ? { }
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , langs ? null
@@ -58,7 +61,7 @@ args@{ pkgs ? null
 
 # Warn when enable-gated fields are explicitly passed but enable is false
 let
-  enableGatedFields = [ "lastSupportedVersion" "jobs" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "typ" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
+  enableGatedFields = [ "oldestSupportedVersion" "newestSupportedNightly" "jobs" "gitignore" "envrc" "lfs" "labels" "preCommit" "conventions" "release" "containerRelease" "npmRelease" "visualBaselines" "figma" "typ" "skills" "gitlabSync" "install" "traceyCheck" "style" "styleFormat" "styleAssert" "moduleFlags" "excludeDirs" "claude" ];
   presentGated = builtins.filter (f: args ? ${f}) enableGatedFields;
   warnIfNeeded = value:
     if (!enable && presentGated != [ ]) then
@@ -195,7 +198,7 @@ if nixpkgs != null && pkgs == null then {
 
     # A section's `install.packages` are nixpkgs attribute paths its CI jobs get; v_flakes' own particles get them locally too
     catalogFor = installConfig: import ./particles/catalog.nix {
-      inherit pkgs rust rs cargoRoot lastSupportedVersion;
+      inherit pkgs rust rs cargoRoot oldestSupportedVersion newestSupportedNightly;
       runtimeInputs = map (n: pkgs.lib.getAttrFromPath (pkgs.lib.splitString "." n) pkgs) (installConfig.packages or [ ]);
     };
     particles = import ./particles {
@@ -226,7 +229,7 @@ if nixpkgs != null && pkgs == null then {
       typstRelease = if typ == null then null else
         assert typ ? document || throw "v_flakes.github: `typ` is only taken for its document; set `main` on the typ module";
         { inherit (typ) html; };
-      inherit pname lastSupportedVersion jobsOther release containerRelease npmRelease visualBaselines gitlabSync cargoRoot webUnstable;
+      inherit pname jobsOther release containerRelease npmRelease visualBaselines gitlabSync cargoRoot webUnstable;
       figma = figmaChecked;
       lfs = lfs == true;
       skills = if skills == null then null else { skargo = "github:EV-Main/skills/${import ../pins/skargo.nix}"; } // skills;
@@ -328,6 +331,10 @@ if nixpkgs != null && pkgs == null then {
         (${git_ops}/bin/git_ops sync-conventions --version-key ${conventionsVersionKey} ${conventionsFileArgs} </dev/null >/dev/null 2>/dev/null 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &) # fd 3+: direnv waits on its env-dump pipe
       '' else "";
   in
+  assert !(enable && rust != null && oldestSupportedVersion == null)
+    || throw "v_flakes.github: a rust repo must set `oldestSupportedVersion`: the oldest toolchain the code builds on, as a nightly date (\"nightly-2026-06-29\") or a version (\"1.85\"). The CI job \"Rust <it>\" tests on it, and readme-fw's msrv badge shows it: define it once and pass it to both. `newestSupportedNightly` is the optional other end";
+  assert newestSupportedNightly == null || builtins.substring 0 8 newestSupportedNightly == "nightly-"
+    || throw "v_flakes.github: `newestSupportedNightly` is a nightly date (\"nightly-2026-06-29\"), got \"${newestSupportedNightly}\"";
   warnIfNeeded ({
     inherit workflows;
     inherit (workflows) errors warnings other;

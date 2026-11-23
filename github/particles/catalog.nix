@@ -1,8 +1,8 @@
 # The particles v_flakes ships, by the name a `jobs.<section>` list gives them. Each is
 # `args: { program; prepare ? null; ci ? null; ciCache ? [ ]; badges ? { }; release ? null; }`; `ci` is a CI body for what the local
-# program can't do there (miri's toolchain): `{ job; work; post ? [ ]; timedIf ? null; }`; `release` one more, run on release tags only.
+# program can't do there (miri's toolchain): `{ job; work; post ? [ ]; timedIf ? null; }`; `release` ones more, by suffix of the job id, run on release tags only.
 # `badges`: gist key -> a job output of seconds, which the section's `report` job writes as that badge.
-{ pkgs, rust, rs, runtimeInputs, cargoRoot, lastSupportedVersion }:
+{ pkgs, rust, rs, runtimeInputs, cargoRoot, oldestSupportedVersion, newestSupportedNightly }:
 let
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
@@ -33,6 +33,7 @@ let
     if cargoRoot == "." then job
     else lib.recursiveUpdate job { defaults.run.working-directory = cargoRoot; };
   rustCi = ci: ci // { job = inCargoRoot ci.job; };
+  onToolchain = version: skipArgs: rustCi (import (parts + "/rust/tests.nix") { inherit version skipArgs; });
 
   machete = (import ../../langs/rs).machete system;
   sortDerives = (import ../../langs/rs).sort_derives system;
@@ -55,7 +56,8 @@ in
       '';
       ciCache = rs.ciCache;
       badges = { build = "prepare_seconds"; test = "seconds"; };
-      release = if lastSupportedVersion == null then null else rustCi (import (parts + "/rust/tests.nix") { inherit lastSupportedVersion skipArgs; });
+      release = lib.optionalAttrs (oldestSupportedVersion != null) { oldest = onToolchain oldestSupportedVersion skipArgs; }
+        // lib.optionalAttrs (newestSupportedNightly != null) { newest = onToolchain newestSupportedNightly skipArgs; };
     };
 
   rust-doc = { package ? null }:

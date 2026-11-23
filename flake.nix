@@ -90,7 +90,7 @@
             inherit pkgs pname;
             rs = rsModule;
             enable = true;
-            lastSupportedVersion = "nightly-${(import ./langs/rs).nightly_version}";
+            oldestSupportedVersion = "nightly-${(import ./langs/rs).nightly_version}";
             jobs = {
               default = true;
               errors.hooks = { push.paths = [ "cli/src/**" ]; };
@@ -102,7 +102,6 @@
           readme = (import ./readme_fw) {
             inherit pkgs pname;
             rootDir = ./.;
-            lastSupportedVersion = null;
             defaults = true;
             badges = [ "ci" ];
           };

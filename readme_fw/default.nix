@@ -19,7 +19,8 @@ args@{ pkgs
 , rootDir
 , pname
 , badges
-, lastSupportedVersion
+, oldestSupportedVersion ? null # a rust repo with the msrv badge
+, newestSupportedNightly ? null # with the newest_nightly badge
 , defaults ? false
 , default ? defaults
 , licenses ? null
@@ -112,7 +113,8 @@ let
     inherit
       pkgs
       pname
-      lastSupportedVersion
+      oldestSupportedVersion
+      newestSupportedNightly
       rootDir
       gistId
       logo

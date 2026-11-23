@@ -1,7 +1,8 @@
 { pkgs
 , rootDir
 , pname
-, lastSupportedVersion
+, oldestSupportedVersion
+, newestSupportedNightly
 , gistId ? "b48e6f02c61942200e7d1e3eeabf9bcb"
 , logo ? ""
 , branch ? "main"
@@ -12,8 +13,15 @@ let
   # CI badges carry a sentinel that readme_fw's shellHook resolves from `origin`.
   repo = "@@REPO_SLUG@@";
   gistBadge = alt: key: ''![${alt}](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/valeratrades/${gistId}/raw/${pname}-${key}.json)'';
+  # `label-message`: a dash after the first is the message's own, which shields reads doubled
+  shield = v:
+    let m = builtins.match "([^-]*)-(.*)" v; in
+    if m == null then v else "${builtins.elemAt m 0}-${builtins.replaceStrings [ "-" ] [ "--" ] (builtins.elemAt m 1)}";
   badges = {
-    msrv = ''![Minimum Supported Rust Version](https://img.shields.io/badge/${lastSupportedVersion}+-ab6000.svg)'';
+    msrv = assert oldestSupportedVersion != null || throw "v_flakes.readme-fw: the msrv badge needs `oldestSupportedVersion`: the oldest toolchain the code builds on (the same value github gets)";
+      ''![Minimum Supported Rust Version](https://img.shields.io/badge/${shield oldestSupportedVersion}+-ab6000.svg)'';
+    newest_nightly = assert newestSupportedNightly != null || throw "v_flakes.readme-fw: the newest_nightly badge needs `newestSupportedNightly`";
+      ''![Newest Supported Nightly](https://img.shields.io/badge/${shield newestSupportedNightly}-ab6000.svg)'';
 
     crates_io = ''[<img alt="crates.io" src="https://img.shields.io/crates/v/${pname}.svg?color=fc8d62&logo=rust" height="20" style=flat-square>](https://crates.io/crates/${pname})'';
 

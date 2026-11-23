@@ -1,7 +1,6 @@
 args@{ pkgs ? null
 , nixpkgs ? null
 , pname ? null
-, lastSupportedVersion ? null
 , # resolved particles (github/particles), one workflow per section
   particlesErrors ? [ ]
 , particlesWarnings ? [ ]
@@ -399,9 +398,9 @@ if nixpkgs != null && pkgs == null then {
         bespoke = builtins.filter (p: p.ci != null) particles;
         generic = builtins.filter (p: p.ci == null) particles;
         # outside `jobs`: the report tallies every push's, and these are skipped on all but release tags
-        releaseJobs = builtins.listToAttrs (map
-          (p: { name = "${p.name}-release"; value = withInstall installConfig (p.release.job // { steps = p.release.job.steps ++ p.release.work; }); })
-          (builtins.filter (p: p.release != null) particles));
+        releaseJobs = builtins.listToAttrs (builtins.concatMap
+          (p: map (k: { name = "${p.name}-release-${k}"; value = withInstall installConfig (p.release.${k}.job // { steps = p.release.${k}.job.steps ++ p.release.${k}.work; }); }) (builtins.attrNames p.release))
+          particles);
 
         bespokeJob = p: withInstall installConfig (p.ci.job // {
           outputs = (p.ci.job.outputs or { }) // { seconds = "\${{ steps.particle.outputs.seconds }}"; };

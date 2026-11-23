@@ -38,7 +38,7 @@ let
       ci = p.ci or null;
       ciCache = map (c: assert lib.subtractLists [ "paths" "hashFiles" "stamp" "sweep" "restored" ] (builtins.attrNames c) == [ ] || throw "v_flakes.github: particle `${s.name}`'s ciCache has unknown keys"; c) (lib.toList (p.ciCache or [ ]));
       badges = p.badges or { };
-      release = p.release or null;
+      release = p.release or { };
     };
 
   bySection = builtins.mapAttrs (severity: map (resolve severity)) sections;

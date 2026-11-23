@@ -70,7 +70,7 @@ TODO
       readme = v-utils.readme-fw {
         inherit pkgs pname;
         rootDir = ./docs/.readme_assets/.;
-        lastSupportedVersion = "nightly-1.86";
+        oldestSupportedVersion = "nightly-2026-06-29";
         defaults = true;
         badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ];
       };
