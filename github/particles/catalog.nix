@@ -15,9 +15,12 @@ let
   # every rust particle runs in the cargo root, with the shell's compiler and wrapper, and what CI's
   # nix-shell gives every rust job (install.nix): a linker, pkg-config, openssl, the section's packages' .pc files
   pkgConfigPath = lib.concatMapStringsSep ":" (p: "${p.dev or p}/lib/pkgconfig") ([ pkgs.openssl ] ++ runtimeInputs);
+  # a crate linking by name alone (`#[link(name = "gbm")]`) asks no .pc file where it is
+  libraryPath = lib.makeLibraryPath runtimeInputs;
   cargoWith = toolchain: name: inputs: text: assert rs != null || throw "v_flakes.github: `${name}` needs the `rs` module";
     program name ([ toolchain pkgs.stdenv.cc pkgs.mold pkgs.pkg-config ] ++ rs.enabledPackages ++ inputs) ''
       export PKG_CONFIG_PATH="${pkgConfigPath}''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+      export LIBRARY_PATH="${libraryPath}''${LIBRARY_PATH:+:$LIBRARY_PATH}" LD_LIBRARY_PATH="${libraryPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       cd "$(git rev-parse --show-toplevel)/${cargoRoot}"
       ${text}
     '';
